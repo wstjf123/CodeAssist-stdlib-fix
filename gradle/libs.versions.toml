@@ -1,0 +1,96 @@
+[versions]
+kotlin = "2.4.0"
+coroutines = "1.10.2"
+junit = "5.11.4"
+jdt = "3.40.0"
+compose = "1.10.3"
+agp = "9.2.1"
+activityCompose = "1.13.0"
+androidxCore = "1.13.1"   # androidx.core — provides FileProvider for sharing app-private files
+androidxTestRunner = "1.6.2"      # androidx.test:runner — AndroidJUnitRunner for connectedAndroidTest
+androidxTestExtJunit = "1.2.1"    # androidx.test.ext:junit — JUnit4 + AndroidJUnit4 on device
+# Pure-Java Android build tools, invoked IN-PROCESS (no `java -jar`) so they run on ART when statically
+# linked into the app. On desktop they're test-only; :ide-android bundles them (see android-support).
+r8 = "8.13.19"        # com.android.tools.r8.D8 — the dexer
+apksig = "8.7.3"      # com.android.apksig.ApkSigner — APK v1/v2/v3 signing
+bundletool = "1.18.3" # com.android.tools.build.bundletool — builds the .aab (aligns with AGP 9.x's bundletool)
+guava = "32.0.1-jre"  # com.google.common.* — bundletool's collections (ImmutableList) at compile time
+asm = "9.7"           # org.ow2.asm — bytecode rewrite of System.exit for the in-process Java dex-run
+trove4j = "1.0.20200330"  # gnu.trove.* — IntelliJ-core dependency the Kotlin compiler needs but doesn't bundle
+desugarJdkLibs = "2.1.5"  # com.android.tools:desugar_jdk_libs — core-library desugaring (temporarily enabled)
+bouncycastle = "1.78.1"   # org.bouncycastle — in-process keystore creation (keypair + self-signed X.509) on ART (no keytool)
+
+[libraries]
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+jdt-core = { module = "org.eclipse.jdt:org.eclipse.jdt.core", version.ref = "jdt" }
+# ecj (the standalone Eclipse compiler) arrives transitively via jdt.core; named here so :ide-android
+# can resolve it on its own and feed it to the ART bytecode-relocation task (see RelocateTypesInJar).
+jdt-ecj = { module = "org.eclipse.jdt:ecj", version.ref = "jdt" }
+# org.eclipse.core.contenttype — JDT's public DOM/JavaCore path touches IContentTypeManager at class-load
+# time. It normally arrives transitively via org.eclipse.core.runtime, but :ide-android excludes that
+# (to swap in a StackWalker-relocated copy), which drops contenttype too. Name it here so :ide-android can
+# add it back explicitly. Version tracks what jdt.core 3.40.0 resolves transitively. See RelocateTypesInJar.
+eclipse-contenttype = { module = "org.eclipse.platform:org.eclipse.core.contenttype", version = "3.9.600" }
+# org.eclipse.core.jobs — the public DOM ASTParser constructor reads DefaultWorkingCopyOwner.PRIMARY, whose
+# enclosing IJavaElement/working-copy hierarchy reaches org.eclipse.core.runtime.jobs.ISchedulingRule at
+# class-load time. It normally arrives transitively via org.eclipse.core.runtime, which :ide-android excludes
+# (to swap in a StackWalker-relocated copy), dropping core.jobs too. ART links class hierarchies more eagerly
+# than HotSpot, so the missing ISchedulingRule is an uncatchable NoClassDefFoundError that kills editor
+# analysis + source indexing. Add it back explicitly; it is a plain jar (no StackWalker/Runtime$Version refs),
+# so dex as-is. Version tracks what jdt.core 3.40.0 resolves transitively.
+eclipse-jobs = { module = "org.eclipse.platform:org.eclipse.core.jobs", version = "3.15.400" }
+# lang-kotlin (editor-only Kotlin backend): the Kotlin frontend's PARSER only — a resolution-free
+# standalone PSI host (text -> KtFile). We discard all analysis/FIR and build our own symbols/inference/
+# completion on the neutral DOM. compiler-embeddable bundles intellij-core + the PSI/parser; metadata-jvm
+# is a small, compiler-free library that decodes Kotlin libraries' @Metadata to recover real Kotlin
+# signatures (extensions, properties, default args, nullability). Both track the Kotlin version.
+kotlin-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-compiler-embeddable", version.ref = "kotlin" }
+kotlin-metadata-jvm = { module = "org.jetbrains.kotlin:kotlin-metadata-jvm", version.ref = "kotlin" }
+# The Jetpack Compose kotlinc compiler plugin (ships with Kotlin since 2.0, so version.ref = `kotlin`).
+# Fed to the in-process K2JVMCompiler via `-Xplugin` when a module depends on the Compose runtime, so a real
+# @Composable build emits the plugin-transformed bytecode. Bundled as a lang-kotlin resource jar (for the
+# service descriptor + desktop class-load) AND dexed into :ide-android (so its registrar resolves on ART).
+kotlin-compose-compiler-plugin = { module = "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable", version.ref = "kotlin" }
+# The Kotlin standard library JAR, bundled as an :ide-android asset so the on-device K2JVMCompiler spike has
+# stdlib on its compile classpath (the dexed app classes aren't usable as a -classpath input). Tracks `kotlin`.
+kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
+# gnu.trove.* — IntelliJ-core (and thus the embedded Kotlin compiler) references it un-relocated but does
+# not bundle it; dexed into :ide-android so the on-device compiler resolves it.
+trove4j = { module = "org.jetbrains.intellij.deps:trove4j", version.ref = "trove4j" }
+# Compose Multiplatform runtime (JVM/desktop variant), used as a test-only compile classpath so the
+# KotlinJvmCompiler @Composable-transform test has the real `androidx.compose.runtime.*` to compile against.
+compose-runtime-desktop = { module = "org.jetbrains.compose.runtime:runtime-desktop", version.ref = "compose" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
+androidx-core = { module = "androidx.core:core", version.ref = "androidxCore" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTestRunner" }
+androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidxTestExtJunit" }
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+android-r8 = { module = "com.android.tools:r8", version.ref = "r8" }
+android-apksig = { module = "com.android.tools.build:apksig", version.ref = "apksig" }
+android-bundletool = { module = "com.android.tools.build:bundletool", version.ref = "bundletool" }
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
+desugar-jdk-libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugarJdkLibs" }
+desugar-jdk-libs-configuration = { module = "com.android.tools:desugar_jdk_libs_configuration", version.ref = "desugarJdkLibs" }
+ow2-asm = { module = "org.ow2.asm:asm", version.ref = "asm" }
+ow2-asm-tree = { module = "org.ow2.asm:asm-tree", version.ref = "asm" }
+ow2-asm-commons = { module = "org.ow2.asm:asm-commons", version.ref = "asm" } # ClassRemapper/Remapper — bridge reparent + type remap
+# Bouncy Castle: generate an RSA keypair + self-signed X.509 cert and write a PKCS12 keystore IN-PROCESS, so
+# users can create signing keystores on-device (ART has no `keytool`). compileOnly+test in :android-support,
+# bundled into the launchers (:ide-android, :ide-desktop). bcpkix pulls bcprov transitively.
+bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncycastle" }
+bouncycastle-prov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+compose = { id = "org.jetbrains.compose", version.ref = "compose" }
+android-application = { id = "com.android.application", version.ref = "agp" }
+# AGP 9's KMP library plugin: configures a Kotlin Multiplatform module's Android target inside `kotlin {}`.
+android-kmp-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }

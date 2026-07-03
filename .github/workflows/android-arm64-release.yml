@@ -1,0 +1,48 @@
+name: Android arm64 Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-arm64-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build release APK
+    runs-on: ubuntu-latest
+    env:
+      JAVA_VERSION: "17"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Disable Kotlin incremental compilation
+        run: |
+          mkdir -p ~/.gradle
+          echo "kotlin.incremental=false" >> ~/.gradle/gradle.properties
+
+      - name: Build arm64 release APK with debug signing
+        run: ./gradlew :ide-android:assembleRelease --console=plain --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeassist-arm64-release-debug-signed-apk
+          path: ide-android/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
