@@ -49,6 +49,7 @@ import dev.ide.lang.jdt.JdtSourceAnalyzer
 import dev.ide.lang.LanguageBackend
 import dev.ide.lang.LANGUAGE_BACKEND_EP
 import dev.ide.lang.kotlin.KotlinLanguageBackend
+import dev.ide.lang.kotlin.KotlinPerf
 import dev.ide.lang.kotlin.KotlinSourceAnalyzer
 import dev.ide.lang.kotlin.compile.BundledKotlinStdlib
 import dev.ide.lang.kotlin.compile.DefaultKotlinPluginLoader
@@ -393,6 +394,43 @@ class IdeServices private constructor(
         file.fileName?.toString()?.let { it.endsWith(".kt") || it.endsWith(".kts") } == true
 
     private val docVersion = AtomicLong(0)
+
+    private data class ComposePreviewAnalysisKey(
+        val moduleId: String,
+        val file: String,
+        val functionName: String,
+        val arity: Int,
+        val textHash: Int,
+        val textLength: Int,
+        val overlayHash: Int,
+    )
+
+    private data class ComposePreviewAnalysis(
+        val lowered: LoweredComposePreview?,
+        val diagnostics: List<String>,
+    )
+
+    private val composePreviewAnalysisLock = Any()
+    private val composePreviewAnalysisCache =
+        object : LinkedHashMap<ComposePreviewAnalysisKey, ComposePreviewAnalysis>(16, 0.75f, true) {
+            override fun removeEldestEntry(
+                eldest: MutableMap.MutableEntry<ComposePreviewAnalysisKey, ComposePreviewAnalysis>?,
+            ): Boolean = size > 16
+        }
+
+    private fun cachedComposePreviewAnalysis(
+        key: ComposePreviewAnalysisKey,
+        compute: () -> ComposePreviewAnalysis,
+    ): ComposePreviewAnalysis {
+        synchronized(composePreviewAnalysisLock) { composePreviewAnalysisCache[key]?.let { return it } }
+        val value = compute()
+        synchronized(composePreviewAnalysisLock) { composePreviewAnalysisCache[key] = value }
+        return value
+    }
+
+    private fun clearComposePreviewAnalysisCache() {
+        synchronized(composePreviewAnalysisLock) { composePreviewAnalysisCache.clear() }
+    }
 
     private val indexScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -1029,6 +1067,18 @@ class IdeServices private constructor(
         return out
     }
 
+    private fun kotlinOverlayHash(): Int {
+        var h = 1
+        for ((path, content) in openDocuments.entries.sortedBy { it.key.toString() }) {
+            val s = path.toString()
+            if (!s.endsWith(".kt") && !s.endsWith(".kts")) continue
+            h = 31 * h + s.hashCode()
+            h = 31 * h + content.length
+            h = 31 * h + content.hashCode()
+        }
+        return h
+    }
+
     private fun fqcnOf(path: Path, text: String): String? {
         val cls =
             path.fileName.toString().removeSuffix(".java").takeIf { it.isNotEmpty() } ?: return null
@@ -1367,6 +1417,7 @@ class IdeServices private constructor(
         // changes here (deps/SDK/facet/language-level edits) — so drop them to force a rebuild.
         repoCache.clear()
         customViewCache.clear()
+        clearComposePreviewAnalysisCache()
     }
 
     /**
@@ -1682,6 +1733,7 @@ class IdeServices private constructor(
     /** The `@Preview @Composable` functions in [file]'s live buffer [text] — the editor's preview targets. */
     fun composePreviews(file: Path, text: String): List<dev.ide.lang.kotlin.interp.PreviewInfo> {
         val module = moduleForEditableFile(file) ?: return emptyList()
+        updateDocument(file, text)
         val analyzer = analyzerFor(
             module, KotlinLanguageBackend.LANGUAGE_ID
         ) as? dev.ide.lang.kotlin.KotlinSourceAnalyzer ?: return emptyList()
@@ -1757,6 +1809,7 @@ class IdeServices private constructor(
     ): PreviewRunResult {
         val module =
             moduleForEditableFile(file) ?: return PreviewRunResult(false, "此文件没有对应模块")
+        updateDocument(file, text)
         val analyzer = analyzerFor(
             module, KotlinLanguageBackend.LANGUAGE_ID
         ) as? dev.ide.lang.kotlin.KotlinSourceAnalyzer ?: return PreviewRunResult(
@@ -1789,26 +1842,7 @@ class IdeServices private constructor(
     fun composePreviewDiagnostics(
         file: Path, text: String, functionName: String, arity: Int = 0
     ): List<String> = try {
-        val module = moduleForEditableFile(file) ?: return listOf("no module owns this file")
-        val analyzer = analyzerFor(
-            module, KotlinLanguageBackend.LANGUAGE_ID
-        ) as? dev.ide.lang.kotlin.KotlinSourceAnalyzer ?: return listOf("not a Kotlin file")
-        val vf = store.vfs.fileFor(file)
-        analyzer.incrementalParser.parseFull(
-            EditorDocument(
-                vf, docVersion.incrementAndGet(), text
-            )
-        )
-        if (analyzer.hasSyntaxErrors(vf)) return listOf("the file has syntax errors — fix them to preview")
-        val program = previewModelFor(module, vf, analyzer)?.program ?: emptyMap()
-        val entry = previewEntry(program, functionName, arity)
-            ?: return listOf("未找到 @Composable `$functionName`（lowered: ${program.keys.joinToString()}）")
-        entry.diagnostics.map { d ->
-            val snippet = text.substring(
-                d.source.start.coerceIn(0, text.length), d.source.end.coerceIn(0, text.length)
-            ).replace('\n', ' ').trim()
-            if (snippet.isBlank()) d.reason else "${d.reason}: \"$snippet\""
-        }
+        analyzeComposePreview(file, text, functionName, arity).diagnostics
             .ifEmpty { listOf("`$functionName` lowered with no diagnostics — it may render; if not, the failure is in the render path") }
     } catch (t: Throwable) {
         // NEVER return empty on a failure path — a bare "can't be interpreted" with no reason is useless.
@@ -1820,34 +1854,96 @@ class IdeServices private constructor(
      *  on-device render host calls this, then composes [LoweredComposePreview] via the interpreter. */
     fun lowerComposePreview(
         file: Path, text: String, functionName: String, arity: Int = 0
-    ): LoweredComposePreview? {
-        val module = moduleForEditableFile(file) ?: return null
+    ): LoweredComposePreview? = analyzeComposePreview(file, text, functionName, arity).lowered
+
+    private fun analyzeComposePreview(
+        file: Path, text: String, functionName: String, arity: Int,
+    ): ComposePreviewAnalysis {
+        val module = moduleForEditableFile(file) ?: return ComposePreviewAnalysis(null, listOf("no module owns this file"))
+        updateDocument(file, text)
         val analyzer = analyzerFor(
             module, KotlinLanguageBackend.LANGUAGE_ID
-        ) as? dev.ide.lang.kotlin.KotlinSourceAnalyzer ?: return null
+        ) as? dev.ide.lang.kotlin.KotlinSourceAnalyzer ?: return ComposePreviewAnalysis(null, listOf("not a Kotlin file"))
+        val key = ComposePreviewAnalysisKey(
+            module.id.value,
+            file.toAbsolutePath().normalize().toString(),
+            functionName,
+            arity,
+            text.hashCode(),
+            text.length,
+            kotlinOverlayHash(),
+        )
+        return cachedComposePreviewAnalysis(key) {
+            KotlinPerf.trace("kt.preview") {
+                analyzeComposePreviewUncached(file, text, functionName, arity, analyzer)
+            }
+        }
+    }
+
+    private fun analyzeComposePreviewUncached(
+        file: Path,
+        text: String,
+        functionName: String,
+        arity: Int,
+        analyzer: dev.ide.lang.kotlin.KotlinSourceAnalyzer,
+    ): ComposePreviewAnalysis {
         val vf = store.vfs.fileFor(file)
-        analyzer.incrementalParser.parseFull(EditorDocument(vf, docVersion.incrementAndGet(), text))
+        KotlinPerf.span("parse") {
+            analyzer.incrementalParser.parseFull(EditorDocument(vf, docVersion.incrementAndGet(), text))
+        }
         // A file with syntax errors mis-shapes declarations when parsed error-tolerantly — interpreting it
         // builds a garbage program that crashes the real Compose runtime in a phase nothing can catch. Don't
         // render it; the editor's diagnostics already flag the errors and the preview shows a "fix errors" state.
-        if (analyzer.hasSyntaxErrors(vf)) return null
+        if (analyzer.hasSyntaxErrors(vf)) {
+            return ComposePreviewAnalysis(null, listOf("the file has syntax errors — fix them to preview"))
+        }
         // Cross-file AND cross-module: the program + classes include every project-source type/top-level
         // function the preview transitively reaches in OTHER files — same module or a dependency module — so a
         // `data class`/helper declared elsewhere is constructible/callable rather than crashing the render with
         // a missing class.
-        val model = previewModelFor(module, vf, analyzer) ?: return null
+        val module = moduleForEditableFile(file) ?: return ComposePreviewAnalysis(null, listOf("no module owns this file"))
+        val model = KotlinPerf.span("model") { previewModelFor(module, vf, analyzer) }
+            ?: return ComposePreviewAnalysis(null, listOf("preview model could not be built"))
         val program = model.program
-        val entry =
-            previewEntry(program, functionName, arity)?.takeIf { it.isComplete } ?: return null
+        val entry = previewEntry(program, functionName, arity)
+            ?: return ComposePreviewAnalysis(
+                null,
+                listOf("未找到 @Composable `$functionName`（lowered: ${program.keys.joinToString()}）"),
+            )
+        if (!entry.isComplete) {
+            return ComposePreviewAnalysis(
+                null,
+                previewDiagnosticMessages(entry.diagnostics, text).ifEmpty { listOf("unsupported constructs") },
+            )
+        }
         // Every source type the preview can actually REACH must lower cleanly too (a malformed `data class` it
         // constructs would otherwise build wrong-typed instances). Scope the check to reachable types only — an
         // unrelated class in the same file (e.g. a `MainActivity` whose `onCreate` uses a construct the
         // interpreter doesn't model) is never instantiated by the preview, so it must not block rendering.
         val classes = model.classes
         val reachable = dev.ide.lang.kotlin.interp.reachableSourceClasses(entry, program, classes)
-        if (classes.any { it.fqn in reachable && !it.isComplete }) return null
-        val parameter = resolvePreviewParameter(analyzer, vf, functionName, arity, classes)
-        return LoweredComposePreview(entry, program, classes, parameter)
+        val brokenClass = classes.firstOrNull { it.fqn in reachable && !it.isComplete }
+        if (brokenClass != null) {
+            val reasons = (brokenClass.diagnostics + brokenClass.methods.values.flatMap { it.diagnostics })
+                .map { it.reason }
+                .distinct()
+            return ComposePreviewAnalysis(
+                null,
+                reasons.ifEmpty { listOf("Source class `${brokenClass.simpleName}` is not fully interpretable") },
+            )
+        }
+        val parameter = KotlinPerf.span("parameter") { resolvePreviewParameter(analyzer, vf, functionName, arity, classes) }
+        return ComposePreviewAnalysis(LoweredComposePreview(entry, program, classes, parameter), emptyList())
+    }
+
+    private fun previewDiagnosticMessages(
+        diagnostics: List<dev.ide.lang.kotlin.interp.LoweringDiagnostic>,
+        text: String,
+    ): List<String> = diagnostics.map { d ->
+        val start = d.source.start.coerceIn(0, text.length)
+        val end = d.source.end.coerceIn(start, text.length)
+        val snippet = text.substring(start, end).replace('\n', ' ').trim()
+        if (snippet.isBlank()) d.reason else "${d.reason}: \"$snippet\""
     }
 
     /** The lowered preview function for [functionName] at [arity] (a `@PreviewParameter` preview has arity > 0);

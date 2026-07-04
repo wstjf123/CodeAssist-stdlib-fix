@@ -203,9 +203,15 @@ class KotlinSourceAnalyzer(ctx: CompilationContext) : SourceAnalyzer, Disposable
     /** PSI→ResolvedTree lowering for the Compose-preview interpreter, with its own per-function memoization. */
     private val previewLowering by lazy { dev.ide.lang.kotlin.interp.KotlinPreviewLowering(service, ::reuseCachesFor) }
 
+    private fun previewParsed(file: VirtualFile): KotlinParsedFile? =
+        lastByFile[file.path]?.also {
+            refreshOverlay()
+            syncFocal(it)
+        }
+
     /** The `@Preview @Composable` functions in [file]'s last parse — the editor's preview targets. */
     fun composePreviews(file: VirtualFile): List<dev.ide.lang.kotlin.interp.PreviewInfo> =
-        lastByFile[file.path]?.let { previewLowering.previews(it) } ?: emptyList()
+        previewParsed(file)?.let { previewLowering.previews(it) } ?: emptyList()
 
     /** Whether [file]'s last parse contains syntax errors; a preview must not interpret such a file. See
      *  [dev.ide.lang.kotlin.interp.KotlinPreviewLowering.hasSyntaxErrors] for why. */
@@ -215,24 +221,24 @@ class KotlinSourceAnalyzer(ctx: CompilationContext) : SourceAnalyzer, Disposable
     /** Best-effort FQN of a `@PreviewParameter` provider named by [simpleName] in [file] (imports/same package)
      *  — so the renderer can load a library provider class reflectively when it isn't project source. */
     fun previewProviderFqn(file: VirtualFile, simpleName: String): String? =
-        lastByFile[file.path]?.let { previewLowering.typeFqn(it, simpleName) }
+        previewParsed(file)?.let { previewLowering.typeFqn(it, simpleName) }
 
     /** Lower every top-level function in [file] to a [dev.ide.lang.kotlin.interp.ResolvedFunction], keyed
      *  `"name/arity"` — the program the interpreter runs a preview against (same-file composables included). */
     fun lowerFile(file: VirtualFile): Map<String, dev.ide.lang.kotlin.interp.ResolvedFunction> =
-        lastByFile[file.path]?.let { previewLowering.program(it) } ?: emptyMap()
+        previewParsed(file)?.let { previewLowering.program(it) } ?: emptyMap()
 
     /** Lower every source class/object/enum in [file] to a [dev.ide.lang.kotlin.interp.ResolvedClass] — the
      *  project-source types a preview's program may construct or reference. */
     fun lowerFileClasses(file: VirtualFile): List<dev.ide.lang.kotlin.interp.ResolvedClass> =
-        lastByFile[file.path]?.let { previewLowering.classes(it) } ?: emptyList()
+        previewParsed(file)?.let { previewLowering.classes(it) } ?: emptyList()
 
     /** The cross-file-expanded preview program + classes for [file]: its own program/classes plus every
      *  project-source type/top-level function it transitively reaches in OTHER files (same module), so a
      *  preview that constructs a `data class` or calls a helper declared elsewhere still interprets. Null when
      *  [file] hasn't been parsed. See [dev.ide.lang.kotlin.interp.KotlinPreviewLowering.crossFileModel]. */
     fun lowerFileWithDeps(file: VirtualFile): dev.ide.lang.kotlin.interp.PreviewModel? =
-        lastByFile[file.path]?.let { previewLowering.crossFileModel(it) }
+        previewParsed(file)?.let { previewLowering.crossFileModel(it) }
 
     /** Cross-MODULE preview model for [file]: seed from [file]'s own lowering, then run the reachable-declaration
      *  expansion over the supplied [provider] (the host's cross-module dispatcher). Null when [file] isn't parsed.
@@ -242,22 +248,28 @@ class KotlinSourceAnalyzer(ctx: CompilationContext) : SourceAnalyzer, Disposable
     fun lowerFileWithDeps(
         file: VirtualFile, provider: dev.ide.lang.kotlin.interp.PreviewDeclProvider,
     ): dev.ide.lang.kotlin.interp.PreviewModel? =
-        lastByFile[file.path]?.let { previewLowering.expand(previewLowering.loweredEntryFile(it), provider) }
+        previewParsed(file)?.let { previewLowering.expand(previewLowering.loweredEntryFile(it), provider) }
 
     /** The source file declaring top-level type [fqn] within this module's source model (which spans its own +
      *  dependency-module sources), or null. The cross-module preview dispatcher uses this to LOCATE a reached
      *  declaration; the file is lowered by its owning module's analyzer via [loweredFile]. */
-    fun findDeclaringTypeFile(fqn: String): KotlinSymbolService.PreviewSourceFile? =
-        service.sourceFileDeclaringType(fqn)
+    fun findDeclaringTypeFile(fqn: String): KotlinSymbolService.PreviewSourceFile? {
+        refreshOverlay()
+        return service.sourceFileDeclaringType(fqn)
+    }
 
     /** The source files declaring a top-level function named [name] within this module's source model. */
-    fun findDeclaringFunctionFiles(name: String): List<KotlinSymbolService.PreviewSourceFile> =
-        service.sourceFilesDeclaringFunction(name)
+    fun findDeclaringFunctionFiles(name: String): List<KotlinSymbolService.PreviewSourceFile> {
+        refreshOverlay()
+        return service.sourceFilesDeclaringFunction(name)
+    }
 
     /** Lower a single source file (located via [findDeclaringTypeFile]/[findDeclaringFunctionFiles]) with THIS
      *  module's analyzer — so a dependency module's file resolves against ITS OWN classpath. */
-    fun loweredFile(pf: KotlinSymbolService.PreviewSourceFile): dev.ide.lang.kotlin.interp.PreviewFileModel? =
-        previewLowering.loweredFile(pf)
+    fun loweredFile(pf: KotlinSymbolService.PreviewSourceFile): dev.ide.lang.kotlin.interp.PreviewFileModel? {
+        refreshOverlay()
+        return previewLowering.loweredFile(pf)
+    }
 
     /** The incremental-analyze engine (runs the semantic checks with per-declaration caching). Holds the
      *  per-file analyze cache, so a single instance is kept for the analyzer's lifetime. */

@@ -52,7 +52,9 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
     override fun Preview(path: String, preview: UiComposePreview, text: String, dark: Boolean, onProblems: (List<PreviewIssue>) -> Unit, onBusy: (Boolean) -> Unit, modifier: Modifier) {
         val report by rememberUpdatedState(onProblems)
         val reportBusy by rememberUpdatedState(onBusy)
+        var useProjectLoader by remember(path) { mutableStateOf(false) }
         val state by produceState<PreviewState>(PreviewState.Loading, path, preview.functionName, preview.arity, text) {
+            value = PreviewState.Loading
             val lowered = runCatching { backend.lowerComposePreview(path, preview.functionName, preview.arity, text) }.getOrNull()
             value = if (lowered != null) PreviewState.Ready(lowered) else {
                 // Surface WHY it isn't interpretable (the unsupported constructs + offending source) instead of
@@ -64,22 +66,25 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
             }
         }
         // Dex the project's library closure once (off-thread, cached by dependency fingerprint) and dispatch
-        // library composables through it. Null while it builds / on failure → the renderer falls back to the
-        // IDE's bundled Compose, which still serves standard composables.
-        val loader by produceState<ClassLoader?>(null, path) {
-            value = runCatching {
-                backend.composePreviewLibs(path)?.let { withContext(Dispatchers.IO) { ComposeLibraryLoader.loaderFor(it) } }
-            }.getOrNull()
+        // library composables through it. This is intentionally lazy: a simple preview that only uses the IDE's
+        // bundled Compose should not D8-dex the whole project classpath just by opening the preview pane.
+        val loader by produceState<ClassLoader?>(null, path, useProjectLoader) {
+            value = null
+            if (useProjectLoader) {
+                value = runCatching {
+                    backend.composePreviewLibs(path)?.let { withContext(Dispatchers.IO) { ComposeLibraryLoader.loaderFor(it) } }
+                }.getOrNull()
+            }
         }
         val renderer = remember(loader) { ComposePreviewRenderer(loader) }
-        var renderError by remember(path, preview.variantId, text) { mutableStateOf<Throwable?>(null) }
-        var partialError by remember(path, preview.variantId, text) { mutableStateOf<Throwable?>(null) }
+        var renderError by remember(path, preview.variantId, text, useProjectLoader, loader) { mutableStateOf<Throwable?>(null) }
+        var partialError by remember(path, preview.variantId, text, useProjectLoader, loader) { mutableStateOf<Throwable?>(null) }
         // The interpreter re-runs on every recomposition pass, so a content lambda that fails deterministically
         // hands the renderer a FRESH Throwable each pass. Writing that to `partialError` (read during
         // composition) every pass would invalidate → re-run → invalidate … an unbounded recomposition loop.
         // Track the last error identity (type + message) and update state only when it actually changes — incl.
         // clearing to null. Keyed alongside `partialError` so both reset together on a new buffer.
-        val partialKey = remember(path, preview.variantId, text) { arrayOfNulls<String>(1) }
+        val partialKey = remember(path, preview.variantId, text, useProjectLoader, loader) { arrayOfNulls<String>(1) }
 
         // Tell the pane when the engine is busy lowering/interpreting the buffer (the Loading phase) vs. settled,
         // so its badge can show a loading state while a fresh edit is being caught up to.
@@ -126,13 +131,17 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
                         // fresh Throwable each pass, so keying on it would relaunch + rewrite state every
                         // recomposition → a render loop. Same message/type ⇒ same key ⇒ captured once.
                         val onErr: @Composable (Throwable) -> Unit = { error ->
-                            LaunchedEffect(error.message, error::class) { renderError = error }
+                            LaunchedEffect(error.message, error::class) {
+                                if (!useProjectLoader && error.mayNeedProjectLoader()) useProjectLoader = true
+                                renderError = error
+                            }
                             PreviewRenderError(error)
                         }
                         val onPartial: (Throwable?) -> Unit = { e ->
                             val key = e?.let { "${it::class.java.name}: ${it.message}" }
                             if (key != partialKey[0]) {
                                 partialKey[0] = key
+                                if (!useProjectLoader && e?.mayNeedProjectLoader() == true) useProjectLoader = true
                                 if (e != null) log.warn("Compose preview partial render", e)
                                 partialError = e
                             }
@@ -154,6 +163,14 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
         data class NotInterpretable(val reasons: List<String>) : PreviewState
     }
 }
+
+private fun Throwable.mayNeedProjectLoader(): Boolean =
+    generateSequence(this) { it.cause }.any { t ->
+        t is ClassNotFoundException ||
+            t is NoClassDefFoundError ||
+            t.message?.contains("cannot load class") == true ||
+            t.message?.contains("cannot load facade") == true
+    }
 
 /**
  * Render the lowered preview, expanding a `@PreviewParameter` into one stacked render per sample value (each in
