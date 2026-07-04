@@ -737,6 +737,18 @@ class KotlinTreeResolverTest {
         assertFalse(fn.isComplete)
     }
 
+    @Test
+    fun javaMappedCharSequenceOverloadLowers() {
+        // Mirrors `Toast#setText(Int)` / `Toast#setText(CharSequence)`: a source `CharSequence` argument must
+        // bind to the JVM `java.lang.CharSequence` parameter instead of leaving the side-effect statement
+        // Unsupported in preview gap-tolerant execution.
+        val fn = lower("package demo\nfun f(t: ToastLike, s: CharSequence) { t.setText(s)\n  t.show() }")
+        assertTrue(fn.isComplete, "CharSequence overload should lower completely; diags=${fn.diagnostics}")
+        val setText = assertIs<RNode.Call>(fn.stmts()[0])
+        assertEquals("setText", setText.callee.displayName)
+        assertIs<RNode.Call>(fn.stmts()[1], "following statement should still lower normally")
+    }
+
     companion object {
         val srcDir: Path = tempProject(
             mapOf(
@@ -795,6 +807,11 @@ class KotlinTreeResolverTest {
                     fun Banner(onClick: () -> Unit, label: String = "", content: () -> Unit) {}
                     fun String.getSize(): Int = length
                     fun Greeter.shout(volume: Int): String = ""
+                    class ToastLike {
+                        fun setText(value: Int) {}
+                        fun setText(value: java.lang.CharSequence) {}
+                        fun show() {}
+                    }
                 """.trimIndent(),
             ),
         )

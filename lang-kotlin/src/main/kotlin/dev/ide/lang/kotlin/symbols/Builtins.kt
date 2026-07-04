@@ -117,6 +117,9 @@ object Builtins {
     /** The Kotlin classifier a JVM type maps to (`java.lang.String` → `kotlin.String`), or null if unmapped. */
     fun kotlinTypeFor(javaFqn: String): String? = JAVA_TO_KOTLIN[javaFqn]
 
+    /** Canonical classifier for Kotlin/JVM mapped built-ins when comparing types for assignability. */
+    fun normalizeMappedType(fqn: String): String = JAVA_TO_KOTLIN[fqn] ?: fqn
+
     fun builtinSupertypes(fqn: String): List<String> = SUPERTYPES[fqn] ?: emptyList()
 
     /**

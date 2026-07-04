@@ -138,14 +138,17 @@ class KotlinType(
 ) : TypeRef {
 
     override fun isAssignableFrom(other: TypeRef): Boolean {
-        if (other.qualifiedName == qualifiedName) return true
-        if (qualifiedName == "kotlin.Any" || qualifiedName == "java.lang.Object") return true
+        val target = Builtins.normalizeMappedType(qualifiedName)
+        val source = Builtins.normalizeMappedType(other.qualifiedName)
+        if (source == target) return true
+        if (target == "kotlin.Any") return true
         val seen = HashSet<String>()
         val stack = ArrayDeque(other.supertypes())
         while (stack.isNotEmpty()) {
             val s = stack.removeLast()
-            if (!seen.add(s.qualifiedName)) continue
-            if (s.qualifiedName == qualifiedName) return true
+            val sf = Builtins.normalizeMappedType(s.qualifiedName)
+            if (!seen.add(sf)) continue
+            if (sf == target) return true
             stack.addAll(s.supertypes())
         }
         return false
