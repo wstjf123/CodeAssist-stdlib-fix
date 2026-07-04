@@ -109,6 +109,9 @@ class MavenDependencyResolverTest {
         // the AAR's res/ is exploded next to classes.jar, for the IDE's resource model
         val res = Path.of(art.classesRoot.path).parent.resolve("res/values/strings.xml")
         assertTrue(Files.isRegularFile(res), "AAR res/ should be extracted next to classes.jar: $res")
+        val proguard = Path.of(art.classesRoot.path).parent.resolve("proguard.txt")
+        assertTrue(Files.isRegularFile(proguard), "AAR consumer proguard rules should be extracted next to classes.jar: $proguard")
+        assertTrue("com.example.Kept" in Files.readAllBytes(proguard).toString(Charsets.UTF_8))
     }
 
     @Test
@@ -954,6 +957,9 @@ class MavenDependencyResolverTest {
             zos.putNextEntry(ZipEntry("AndroidManifest.xml")); zos.write("<manifest/>".toByteArray()); zos.closeEntry()
             zos.putNextEntry(ZipEntry("res/values/strings.xml"))
             zos.write("""<resources><string name="widget_label">W</string></resources>""".toByteArray())
+            zos.closeEntry()
+            zos.putNextEntry(ZipEntry("proguard.txt"))
+            zos.write("-keep class com.example.Kept { *; }\n".toByteArray())
             zos.closeEntry()
         }
         return out.toByteArray()

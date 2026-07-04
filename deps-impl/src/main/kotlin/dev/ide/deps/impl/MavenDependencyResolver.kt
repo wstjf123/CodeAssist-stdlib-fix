@@ -777,9 +777,10 @@ class MavenDependencyResolver(
 
     /**
      * Explode an `.aar` into the cache, returning its `classes.jar`. Alongside it, the AAR's `res/`,
-     * `assets/`, `jni/` and `AndroidManifest.xml` are unpacked into the same exploded dir — so a consumer
-     * (the IDE's resource model / Android build) can find a library's resources as a `res/` sibling of its
-     * `classes.jar` and its package name in the sibling manifest, with no further unzip at use time.
+     * `assets/`, `jni/`, `AndroidManifest.xml` and consumer `proguard.txt` are unpacked into the same exploded
+     * dir — so a consumer (the IDE's resource model / Android build) can find a library's resources as a
+     * `res/` sibling of its `classes.jar`, its package name in the sibling manifest, and its R8 rules without
+     * further unzip at use time.
      */
     /** The class root for a downloaded [artifact]: an AAR is exploded to its `classes.jar`; a jar is itself. */
     private fun classRootOf(kind: ArtifactKind, coord: Coordinate, artifact: Path): VirtualFile =
@@ -790,8 +791,10 @@ class MavenDependencyResolver(
         Files.createDirectories(dir)
         val classesJar = dir.resolve("classes.jar")
         val marker = dir.resolve(".extracted")
-        // Re-extract if a prior (pre-manifest) explosion left no manifest, so the package name is available.
-        if (Files.isRegularFile(marker) && Files.isRegularFile(dir.resolve("AndroidManifest.xml"))) {
+        // Re-extract if a prior explosion left no manifest/proguard metadata. The marker content versions the
+        // exploded layout so existing caches heal once after the resolver learns a new AAR sidecar.
+        if (Files.isRegularFile(marker) && Files.readAllBytes(marker).toString(Charsets.UTF_8) == EXPLODED_AAR_MARKER &&
+            Files.isRegularFile(dir.resolve("AndroidManifest.xml"))) {
             // Heal a classes.jar an older build left as a zero-entry zip (resource-only AAR): unusable on ART,
             // where ZipFile rejects an empty archive. Cheap (central-directory read) and only rewrites the bad ones.
             if (Files.isRegularFile(classesJar) && !isUsableJar(classesJar)) writeManifestOnlyJar(classesJar)
@@ -809,7 +812,7 @@ class MavenDependencyResolver(
                         foundClasses = true
                     }
                     !entry.isDirectory && (name.startsWith("res/") || name.startsWith("assets/") ||
-                        name.startsWith("jni/") || name == "AndroidManifest.xml") -> {
+                        name.startsWith("jni/") || name == "AndroidManifest.xml" || name == "proguard.txt") -> {
                         val target = dir.resolve(name).normalize()
                         if (target.startsWith(dir)) { // zip-slip guard
                             Files.createDirectories(target.parent)
@@ -823,7 +826,7 @@ class MavenDependencyResolver(
         }
         // resource-only AAR (no code) → a classes.jar with a single manifest entry (see [writeManifestOnlyJar]).
         if (!foundClasses) writeManifestOnlyJar(classesJar)
-        marker.writeText("")
+        marker.writeText(EXPLODED_AAR_MARKER)
         return classesJar
     }
 
@@ -849,6 +852,7 @@ class MavenDependencyResolver(
 
     private companion object {
         const val MAX_NODES = 4000
+        const val EXPLODED_AAR_MARKER = "v2:manifest+proguard"
 
         /** A `<version>X</version>` entry in `maven-metadata.xml`. */
         val METADATA_VERSION = Regex("<version>([^<]+)</version>")

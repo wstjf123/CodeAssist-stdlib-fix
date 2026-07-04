@@ -9,6 +9,8 @@ import dev.ide.model.Module
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.nio.file.StandardCopyOption
+import java.util.zip.ZipFile
 
 /** A dependency AAR's `aar-metadata.properties` (AGP's `minCompileSdk` etc.), tagged with a display [name]. */
 data class AarMetadataRef(val name: String, val propertiesFile: Path)
@@ -71,7 +73,7 @@ object AndroidLibraries {
             isExplodedAar(root) -> root.parent.let { dir ->
                 addAarParts(listOf(root), dirOrNull(dir, "res"), dirOrNull(dir, "assets"), dirOrNull(dir, "jni"),
                     dir.resolve("AndroidManifest.xml").takeIf { Files.isRegularFile(it) },
-                    dir.resolve("proguard.txt").takeIf { Files.isRegularFile(it) },
+                    proguardForExplodedAar(dir),
                     dir.resolve(AarMetadata.ENTRY_PATH).takeIf { Files.isRegularFile(it) },
                     dir.fileName?.toString() ?: root.toString())
             }
@@ -111,6 +113,29 @@ object AndroidLibraries {
     } == true
 
     private fun dirOrNull(parent: Path, name: String): Path? = parent.resolve(name).takeIf { Files.isDirectory(it) }
+
+    /**
+     * Maven AARs are usually represented in the model as `<artifact>-exploded/classes.jar`. Older resolver
+     * caches did not unpack root `proguard.txt`, so heal that layout from the sibling `<artifact>.aar` when
+     * present. This makes release/R8 builds pick up dependency consumer rules without requiring a manual
+     * dependency re-sync.
+     */
+    private fun proguardForExplodedAar(dir: Path): Path? {
+        val existing = dir.resolve("proguard.txt")
+        if (Files.isRegularFile(existing)) return existing
+        val base = dir.fileName?.toString()?.removeSuffix("-exploded") ?: return null
+        val aar = dir.parent?.resolve("$base.aar")?.takeIf { Files.isRegularFile(it) } ?: return null
+        return extractAarProguard(aar, existing)
+    }
+
+    private fun extractAarProguard(aar: Path, out: Path): Path? = runCatching {
+        ZipFile(aar.toFile()).use { zf ->
+            val entry = zf.getEntry("proguard.txt") ?: return@runCatching null
+            out.parent?.let(Files::createDirectories)
+            zf.getInputStream(entry).use { Files.copy(it, out, StandardCopyOption.REPLACE_EXISTING) }
+            out
+        }
+    }.getOrNull()
 
     /** The `package` attribute of an AAR's bundled `AndroidManifest.xml`, fed to aapt2 `--extra-packages`. */
     private fun manifestPackage(manifest: Path): String? = runCatching {
