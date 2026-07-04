@@ -14,6 +14,7 @@ import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Modifier
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.util.stream.Collectors
 
 /**
@@ -47,14 +48,24 @@ class DexClassLoaderRunner(private val cacheDir: File) : DexRunner {
             log("No dex to run."); return@withContext 1
         }
 
-        val madeReadOnlyDexes = dexes.map { path ->
-            val file = path.toFile()
+        // ART rejects dex files that are writable. Project builds live on emulated external storage, where
+        // clearing write bits is not reliable, so load from the app's private cache instead.
+        val loadDir = File(cacheDir, "dexrun-load").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        val loadDexes = dexes.map { path ->
+            val target = File(loadDir, path.fileName.toString())
+            Files.copy(path, target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            target
+        }
 
+        val madeReadOnlyDexes = loadDexes.map { file ->
             val madeReadOnly = runCatching {
                 file.setWritable(false, false)
             }.getOrDefault(false)
 
-            return@map file to madeReadOnly
+            return@map file to (madeReadOnly && !file.canWrite())
         }
 
         val hasErrors = madeReadOnlyDexes.any { !it.second }
@@ -65,7 +76,7 @@ class DexClassLoaderRunner(private val cacheDir: File) : DexRunner {
             return@withContext 1
         }
 
-        val dexPath = dexes.joinToString(File.pathSeparator) { it.toString() }
+        val dexPath = loadDexes.joinToString(File.pathSeparator) { it.absolutePath }
         val optimized = File(cacheDir, "dexrun-oat").apply { mkdirs() }
         val loader = try {
             dalvik.system.DexClassLoader(
