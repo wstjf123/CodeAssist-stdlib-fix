@@ -14,7 +14,10 @@ import dev.ide.interp.ComposableInvoker
  */
 class ComposeRuntime(private val dispatcher: ComposeDispatcher) : ComposableInvoker {
 
-    override fun invokeComposable(callSiteKey: Int, restartable: Boolean, args: List<Any?>, body: () -> Any?): Any? {
+    override fun invokeComposable(callSiteKey: Int, restartable: Boolean, args: List<Any?>, body: () -> Any?): Any? =
+        invokeComposable(callSiteKey, restartable, args, body, force = false)
+
+    private fun invokeComposable(callSiteKey: Int, restartable: Boolean, args: List<Any?>, body: () -> Any?, force: Boolean): Any? {
         val outer = dispatcher.composer ?: return body() // no composition in progress → just run it
         val group = ComposableAbi.startRestartGroup(outer, callSiteKey)
         dispatcher.composer = group
@@ -26,7 +29,7 @@ class ComposeRuntime(private val dispatcher: ComposeDispatcher) : ComposableInvo
             // runtime says this group may skip (i.e. it wasn't invalidated by its own state read). The arg
             // recording must happen every pass to keep slot positions stable, so it runs before the skip test.
             val argsChanged = if (restartable) ComposableAbi.argsChanged(group, args) else true
-            result = if (restartable && !argsChanged && ComposableAbi.isSkipping(group)) {
+            result = if (restartable && !force && !argsChanged && ComposableAbi.isSkipping(group)) {
                 ComposableAbi.skipToGroupEnd(group)
                 Unit // a skipped Unit composable contributes no value; its nodes are reused from last time
             } else {
@@ -44,9 +47,18 @@ class ComposeRuntime(private val dispatcher: ComposeDispatcher) : ComposableInvo
         }
         // On recomposition the runtime hands us a fresh composer; re-run the whole composable (it reopens its
         // own restart group and re-registers), exactly as the plugin's restart lambda re-invokes the function.
-        ComposableAbi.updateScope(scope) { recomposeComposer ->
+        ComposableAbi.updateScope(scope) { recomposeComposer, _ ->
+            val previous = dispatcher.composer
             dispatcher.composer = recomposeComposer
-            invokeComposable(callSiteKey, restartable, args, body)
+            try {
+                // This callback is this restart group's own invalidation path (for example, a MutableState read
+                // inside the group changed). The real compiler ORs in the "changed" bit before re-entering the
+                // function, so the body executes even when value parameters are unchanged. Parent-driven
+                // recomposition still reaches this function through the normal call path above and may skip.
+                invokeComposable(callSiteKey, restartable, args, body, force = true)
+            } finally {
+                dispatcher.composer = previous
+            }
         }
         return result
     }

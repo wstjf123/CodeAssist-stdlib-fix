@@ -522,10 +522,12 @@ object ComposableAbi {
 
     /** Register the recomposition block: when the scope is invalidated (a state it read changed), the real
      *  Recomposer calls [recompose] with a fresh composer. No-op if [scope] is null. */
-    fun updateScope(scope: Any?, recompose: (Any) -> Unit) {
+    fun updateScope(scope: Any?, recompose: (Any, Int) -> Unit) {
         if (scope == null) return
         // The runtime expects a `(Composer, Int) -> Unit`; a Kotlin lambda is a Function2 (generics erase).
-        val block: Function2<Any?, Any?, Unit> = { composer, _ -> composer?.let(recompose) }
+        val block: Function2<Any?, Any?, Unit> = { composer, changed ->
+            composer?.let { recompose(it, (changed as? Number)?.toInt() ?: 0) }
+        }
         scope.javaClass.methods.first { it.name == "updateScope" && it.parameterCount == 1 }.invoke(scope, block)
     }
 

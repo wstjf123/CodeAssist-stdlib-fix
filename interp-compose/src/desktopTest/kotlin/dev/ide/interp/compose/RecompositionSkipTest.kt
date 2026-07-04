@@ -152,6 +152,39 @@ class RecompositionSkipTest {
         }
     }
 
+    @Test
+    fun stateInsideRestartableChildFeedsUpdatedTextBackBeforeNextInput() {
+        val dispatcher = ComposeDispatcher()
+        val runtime = ComposeRuntime(dispatcher)
+        val child = rememberedTextFieldProgram("StatefulTextField")
+        val root = rootCallingStatefulChild()
+        val interpreter = Interpreter(functions = mapOf("StatefulTextField/0" to child), dispatcher = dispatcher, composableInvoker = runtime)
+
+        runInteractiveRecompositionTest(
+            content = {
+                dispatcher.composer = currentComposer
+                try {
+                    runtime.invokeComposable(rootKey + 3, restartable = false, args = emptyList()) {
+                        interpreter.call(root, emptyList())
+                    }
+                } finally {
+                    dispatcher.composer = null
+                }
+            },
+            interact = {
+                TextFieldCapture.onValueChange?.invoke("a") ?: error("text field callback was not captured")
+            },
+            settled = { TextFieldCapture.values.lastOrNull() == "a" },
+            afterSettled = {
+                TextFieldCapture.onValueChange?.invoke("ab") ?: error("text field callback was not captured after first input")
+            },
+            settledAgain = { TextFieldCapture.values.lastOrNull() == "ab" },
+        ) {
+            assertEquals(listOf("", "a", "ab"), TextFieldCapture.values, "state inside a child composable must update its text field")
+            assertEquals(1, TextFieldCapture.stateCreations, "the child composable's `remember` should keep one state delegate")
+        }
+    }
+
     /** `fun Root(s: MutableState) { s.value /* subscribe */; Child("x") }`. The state arrives as a param and is
      *  read with `ownerFqn = null` (an instance getter on the receiver), matching the proven device spike. */
     private fun rootReadingStateThenCallingChild(): ResolvedFunction {
@@ -195,7 +228,7 @@ class RecompositionSkipTest {
      * }
      * ```
      */
-    private fun rememberedTextFieldProgram(): ResolvedFunction {
+    private fun rememberedTextFieldProgram(name: String = "Editable"): ResolvedFunction {
         val delegateSlot = SlotId(0)
         val inputSlot = SlotId(1)
         val valueProperty = Binding.Property("value", "androidx.compose.runtime.MutableState", backingField = false)
@@ -245,9 +278,18 @@ class RecompositionSkipTest {
             callSiteKey = CallSiteKey(203), source = span,
         )
         return ResolvedFunction(
-            "Editable", emptyList(), RNode.Block(listOf(localTextDelegate, field), isExpression = false, source = span),
+            name, emptyList(), RNode.Block(listOf(localTextDelegate, field), isExpression = false, source = span),
             emptyList(), returnsUnit = true,
         )
+    }
+
+    private fun rootCallingStatefulChild(): ResolvedFunction {
+        val childCall = RNode.Call(
+            ResolvedCallable.Source("StatefulTextField", "StatefulTextField/0", emptyList(), isComposable = true),
+            DispatchKind.TOP_LEVEL, receiver = null, args = emptyList(),
+            callSiteKey = CallSiteKey(301), source = span,
+        )
+        return ResolvedFunction("PreviewRoot", emptyList(), RNode.Block(listOf(childCall), isExpression = false, source = span), emptyList(), returnsUnit = true)
     }
 
     // --- headless recomposition harness ---
