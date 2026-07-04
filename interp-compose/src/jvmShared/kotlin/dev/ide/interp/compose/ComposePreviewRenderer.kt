@@ -1,6 +1,7 @@
 package dev.ide.interp.compose
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.currentComposer
 import androidx.compose.runtime.remember
@@ -46,11 +47,11 @@ class ComposePreviewRenderer(
      * of letting the exception abort the IDE's composition. The restart group is balanced first
      * ([ComposeRuntime]) so the slot table stays consistent.
      *
-     * Content-lambda errors (exceptions thrown inside lazy content like `LazyColumn { items { … } }`) are
-     * swallowed by [ComposeDispatcher] so they don't kill the host thread, but the first one is captured in
-     * [ComposeDispatcher.contentLambdaError]. After every composition pass a [SideEffect] reads that field,
-     * resets it, and calls [onPartialError] (null = no error this pass, non-null = partial render failure) so
-     * the host can surface a chip-level warning without replacing the (partial) preview content.
+     * Content-lambda errors (exceptions thrown inside lazy content like `LazyColumn { items { … } }`) and plain
+     * event-callback errors (`onClick`, `onValueChange`) are swallowed by [ComposeDispatcher] so they don't kill
+     * the host thread. After every composition pass a [SideEffect] drains those fields and calls
+     * [onPartialError] (null = no error this pass, non-null = partial/event failure) so the host can surface a
+     * chip-level warning without replacing the rendered preview content.
      */
     /**
      * The sample values a `@PreviewParameter` [binding] yields (instantiating its provider against [program]/
@@ -85,6 +86,12 @@ class ComposePreviewRenderer(
             // tolerateGaps: a single unsupported construct skips rather than blanking the whole preview.
             Interpreter(program, dispatcher, runtime, classLoader = loader, classes = classes, tolerateGaps = true)
         }
+        DisposableEffect(onPartialError) {
+            dispatcher.eventLambdaErrorReporter = { onPartialError(it) }
+            onDispose {
+                if (dispatcher.eventLambdaErrorReporter != null) dispatcher.eventLambdaErrorReporter = null
+            }
+        }
         // We're inside the IDE's composition: thread its composer, then drive the preview through its own
         // restart group so state changes recompose just the preview subtree.
         dispatcher.composer = currentComposer
@@ -100,13 +107,15 @@ class ComposePreviewRenderer(
             log.warning("Compose preview render failed: ${t::class.simpleName}: ${t.message}")
             t
         }
-        // After each composition pass, drain the content-lambda error (LazyColumn/Scaffold bodies that threw
-        // mid-subcompose, outside this try/catch). Reset the field so the NEXT pass starts clean; always call
-        // onPartialError so the host knows when the error clears (null) after a fix.
+        // After each composition pass, drain content-lambda errors (LazyColumn/Scaffold bodies that threw
+        // mid-subcompose, outside this try/catch) plus event-callback errors (TextField/Button callbacks). Reset
+        // the fields so the NEXT pass starts clean; always call onPartialError so the host knows when the error
+        // clears (null) after a fix.
         SideEffect {
-            val partial = dispatcher.contentLambdaError
+            val partial = dispatcher.eventLambdaError ?: dispatcher.contentLambdaError
             if (partial != null) {
                 log.warning("Compose preview partial render error: ${partial::class.simpleName}: ${partial.message}")
+                dispatcher.eventLambdaError = null
                 dispatcher.contentLambdaError = null
             }
             onPartialError(partial)

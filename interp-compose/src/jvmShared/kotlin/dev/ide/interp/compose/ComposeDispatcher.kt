@@ -41,8 +41,10 @@ class ComposeDispatcher(
     private val fallback: Dispatcher = fallback ?: ReflectiveDispatcher(
         loader = loader ?: ReflectiveDispatcher::class.java.classLoader,
         lambdaProxies = LambdaProxyStrategy { lambda, fi, composable ->
-            // A composable function-type param: thread the Composer; otherwise let the default proxy run.
-            if (composable) composableLambdaProxy(lambda, fi) else null
+            // A composable function-type param: thread the Composer. Plain event callbacks (`onClick`,
+            // `onValueChange`) still get a Compose-owned proxy so callback failures are surfaced in the preview
+            // chip instead of disappearing inside Compose's input/event dispatch.
+            if (composable) composableLambdaProxy(lambda, fi) else eventLambdaProxy(lambda, fi)
         },
     )
 
@@ -59,6 +61,14 @@ class ComposeDispatcher(
      */
     @Volatile
     var contentLambdaError: Throwable? = null
+
+    /** First error thrown by a plain event callback (`onClick`, `onValueChange`, …) during this composition. */
+    @Volatile
+    var eventLambdaError: Throwable? = null
+
+    /** Called immediately when an event callback fails; event failures may not schedule another composition. */
+    @Volatile
+    var eventLambdaErrorReporter: ((Throwable) -> Unit)? = null
 
     override fun dispatch(call: RNode.Call, receiver: Any?, args: List<Any?>): Any? {
         val c = composer
@@ -126,7 +136,7 @@ class ComposeDispatcher(
             return ComposableAbi.call(
                 callee.ownerFqn!!, callee.methodName, effectiveArgs, composer,
                 declaredParamCount = callee.paramTypes.size + if (isExtension) 1 else 0,
-                lambdaProxy = ::composableLambdaProxy,
+                lambdaProxy = ::lambdaProxy,
                 loader = loader,
                 receiver = if (isExtension) null else receiver,
                 receiverCount = if (isExtension) 1 else 0,
@@ -137,6 +147,13 @@ class ComposeDispatcher(
             ComposableAbi.endGroup(composer)
         }
     }
+
+    private fun lambdaProxy(lambda: InterpretedLambda, functionalInterface: Class<*>): Any =
+        if (functionalInterface.methods.any { it.name == "invoke" && it.parameterTypes.any(COMPOSER::isAssignableFrom) }) {
+            composableLambdaProxy(lambda, functionalInterface)
+        } else {
+            eventLambdaProxy(lambda, functionalInterface)
+        }
 
     /**
      * Wrap a `@Composable` content lambda as a proxy of its transformed functional type (e.g.
@@ -177,6 +194,29 @@ class ComposeDispatcher(
                     }
                 }
                 "toString" -> "InterpretedComposableLambda"
+                "hashCode" -> System.identityHashCode(lambda)
+                "equals" -> callArgs?.getOrNull(0) === lambda
+                else -> null
+            }
+        }
+
+    private fun eventLambdaProxy(lambda: InterpretedLambda, functionalInterface: Class<*>): Any =
+        Proxy.newProxyInstance(
+            functionalInterface.classLoader ?: javaClass.classLoader, arrayOf(functionalInterface),
+        ) { _, method, callArgs ->
+            when (method.name) {
+                "invoke" -> {
+                    try {
+                        lambda.invoke(callArgs?.toList() ?: emptyList())
+                    } catch (ce: kotlin.coroutines.cancellation.CancellationException) {
+                        throw ce
+                    } catch (e: Exception) {
+                        eventLambdaError = eventLambdaError ?: e
+                        eventLambdaErrorReporter?.invoke(e)
+                        Unit
+                    }
+                }
+                "toString" -> "InterpretedEventLambda"
                 "hashCode" -> System.identityHashCode(lambda)
                 "equals" -> callArgs?.getOrNull(0) === lambda
                 else -> null
