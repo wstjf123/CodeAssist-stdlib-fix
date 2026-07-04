@@ -17,7 +17,8 @@ import dev.ide.platform.log.Log
 class PreviewRenderClient(context: Context) {
     private val appContext = context.applicationContext
     private val log = Log.logger("ide.preview")
-    private val lock = Any()
+    @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
+    private val lock = java.lang.Object()
 
     @Volatile private var daemon: IPreviewRenderer? = null
     @Volatile private var bindRequested = false
