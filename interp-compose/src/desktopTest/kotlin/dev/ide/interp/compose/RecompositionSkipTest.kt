@@ -120,6 +120,38 @@ class RecompositionSkipTest {
         }
     }
 
+    @Test
+    fun rememberedMutableStateFeedsUpdatedTextBackBeforeNextInput() {
+        val dispatcher = ComposeDispatcher()
+        val runtime = ComposeRuntime(dispatcher)
+        val interpreter = Interpreter(functions = emptyMap(), dispatcher = dispatcher, composableInvoker = runtime)
+        val entry = rememberedTextFieldProgram()
+
+        runInteractiveRecompositionTest(
+            content = {
+                dispatcher.composer = currentComposer
+                try {
+                    runtime.invokeComposable(rootKey + 2, restartable = false, args = emptyList()) {
+                        interpreter.call(entry, emptyList())
+                    }
+                } finally {
+                    dispatcher.composer = null
+                }
+            },
+            interact = {
+                TextFieldCapture.onValueChange?.invoke("a") ?: error("text field callback was not captured")
+            },
+            settled = { TextFieldCapture.values.lastOrNull() == "a" },
+            afterSettled = {
+                TextFieldCapture.onValueChange?.invoke("ab") ?: error("text field callback was not captured after first input")
+            },
+            settledAgain = { TextFieldCapture.values.lastOrNull() == "ab" },
+        ) {
+            assertEquals(listOf("", "a", "ab"), TextFieldCapture.values, "the second edit should see the first edit's state")
+            assertEquals(1, TextFieldCapture.stateCreations, "`remember` should not recreate the state between edits")
+        }
+    }
+
     /** `fun Root(s: MutableState) { s.value /* subscribe */; Child("x") }`. The state arrives as a param and is
      *  read with `ownerFqn = null` (an instance getter on the receiver), matching the proven device spike. */
     private fun rootReadingStateThenCallingChild(): ResolvedFunction {
@@ -270,6 +302,8 @@ class RecompositionSkipTest {
         content: @Composable () -> Unit,
         interact: () -> Unit,
         settled: () -> Boolean,
+        afterSettled: (() -> Unit)? = null,
+        settledAgain: (() -> Boolean)? = null,
         verify: () -> Unit,
     ) {
         val executor = Executors.newSingleThreadExecutor { Thread(it, "interactive-recompose-test") }
@@ -294,6 +328,16 @@ class RecompositionSkipTest {
                     while (!settled()) {
                         clock.sendFrame(frame++)
                         delay(5)
+                    }
+                    if (afterSettled != null && settledAgain != null) {
+                        withContext(dispatcher) {
+                            afterSettled()
+                            Snapshot.sendApplyNotifications()
+                        }
+                        while (!settledAgain()) {
+                            clock.sendFrame(frame++)
+                            delay(5)
+                        }
                     }
 
                     withContext(dispatcher) {

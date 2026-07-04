@@ -487,21 +487,38 @@ object ComposableAbi {
         }.invoke(composer)
     }
 
-    /** `remember { ... }` is inline in real Compose-compiled source and lowers to `composer.cache(false, ...)`
-     *  in the current group. Calling the runtime facade reflectively treats it like an ordinary composable
-     *  library call and can allocate a fresh slot across interpreted recompositions, so the dispatcher routes it
-     *  here as an intrinsic. */
-    fun cache(composer: Any, invalid: Boolean, calculation: () -> Any?): Any? =
-        cacheMethodCache.getOrPut(composer.javaClass) {
-            composer.javaClass.methods.first {
-                it.name == "cache" && it.parameterCount == 2 && it.parameterTypes[0] == Boolean::class.javaPrimitiveType
-            }
-        }.invoke(composer, invalid, calculation)
+    /** `remember { ... }` is inline in real Compose-compiled source and lowers to the Composer cache protocol:
+     *  `rememberedValue()`, compare with `Composer.Empty`, then `updateRememberedValue(value)`. Calling the
+     *  runtime facade reflectively treats it like an ordinary composable library call and can allocate a fresh
+     *  slot across interpreted recompositions, so the dispatcher routes it here as an intrinsic. */
+    fun cache(composer: Any, invalid: Boolean, calculation: () -> Any?): Any? {
+        val remembered = rememberedValueMethodCache.getOrPut(composer.javaClass) {
+            composer.javaClass.methods.first { it.name == "rememberedValue" && it.parameterCount == 0 }
+        }.invoke(composer)
+        if (!invalid && remembered !== emptySentinel(composer)) return remembered
+        val value = calculation()
+        updateRememberedValueMethodCache.getOrPut(composer.javaClass) {
+            composer.javaClass.methods.first { it.name == "updateRememberedValue" && it.parameterCount == 1 }
+        }.invoke(composer, value)
+        return value
+    }
 
     private val changedMethodCache = java.util.concurrent.ConcurrentHashMap<Class<*>, Method>()
     private val skippingGetterCache = java.util.concurrent.ConcurrentHashMap<Class<*>, Method>()
     private val skipToGroupEndCache = java.util.concurrent.ConcurrentHashMap<Class<*>, Method>()
-    private val cacheMethodCache = java.util.concurrent.ConcurrentHashMap<Class<*>, Method>()
+    private val rememberedValueMethodCache = java.util.concurrent.ConcurrentHashMap<Class<*>, Method>()
+    private val updateRememberedValueMethodCache = java.util.concurrent.ConcurrentHashMap<Class<*>, Method>()
+    private val emptySentinelCache = java.util.concurrent.ConcurrentHashMap<Class<*>, Any>()
+
+    private fun emptySentinel(composer: Any): Any =
+        emptySentinelCache.getOrPut(composer.javaClass) {
+            val composerInterface = composer.javaClass.interfaces.firstOrNull { isComposerType(it) }
+                ?: loadClassNoInit(COMPOSER_CLASS, composer.javaClass.classLoader)
+                ?: error("cannot locate Composer interface for ${composer.javaClass.name}")
+            val companion = composerInterface.fields.first { it.name == "Companion" }.get(null)
+            companion.javaClass.methods.first { it.name == "getEmpty" && it.parameterCount == 0 }.invoke(companion)
+                ?: error("Composer.Empty is null")
+        }
 
     /** Register the recomposition block: when the scope is invalidated (a state it read changed), the real
      *  Recomposer calls [recompose] with a fresh composer. No-op if [scope] is null. */

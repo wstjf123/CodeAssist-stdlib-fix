@@ -159,7 +159,7 @@ class ComposeDispatcher(
     private class Handled(val value: Any?)
 
     private fun intrinsic(ownerFqn: String, methodName: String, args: List<Any?>): Handled? {
-        if (ownerFqn != "androidx.compose.runtime.ComposablesKt" || methodName != "remember") return null
+        if (!ownerFqn.startsWith("androidx.compose.runtime.ComposablesKt") || methodName != "remember") return null
         val calculation = args.lastOrNull() as? InterpretedLambda ?: return null
         val c = composer ?: return null
         val invalid = ComposableAbi.argsChanged(c, args.dropLast(1))
