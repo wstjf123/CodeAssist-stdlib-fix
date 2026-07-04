@@ -43,12 +43,14 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -116,6 +118,11 @@ fun PreviewSurface(
     /** Size the card to its content (a Compose `@Preview` with no device/size declared wraps the composable),
      *  bounded by the selected device as a max. Ignored when [deviceOverride] dictates a fixed size. */
     wrapContent: Boolean = false,
+    /** Let interactive content inside the card receive taps/drag first. Compose previews need this for
+     *  TextField focus/input; XML previews keep the old surface-first behavior for hit-testing and panning. */
+    interactiveContent: Boolean = false,
+    /** Render the device/content card as a plain rectangle. */
+    rectangularCard: Boolean = false,
     topBarExtras: @Composable RowScope.(compact: Boolean) -> Unit = {},
     bottomBarExtras: @Composable RowScope.(compact: Boolean) -> Unit = {},
     overlays: @Composable BoxScope.() -> Unit = {},
@@ -128,6 +135,7 @@ fun PreviewSurface(
     val heightPx = (hdp * device.density).toInt()
     val dotColor = Ca.colors.separator
     val tapHandler = rememberUpdatedState(onSurfaceTap)
+    val focusManager = LocalFocusManager.current
 
     BoxWithConstraints(modifier.fillMaxSize().background(Ca.colors.editorBg).clipToBounds()) {
         // Below this width the chrome bars can't show full labels without squishing, so they collapse to
@@ -142,6 +150,7 @@ fun PreviewSurface(
         val fit = min((maxWidth.value * 0.9f) / devWdp, (maxHeight.value * 0.86f) / devHdp).coerceIn(0.1f, 4f)
         val fitState = rememberUpdatedState(if (wrap) 1f else fit)
         val scale = if (state.userScale <= 0f) (if (wrap) 1f else fit) else state.userScale
+        val cardShape = if (rectangularCard) RectangleShape else RoundedCornerShape(Ca.radius.lg)
 
         // Re-fit (and recentre) whenever the device viewport changes — rotation or device switch.
         LaunchedEffect(widthPx, heightPx, wrap) { state.userScale = 0f; state.offset = Offset.Zero }
@@ -153,27 +162,45 @@ fun PreviewSurface(
                     if (blueprint) drawRect(BlueprintGround)
                     else drawDotGrid(dotColor, 15.dp.toPx(), 1.dp.toPx())
                 }
-                .pointerInput(state) {
-                    // Drive pan/zoom on the INITIAL pass so the surface wins over any interactive previewed
-                    // content (a Compose @Preview can hold scrollables/buttons that would otherwise eat the
-                    // drag/pinch). Only consume once the gesture actually moves, so a plain tap still falls
-                    // through to the card (the XML hit-test) and the deselect handler below.
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent(PointerEventPass.Initial)
-                            if (event.changes.none { it.pressed }) continue
-                            val zoom = event.calculateZoom()
-                            val pan = event.calculatePan()
-                            if (zoom != 1f || pan != Offset.Zero) {
-                                val base = if (state.userScale <= 0f) fitState.value else state.userScale
-                                state.userScale = (base * zoom).coerceIn(0.2f, 5f)
-                                state.offset += pan
-                                event.changes.forEach { if (it.positionChanged()) it.consume() }
+                .then(
+                    if (interactiveContent) {
+                        Modifier.pointerInput(focusManager) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                                    if (event.changes.any { it.pressed && !it.previousPressed }) {
+                                        focusManager.clearFocus(force = true)
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        Modifier.pointerInput(state) {
+                            // XML preview keeps surface-first pan/zoom so canvas selection stays predictable.
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                                    if (event.changes.none { it.pressed }) continue
+                                    val zoom = event.calculateZoom()
+                                    val pan = event.calculatePan()
+                                    if (zoom != 1f || pan != Offset.Zero) {
+                                        val base = if (state.userScale <= 0f) fitState.value else state.userScale
+                                        state.userScale = (base * zoom).coerceIn(0.2f, 5f)
+                                        state.offset += pan
+                                        event.changes.forEach { if (it.positionChanged()) it.consume() }
+                                    }
+                                }
                             }
                         }
                     }
-                }
-                .pointerInput(Unit) { detectTapGestures(onTap = { tapHandler.value?.invoke() }) },
+                )
+                .then(
+                    if (onSurfaceTap != null) {
+                        Modifier.pointerInput(Unit) { detectTapGestures(onTap = { tapHandler.value?.invoke() }) }
+                    } else {
+                        Modifier
+                    },
+                ),
             contentAlignment = Alignment.Center,
         ) {
             Box(
@@ -189,10 +216,10 @@ fun PreviewSurface(
                         if (wrap) Modifier.wrapContentSize().widthIn(max = devWdp.dp).heightIn(max = devHdp.dp)
                         else Modifier.requiredSize(devWdp.dp, devHdp.dp),
                     )
-                    .shadow(if (blueprint) 0.dp else 16.dp, RoundedCornerShape(Ca.radius.lg))
-                    .clip(RoundedCornerShape(Ca.radius.lg))
+                    .shadow(if (blueprint) 0.dp else 16.dp, cardShape)
+                    .clip(cardShape)
                     .background(cardColor)
-                    .border(1.dp, cardBorderColor, RoundedCornerShape(Ca.radius.lg)),
+                    .border(1.dp, cardBorderColor, cardShape),
             ) {
                 card(widthPx, heightPx, device.density)
             }

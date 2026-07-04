@@ -125,6 +125,8 @@ fun ComposePreviewPane(
         state = state,
         deviceOverride = deviceOverride,
         wrapContent = wrap,
+        interactiveContent = true,
+        rectangularCard = true,
         cardColor = cardBg,
         cardBorderColor = Ca.colors.separatorStrong,
         overlays = {
