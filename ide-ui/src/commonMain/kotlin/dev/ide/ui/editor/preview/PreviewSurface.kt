@@ -50,7 +50,6 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -135,7 +134,6 @@ fun PreviewSurface(
     val heightPx = (hdp * device.density).toInt()
     val dotColor = Ca.colors.separator
     val tapHandler = rememberUpdatedState(onSurfaceTap)
-    val focusManager = LocalFocusManager.current
 
     BoxWithConstraints(modifier.fillMaxSize().background(Ca.colors.editorBg).clipToBounds()) {
         // Below this width the chrome bars can't show full labels without squishing, so they collapse to
@@ -164,16 +162,10 @@ fun PreviewSurface(
                 }
                 .then(
                     if (interactiveContent) {
-                        Modifier.pointerInput(focusManager) {
-                            awaitPointerEventScope {
-                                while (true) {
-                                    val event = awaitPointerEvent(PointerEventPass.Initial)
-                                    if (event.changes.any { it.pressed && !it.previousPressed }) {
-                                        focusManager.clearFocus(force = true)
-                                    }
-                                }
-                            }
-                        }
+                        // Let focusable controls inside the preview own the pointer stream. A parent-level
+                        // clearFocus at Initial pass can cancel TextField's platform text-input handoff before
+                        // it establishes its IME session, which makes the field look focused but not editable.
+                        Modifier
                     } else {
                         Modifier.pointerInput(state) {
                             // XML preview keeps surface-first pan/zoom so canvas selection stays predictable.

@@ -425,6 +425,42 @@ class ComposableAbiDefaultsTest {
         assertEquals("nullsource", Capture.label, "`source` defaults — the lambda bound to `onChange`")
     }
 
+    @Test
+    fun namedFunctionArgumentDoesNotActLikeTrailingLambdaDuringOverloadSelection() {
+        // `OutlinedTextField(value = text, onValueChange = { text = it })` arrives at the ABI after named-arg
+        // reordering as declaration-order args `[value, onValueChange]`, with many defaulted parameters after
+        // it. Runtime overload selection must bind that lambda to slot 1 while checking candidates; treating it
+        // as a syntactic trailing lambda makes it fit the LAST slot instead, weakening/disordering overload
+        // choice and then binding the callback incorrectly at invoke time.
+        val lambda = object : dev.ide.interp.InterpretedLambda {
+            override val paramCount = 1
+            override fun invoke(args: List<Any?>): Any? {
+                Capture.label = args.single() as String
+                return null
+            }
+        }
+        composeOnce {
+            val composer: Any = currentComposer
+            ComposableAbi.startGroup(composer, KEY)
+            try {
+                ComposableAbi.call(
+                    ownerFqn = "dev.ide.interp.compose.ComposableAbiDefaultsTestKt",
+                    method = "FieldLike",
+                    originalArgs = listOf<Any?>("old", lambda),
+                    composer = composer,
+                    declaredParamCount = 4,
+                    lambdaProxy = ::anyProxy,
+                    argsInDeclarationOrder = true,
+                    lastArgIsTrailingLambda = false,
+                )
+            } finally {
+                ComposableAbi.endGroup(composer)
+            }
+        }
+        assertEquals("typed", Capture.label, "the declaration-order callback should bind to `onValueChange`")
+        assertEquals(7, Capture.count, "defaulted params after the callback should remain defaulted")
+    }
+
     /** A general proxy: wrap an interpreted lambda as any single-method functional interface. */
     private fun anyProxy(lambda: dev.ide.interp.InterpretedLambda, fi: Class<*>): Any =
         java.lang.reflect.Proxy.newProxyInstance(fi.classLoader, arrayOf(fi)) { _, m, a ->
@@ -617,6 +653,13 @@ interface ToggleSource
 fun Toggle(checked: Boolean, onChange: (Boolean) -> Unit, source: ToggleSource? = null) {
     Capture.flag = checked
     Capture.label = if (source == null) "nullsource" else "hassource"
+}
+
+/** Mirrors text input composables: the callback parameter is early, followed by defaulted parameters. */
+@Composable
+fun FieldLike(value: String, onValueChange: (String) -> Unit, count: Int = 7, source: ToggleSource? = null) {
+    Capture.count = count
+    if (source == null) onValueChange("typed") else onValueChange(value)
 }
 
 /** An inline value class backed by a `long` (cf. `Color`, whose underlying `ULong` is a `long` slot) — its

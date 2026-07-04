@@ -123,7 +123,7 @@ object ComposableAbi {
         // count from its Composer position. We do NOT trust [declaredParamCount] as the count — the resolver
         // sees the project's classpath, which can be a different build of the library than the one loaded here
         // (e.g. project Android Compose vs. the IDE's bundled Desktop Compose); it's only a tie-break hint.
-        val m = transformedMethod(owner, method, originalArgs, declaredParamCount)
+        val m = transformedMethod(owner, method, originalArgs, declaredParamCount, argsInDeclarationOrder, lastArgIsTrailingLambda)
         val n = composerIndex(m)
         val paramTypes = m.parameterTypes
         val trailingInts = m.parameterCount - n - 1
@@ -279,13 +279,20 @@ object ComposableAbi {
      * value-param count is the Composer's index — read off the runtime method, not assumed. Among matches,
      * prefer the one whose count equals [preferredParamCount] (the resolver's pick), else the fewest params.
      */
-    private fun transformedMethod(owner: Class<*>, name: String, suppliedArgs: List<Any?>, preferredParamCount: Int): Method {
+    private fun transformedMethod(
+        owner: Class<*>,
+        name: String,
+        suppliedArgs: List<Any?>,
+        preferredParamCount: Int,
+        argsInDeclarationOrder: Boolean,
+        lastArgIsTrailingLambda: Boolean,
+    ): Method {
         // This `owner.methods` scan + overload pick runs for every composable call on every recomposition, yet
         // it's deterministic given the owner, name, the args' runtime-TYPE shape, and the preferred count — so
         // cache it. Keyed on the Class IDENTITY (a relocated/project-loader Composer build must not alias the
         // bundled one). A successful pick is stable; a miss `error`s and isn't cached.
         val cache = transformedCache.getOrPut(owner) { java.util.concurrent.ConcurrentHashMap() }
-        val key = "$name|$preferredParamCount|${argShape(suppliedArgs)}"
+        val key = "$name|$preferredParamCount|$argsInDeclarationOrder|$lastArgIsTrailingLambda|${argShape(suppliedArgs)}"
         cache[key]?.let { return it }
         val k = suppliedArgs.size
         val shaped = owner.methods.filter { m ->
@@ -293,9 +300,16 @@ object ComposableAbi {
                 ci >= k && (ci + 1 until m.parameterCount).all { m.parameterTypes[it] == Int::class.javaPrimitiveType }
             }
         }
-        val accepting = shaped.filter { firstParamsAccept(it, suppliedArgs, composerIndex(it)) }.ifEmpty { shaped }
+        val accepting = shaped
+            .mapNotNull { m ->
+                val n = composerIndex(m)
+                val score = firstParamsScore(m, suppliedArgs, n, argsInDeclarationOrder, lastArgIsTrailingLambda)
+                if (score == Int.MAX_VALUE) null else m to score
+            }
+            .ifEmpty { shaped.map { it to Int.MAX_VALUE } }
         val chosen = accepting
-            .sortedWith(compareBy({ if (composerIndex(it) == preferredParamCount) 0 else 1 }, { composerIndex(it) }))
+            .sortedWith(compareBy<Pair<Method, Int>>({ it.second }, { if (composerIndex(it.first) == preferredParamCount) 0 else 1 }, { composerIndex(it.first) }))
+            .map { it.first }
             .firstOrNull()
             ?: error("no transformed `$name` (Composer-form) accepting $k arg(s) on ${owner.name}")
         return chosen.also { cache[key] = it }
@@ -317,26 +331,68 @@ object ComposableAbi {
         }
     }
 
-    /** Whether the supplied args (bound by position, trailing lambda → last slot) fit a candidate's first [n]
-     *  parameter types — a lambda fits any interface; a null fits any reference type. */
-    private fun firstParamsAccept(m: Method, suppliedArgs: List<Any?>, n: Int): Boolean {
+    /** Match score for the supplied args against a transformed candidate's first [n] parameter types. Lower is
+     *  better; [Int.MAX_VALUE] means "does not fit". This deliberately distinguishes a named/in-parens lambda
+     *  from a syntactic trailing lambda: after named-arg reordering `[value, onValueChange]` must bind to slots
+     *  0/1 (e.g. `OutlinedTextField(value: String, onValueChange: (String) -> Unit)`), not to the last defaulted
+     *  parameter just because the final supplied value is a lambda. */
+    private fun firstParamsScore(
+        m: Method,
+        suppliedArgs: List<Any?>,
+        n: Int,
+        argsInDeclarationOrder: Boolean,
+        lastArgIsTrailingLambda: Boolean,
+    ): Int {
         val k = suppliedArgs.size
-        val ordered = suppliedArgs.any { it === OmittedArg }
-        val trailingLambda = !ordered && suppliedArgs.lastOrNull() is InterpretedLambda
+        val ordered = argsInDeclarationOrder || suppliedArgs.any { it === OmittedArg }
+        val trailingLambda = !ordered && lastArgIsTrailingLambda && suppliedArgs.lastOrNull() is InterpretedLambda
+        var score = 0
         for (i in 0 until k) {
             val a = suppliedArgs[i]
-            if (a === OmittedArg) continue // an omitted slot fits any param (filled from $default)
+            if (a === OmittedArg) {
+                score += 8 // an omitted slot fits any param (filled from $default), but is weak evidence.
+                continue
+            }
             val slot = if (trailingLambda && i == k - 1) n - 1 else i
-            if (slot !in 0 until n) return false
+            if (slot !in 0 until n) return Int.MAX_VALUE
             val p = m.parameterTypes[slot]
             when (a) {
-                is InterpretedLambda -> if (!p.isInterface) return false
-                null -> if (p.isPrimitive) return false
+                is InterpretedLambda -> {
+                    if (!p.isInterface) return Int.MAX_VALUE
+                    score += 4 // lambdas are structurally erased, so let concrete args dominate overload choice.
+                }
+                null -> {
+                    if (p.isPrimitive) return Int.MAX_VALUE
+                    score += 6
+                }
                 // A boxed value-class parameter (`TextAlign?`) accepts the unboxed underlying value too.
-                else -> if (!boxed(p).isInstance(a) && !acceptsValueClassUnderlying(p, a)) return false
+                else -> {
+                    val boxedParam = boxed(p)
+                    when {
+                        boxedParam == a.javaClass -> score += 0
+                        boxedParam.isInstance(a) -> score += inheritanceDistance(a.javaClass, boxedParam)
+                        acceptsValueClassUnderlying(p, a) -> score += 1
+                        else -> return Int.MAX_VALUE
+                    }
+                }
             }
         }
-        return true
+        return score
+    }
+
+    private fun inheritanceDistance(actual: Class<*>, target: Class<*>): Int {
+        if (actual == target) return 0
+        val seen = HashSet<Class<*>>()
+        val queue = ArrayDeque<Pair<Class<*>, Int>>()
+        queue.add(actual to 1)
+        while (queue.isNotEmpty()) {
+            val (c, d) = queue.removeFirst()
+            if (!seen.add(c)) continue
+            if (c == target) return d
+            c.superclass?.let { queue.add(it to d + 1) }
+            c.interfaces.forEach { queue.add(it to d + 1) }
+        }
+        return 3
     }
 
     /** Whether [value] (already run through [boxValueClassIfNeeded]) can be passed to a parameter of [paramType]
