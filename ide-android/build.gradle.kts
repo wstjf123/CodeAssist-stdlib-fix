@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 // Android launcher: a Compose Android application that renders the reusable IDE UI (:ide-ui) — the same
 // commonMain composables the desktop launcher uses — over an Android [AndroidIdeBackend]. It is the
 // Android counterpart to :ide-desktop. Under AGP 9, Kotlin is built into `com.android.application` (no
@@ -628,10 +630,10 @@ dependencies {
     // Core-library desugaring runtime (temporarily enabled — see isCoreLibraryDesugaringEnabled above).
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
-    implementation(libs.compose.runtime)
-    implementation(libs.compose.foundation)
-    implementation(libs.compose.material3)
-    implementation(libs.compose.ui)
+    implementation(compose.runtime)
+    implementation(compose.foundation)
+    implementation(compose.material3)
+    implementation(compose.ui)
     implementation(libs.androidx.activity.compose)
     // FileProvider (androidx.core.content.FileProvider) — hands other apps content:// URIs to our
     // app-private project files for Share / "Open with", and grants read access on inbound intents.
