@@ -260,10 +260,8 @@ android {
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("compose-strings-asset").get().asFile)
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("r8-dex-asset").get().asFile)
 
-    // Release signing, never committed. Resolution order per field: keystore.properties (gitignored,
-    // alongside this build script) → Gradle property (-PRELEASE_*) → env var (RELEASE_*). With no keystore
-    // the release build is left unsigned — fine for Play, which re-signs with the managed app key (you
-    // upload an AAB signed with your upload key). See keystore.properties.example.
+    // Release signing. A checked-in debug keystore is used so CI and local release APKs have the same
+    // install/update identity.
     signingConfigs {
         val keystoreProps = Properties().apply {
             val f = rootProject.file("keystore.properties")
@@ -284,6 +282,12 @@ android {
                 keyPassword = signingValue("keyPassword", "RELEASE_KEY_PASSWORD", "RELEASE_KEY_PASSWORD")
             }
         }
+        create("fixedDebugRelease") {
+            storeFile = rootProject.file("ide-android/src/main/assets/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     buildTypes {
@@ -292,7 +296,7 @@ android {
             // runtime, so aggressive shrinking would strip needed classes. Revisit with keep rules if
             // download size becomes a concern.
             isMinifyEnabled = false
-            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("fixedDebugRelease")
         }
         // A release-like, non-debuggable build that's still installable locally (signed with the debug key).
         // Use this — never `debug` — to judge runtime/typing/recomposition performance: a `debuggable` app
@@ -304,7 +308,7 @@ android {
             // Sign with the release/upload key when a keystore is configured (so testers get a build with
             // the published signature identity); fall back to the debug key so the variant still installs
             // locally when no release keystore is present.
-            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("fixedDebugRelease")
             matchingFallbacks += listOf("release")
         }
     }

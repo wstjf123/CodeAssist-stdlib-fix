@@ -17,19 +17,19 @@ jobs:
     env:
       JAVA_VERSION: "17"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5.4.0
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4.0.1
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6.2.0
 
       - name: Disable Kotlin incremental compilation
         run: |
@@ -40,7 +40,7 @@ jobs:
         run: ./gradlew :ide-android:assembleRelease --console=plain --stacktrace
 
       - name: Upload APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: codeassist-arm64-release-debug-signed-apk
           path: ide-android/build/outputs/apk/release/*.apk
