@@ -72,7 +72,7 @@ class MainActivity : ComponentActivity() {
             var backend by remember { mutableStateOf<IdeBackend?>(null) }
             var error by remember { mutableStateOf<String?>(null) }
             LaunchedEffect(Unit) {
-                runCatching { withContext(Dispatchers.IO) { AndroidIde.bootstrap(applicationContext) } }.onSuccess { s ->
+                runCatching { withContext(Dispatchers.IO) { AndroidIde.bootstrap(this@MainActivity) } }.onSuccess { s ->
                         session = s; backend = s.backend
                         // Phase-3a build-process-isolation proof (docs/build-process-isolation.md): bind the
                         // :build daemon, open the first on-device project there, and run its default build in

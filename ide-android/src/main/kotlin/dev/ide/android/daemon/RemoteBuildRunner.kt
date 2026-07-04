@@ -2,6 +2,8 @@ package dev.ide.android.daemon
 
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import dev.ide.core.BuildRunner
 import dev.ide.core.IdeServices
 import dev.ide.platform.log.Log
@@ -39,7 +41,9 @@ import kotlinx.coroutines.flow.update
  */
 class RemoteBuildRunner(context: Context, private val services: IdeServices) : BuildRunner {
     private val log = Log.logger("ide.daemon")
+    private val uiContext = context
     private val appContext = context.applicationContext
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val workspaceRoot = services.workspaceRoot.toString()
 
     private val _buildState = MutableStateFlow(BuildState())
@@ -108,8 +112,12 @@ class RemoteBuildRunner(context: Context, private val services: IdeServices) : B
             }
         },
         onInstallIntent = { intent ->
-            runCatching { appContext.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-                .onFailure { e -> _buildState.update { it.copy(log = it.log + line("Couldn't open installer: ${e.message}")) } }
+            mainHandler.post {
+                val foregroundIntent = Intent(intent).removeFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                runCatching { uiContext.startActivity(foregroundIntent) }
+                    .recoverCatching { appContext.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                    .onFailure { e -> _buildState.update { it.copy(log = it.log + line("Couldn't open installer: ${e.message}")) } }
+            }
         },
         onConnected = ::onDaemonConnected,
         onDeath = {

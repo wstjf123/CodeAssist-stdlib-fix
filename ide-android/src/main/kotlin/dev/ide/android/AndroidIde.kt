@@ -56,10 +56,9 @@ object AndroidIde {
         // project's build/run to the separate `:build` daemon (RemoteBuildRunner); whether it's actually used
         // is the app-global "Build in a separate process" setting (default ON), checked in
         // IdeServicesBackend.buildRunnerFor. A build OOM then kills only that process, not the IDE.
-        val appContext = context.applicationContext
         val backend = IdeServicesBackend(
             initial = null, manager = manager, analytics = analytics,
-            buildRunnerFactory = { svc -> dev.ide.android.daemon.RemoteBuildRunner(appContext, svc) },
+            buildRunnerFactory = { svc -> dev.ide.android.daemon.RemoteBuildRunner(context, svc) },
         )
         // Process-wide uncaught-exception handler: report app_crash + surface the non-fatal dialog + keep the
         // app alive (the MainActivity main-thread guard handles the UI looper). See IdeServicesBackend.
