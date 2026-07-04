@@ -1,6 +1,7 @@
 package dev.ide.android
 
 import android.app.PendingIntent
+import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -29,10 +30,14 @@ import java.nio.file.Path
  * background-activity-launch block. Only when no UI is reachable (isolation off / unbound) does it launch here.
  */
 class ApkInstallerImpl(context: Context) : ApkInstaller {
+    private val launchContext = context
     private val context = context.applicationContext
 
     override suspend fun installAndLaunch(apk: Path, packageName: String, log: (String) -> Unit): Boolean = withContext(Dispatchers.IO) {
         if (!Files.exists(apk)) { log("APK not found: $apk"); return@withContext false }
+        if (PackageLaunchBridge.forwardApkInstall(apk.toString(), packageName)) {
+            return@withContext true
+        }
         val pm = context.packageManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !pm.canRequestPackageInstalls()) {
             log("Allow CodeAssist to install apps (Settings → Install unknown apps), then Run again.")
@@ -76,9 +81,9 @@ class ApkInstallerImpl(context: Context) : ApkInstaller {
                         // the UI process; starting it from the daemon can be treated as a background launch and
                         // later surface as INSTALL_FAILED_ABORTED / "User rejected permissions".
                         @Suppress("DEPRECATION") val confirm = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
-                        confirm?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)?.let { uiIntent ->
-                            if (!PackageLaunchBridge.forwardInstall(uiIntent)) {
-                                runCatching { context.startActivity(uiIntent) }
+                        confirm?.let { uiIntent ->
+                            if (!PackageLaunchBridge.forwardInstall(uiIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))) {
+                                runCatching { startInstallConfirmation(uiIntent) }
                             }
                         }
                     }
@@ -102,6 +107,14 @@ class ApkInstallerImpl(context: Context) : ApkInstaller {
             }
         }
         ContextCompat.registerReceiver(context, receiver, IntentFilter(action), ContextCompat.RECEIVER_NOT_EXPORTED)
+    }
+
+    private fun startInstallConfirmation(intent: Intent) {
+        if (launchContext is Activity) {
+            launchContext.startActivity(Intent(intent).apply { removeFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
+        } else {
+            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
     }
 
     private companion object {

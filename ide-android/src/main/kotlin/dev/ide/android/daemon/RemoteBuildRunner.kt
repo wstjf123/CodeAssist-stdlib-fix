@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
+import dev.ide.android.ApkInstallerImpl
 import dev.ide.core.BuildRunner
 import dev.ide.core.IdeServices
 import dev.ide.platform.log.Log
@@ -25,6 +26,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import java.nio.file.Paths
 
 /**
  * Routes a project's build/run to the `:build` daemon process (build-process isolation,
@@ -44,6 +50,8 @@ class RemoteBuildRunner(context: Context, private val services: IdeServices) : B
     private val uiContext = context
     private val appContext = context.applicationContext
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val uiScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val uiInstaller = ApkInstallerImpl(context)
     private val workspaceRoot = services.workspaceRoot.toString()
 
     private val _buildState = MutableStateFlow(BuildState())
@@ -109,6 +117,15 @@ class RemoteBuildRunner(context: Context, private val services: IdeServices) : B
             // activity, so the activity launch isn't blocked) and surface the outcome in the build console.
             if (pkg.isNotEmpty()) {
                 dev.ide.android.ApkLauncher.launch(appContext, pkg) { msg -> _buildState.update { it.copy(log = it.log + line(msg)) } }
+            }
+        },
+        onInstallApk = { apkPath, packageName ->
+            if (apkPath.isNotEmpty() && packageName.isNotEmpty()) {
+                uiScope.launch {
+                    uiInstaller.installAndLaunch(Paths.get(apkPath), packageName) { msg ->
+                        _buildState.update { it.copy(log = it.log + line(msg)) }
+                    }
+                }
             }
         },
         onInstallIntent = { intent ->

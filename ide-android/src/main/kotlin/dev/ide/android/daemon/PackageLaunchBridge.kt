@@ -22,6 +22,9 @@ object PackageLaunchBridge {
     @Volatile
     private var installForwarder: ((Intent) -> Boolean)? = null
 
+    @Volatile
+    private var apkInstallForwarder: ((String, String) -> Boolean)? = null
+
     /** Registered by [BuildDaemonService] while it holds a live UI callback; cleared (null) when it doesn't. */
     fun setForwarder(f: ((String) -> Boolean)?) {
         forwarder = f
@@ -31,9 +34,16 @@ object PackageLaunchBridge {
         installForwarder = f
     }
 
+    fun setApkInstallForwarder(f: ((String, String) -> Boolean)?) {
+        apkInstallForwarder = f
+    }
+
     /** Try to forward the launch of [packageName] to the UI process. Returns true if it was handed off (the
      *  caller must NOT also launch locally); false if there's no UI to forward to. */
     fun forwardLaunch(packageName: String): Boolean = forwarder?.invoke(packageName) ?: false
 
     fun forwardInstall(intent: Intent): Boolean = installForwarder?.invoke(intent) ?: false
+
+    fun forwardApkInstall(apkPath: String, packageName: String): Boolean =
+        apkInstallForwarder?.invoke(apkPath, packageName) ?: false
 }

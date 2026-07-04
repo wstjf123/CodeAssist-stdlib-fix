@@ -27,8 +27,11 @@ interface IBuildCallback {
     // background-activity-launch rules — the UI has a foreground activity, so it can.
     oneway void onLaunchPackage(String packageName);
 
-    // The android "Run" needs the OS install-confirmation UI. The PackageInstaller session is created in
-    // :build, but the confirmation activity must be started by the UI process so Android treats it as a
-    // foreground user action instead of aborting the install as rejected/cancelled.
+    // The android "Run" needs the OS install-confirmation UI. The UI process owns the PackageInstaller
+    // session so the install-confirmation activity is tied to the foreground app process.
+    oneway void onInstallApk(String apkPath, String packageName);
+
+    // Legacy/fallback: a PackageInstaller session created in-process needs its pending-user-action activity
+    // started by the UI process. The preferred isolated-build path uses onInstallApk instead.
     oneway void onInstallIntent(in Intent intent);
 }

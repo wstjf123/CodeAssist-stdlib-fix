@@ -395,6 +395,10 @@ class BuildDaemonService : Service() {
             val cb = callback ?: return@setInstallForwarder false
             runCatching { cb.onInstallIntent(intent); true }.getOrDefault(false)
         }
+        PackageLaunchBridge.setApkInstallForwarder { apkPath, packageName ->
+            val cb = callback ?: return@setApkInstallForwarder false
+            runCatching { cb.onInstallApk(apkPath, packageName); true }.getOrDefault(false)
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder = binder
@@ -403,6 +407,7 @@ class BuildDaemonService : Service() {
         super.onDestroy()
         PackageLaunchBridge.setForwarder(null)
         PackageLaunchBridge.setInstallForwarder(null)
+        PackageLaunchBridge.setApkInstallForwarder(null)
         callback = null
         exitForeground()
         runCatching { services?.close() }

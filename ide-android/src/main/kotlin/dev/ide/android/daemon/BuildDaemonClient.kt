@@ -28,6 +28,7 @@ class BuildDaemonClient(
     private val onPermission: (reqId: Int, category: String, detail: String) -> Unit = { _, _, _ -> },
     /** The daemon installed an android-app APK; launch it here in the UI process (foreground-activity rules). */
     private val onLaunchPackage: (packageName: String) -> Unit = {},
+    private val onInstallApk: (apkPath: String, packageName: String) -> Unit = { _, _ -> },
     private val onInstallIntent: (Intent) -> Unit = {},
     /** Fires on EVERY (re)connect — including the auto-restart after the daemon dies — so a client can
      *  re-drive in-flight work. (Distinct from [bind]'s one-shot `onReady`, which fires only the first time.) */
@@ -62,6 +63,7 @@ class BuildDaemonClient(
         override fun onConsoleChunk(runId: Int, text: String?, kind: Int) = onConsoleChunk.invoke(runId, text ?: "", kind)
         override fun onPermission(reqId: Int, category: String?, detail: String?) = onPermission.invoke(reqId, category ?: "", detail ?: "")
         override fun onLaunchPackage(packageName: String?) = onLaunchPackage.invoke(packageName ?: "")
+        override fun onInstallApk(apkPath: String?, packageName: String?) = onInstallApk.invoke(apkPath ?: "", packageName ?: "")
         override fun onInstallIntent(intent: Intent?) { if (intent != null) onInstallIntent.invoke(intent) }
     }
 
