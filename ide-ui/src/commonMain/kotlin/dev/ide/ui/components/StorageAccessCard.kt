@@ -50,7 +50,7 @@ import org.jetbrains.compose.resources.stringResource
 fun StorageAccessCard(path: String?, onOpenInFiles: (() -> Unit)?, modifier: Modifier = Modifier) {
     if (path.isNullOrBlank()) return
     val shape = RoundedCornerShape(Ca.radius.lg)
-    val clipboard = LocalClipboardManager.current
+    @Suppress("DEPRECATION") val clipboard = LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
     Column(
         modifier

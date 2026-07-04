@@ -53,8 +53,9 @@ object XmlContextScanner {
                 isNameStart(c) -> {
                     val s = i
                     val e = readNameEnd(text, i)
-                    curAttr = text.subSequence(s, e).toString()
-                    existing.add(curAttr!!)
+                    val attr = text.subSequence(s, e).toString()
+                    curAttr = attr
+                    existing.add(attr)
                     sawEquals = false
                     i = e
                 }

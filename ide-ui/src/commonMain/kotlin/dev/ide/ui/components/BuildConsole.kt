@@ -288,7 +288,7 @@ private fun copyForTab(
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun CopyButton(label: String, provide: () -> String) {
-    val clipboard = LocalClipboardManager.current
+    @Suppress("DEPRECATION") val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
     var copied by remember { mutableStateOf(false) }
     LaunchedEffect(copied) {

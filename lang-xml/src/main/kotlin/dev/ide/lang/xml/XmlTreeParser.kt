@@ -80,13 +80,9 @@ class XmlTreeParser(snapshot: DocumentSnapshot) {
     private fun parseElement(): XmlNode {
         val start = pos
         pos++ // consume '<'
-        val nameStart = pos
         val name = readName()
         if (name.isEmpty()) report(start, pos, "Expected element name", "xml.expectedName")
         val element = XmlNode(XmlNodeKinds.TAG, start, pos, text, name = name)
-        // record the name token as a child range is unnecessary; name is on the node.
-        nameStart // (kept for clarity)
-
         when (parseAttributes(element)) {
             TagEnd.SELF_CLOSED -> {
                 element.selfClosed = true

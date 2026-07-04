@@ -69,7 +69,7 @@ fun LogsScreen(
     var query by remember { mutableStateOf("") }
     var paused by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val clipboard = LocalClipboardManager.current
+    @Suppress("DEPRECATION") val clipboard = LocalClipboardManager.current
 
     // Live tail: refresh from the ring buffer periodically while the sheet is open (cheap — a snapshot of at
     // most a few hundred records), unless the user paused it (so they can read without the list shifting).

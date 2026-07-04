@@ -454,11 +454,12 @@ private fun StoreDetailSheet(
             }
             message?.let { Text(it, color = Ca.colors.textTertiary, style = Ca.type.footnote) }
             Spacer(Modifier.weight(1f))
+            val templateId = item.templateId
             when {
-                item.kind == UiStoreItemKind.Template && item.templateId != null ->
+                item.kind == UiStoreItemKind.Template && templateId != null ->
                     PrimaryButton(
                         "Use this template",
-                        onClick = { onCreateFromTemplate(item.templateId!!) },
+                        onClick = { onCreateFromTemplate(templateId) },
                         icon = CaIcons.plus,
                         modifier = Modifier.fillMaxWidth(),
                     )

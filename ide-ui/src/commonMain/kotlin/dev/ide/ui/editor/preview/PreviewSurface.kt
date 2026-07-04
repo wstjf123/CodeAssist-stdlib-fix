@@ -268,7 +268,7 @@ fun PreviewProblemChip(issues: List<PreviewIssue>, modifier: Modifier) {
             }
         }
         if (open) {
-            val clipboard = LocalClipboardManager.current
+            @Suppress("DEPRECATION") val clipboard = LocalClipboardManager.current
             // Plain-text form of every issue, for the Copy button (titles + messages, blank-line separated).
             val copyText = issues.joinToString("\n\n") { iss ->
                 (if (iss.title.isNotEmpty()) iss.title + "\n" else "") + iss.message

@@ -111,7 +111,7 @@ fun RunScreen(
 private fun RunTopBar(console: RunConsoleUi?, buildFailed: Boolean, onBack: () -> Unit, onStop: () -> Unit, onRerun: () -> Unit) {
     val iconBox = if (isMobilePlatform) 42 else 34
     val running = console?.phase == RunPhase.Running || console?.phase == RunPhase.Building
-    val clipboard = LocalClipboardManager.current
+    @Suppress("DEPRECATION") val clipboard = LocalClipboardManager.current
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -201,7 +201,8 @@ private fun ProblemRow(d: BuildDiagnosticUi, onOpen: (BuildDiagnosticUi) -> Unit
         val color = if (d.severity == UiSeverity.Error) Ca.colors.error else if (d.severity == UiSeverity.Warning) Ca.colors.warning else Ca.colors.accent
         Icon(if (d.severity == UiSeverity.Error) CaIcons.error else if (d.severity == UiSeverity.Warning) CaIcons.warning else CaIcons.info, null, Modifier.size(14.dp).padding(top = 1.dp), tint = color)
         Text(d.message, color = Ca.colors.textSecondary, style = Ca.type.footnote, modifier = Modifier.weight(1f))
-        if (d.file != null) Text(d.file!!.substringAfterLast('/').substringAfterLast('\\') + (if (d.line > 0) ":${d.line}" else ""), color = Ca.colors.textTertiary, style = Ca.type.codeSmall)
+        val file = d.file
+        if (file != null) Text(file.substringAfterLast('/').substringAfterLast('\\') + (if (d.line > 0) ":${d.line}" else ""), color = Ca.colors.textTertiary, style = Ca.type.codeSmall)
     }
 }
 

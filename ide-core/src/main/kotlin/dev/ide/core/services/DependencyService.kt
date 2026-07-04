@@ -887,7 +887,7 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
                 coordinate = hit.coordinate.toString(),
                 packaging = hit.packaging,
                 compatible = !isAar || accepts,
-                incompatibleReason = if (isAar && !accepts && module != null) aarReason(module) else null,
+                incompatibleReason = if (isAar && !accepts) module?.let(::aarReason) else null,
             )
         }
     }

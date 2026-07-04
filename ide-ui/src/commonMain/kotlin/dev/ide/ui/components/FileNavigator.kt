@@ -615,9 +615,10 @@ private fun TreeRow(
                     onNewSource
                 ) { menuOpen = false }
             }
-            if (canImportHere) targetDir?.let { dir ->
+            if (canImportHere) {
+                val importDir: String = targetDir
                 FileActionItem(CaIcons.download, "Import from file manager") {
-                    menuOpen = false; ctx.onImportInto(dir)
+                    menuOpen = false; ctx.onImportInto(importDir)
                 }
             }
             if (canExportHere) FileActionItem(CaIcons.save, "Export…") {

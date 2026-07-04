@@ -81,14 +81,14 @@ object AndroidPathParser {
                 'Q' -> while (hasNumber(tokens, i)) {
                     var x1 = num(); var y1 = num(); var x = num(); var y = num()
                     if (rel) { x1 += cur.x; y1 += cur.y; x += cur.x; y += cur.y }
-                    path.quadraticBezierTo(x1, y1, x, y)
+                    path.quadraticTo(x1, y1, x, y)
                     lastCtrlX = x1; lastCtrlY = y1; cur.x = x; cur.y = y
                 }
                 'T' -> while (hasNumber(tokens, i)) {
                     var x = num(); var y = num()
                     if (rel) { x += cur.x; y += cur.y }
                     val (rx, ry) = reflect(prevCmd, cur, lastCtrlX, lastCtrlY)
-                    path.quadraticBezierTo(rx, ry, x, y)
+                    path.quadraticTo(rx, ry, x, y)
                     lastCtrlX = rx; lastCtrlY = ry; cur.x = x; cur.y = y
                 }
                 'A' -> while (hasNumber(tokens, i)) {

@@ -4,7 +4,7 @@ import org.w3c.dom.Element
 import java.io.BufferedInputStream
 import java.io.IOException
 import java.net.HttpURLConnection
-import java.net.URL
+import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -255,7 +255,7 @@ interface SdkNetFetcher {
 /** Default [SdkNetFetcher] over `HttpURLConnection` (works on desktop and ART). */
 object HttpSdkNetFetcher : SdkNetFetcher {
     override fun fetchText(url: String): String? = runCatching {
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+        val conn = (URI(url).toURL().openConnection() as HttpURLConnection).apply {
             connectTimeout = 15_000; readTimeout = 30_000; instanceFollowRedirects = true
         }
         conn.inputStream.use { it.readBytes().decodeToString() }
@@ -265,7 +265,7 @@ object HttpSdkNetFetcher : SdkNetFetcher {
         // Resume a partial download: ask for the remaining bytes (HTTP Range) and append. If the server
         // ignores the range (200 OK) or the partial already covers the file (416), fall back cleanly.
         val existing = if (Files.isRegularFile(dest)) Files.size(dest) else 0L
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+        val conn = (URI(url).toURL().openConnection() as HttpURLConnection).apply {
             connectTimeout = 15_000; readTimeout = 60_000; instanceFollowRedirects = true
             if (existing > 0) setRequestProperty("Range", "bytes=$existing-")
         }

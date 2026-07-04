@@ -16,21 +16,21 @@ import kotlinx.coroutines.withContext
 
 /** [ActionService] over the engine's [dev.ide.plugin.impl.ActionManager]: resolve/invoke the contributed
  *  toolbar/menu/palette actions, mapping the plugin-action model to/from the neutral UI DTOs. */
-internal class ActionBackend(private val ctx: BackendContext) : ActionService {
+internal class ActionBackend(private val backend: BackendContext) : ActionService {
 
-    override fun actionsFor(uiCtx: UiActionContext): List<UiActionItem> {
-        val c = uiCtx.toActionContext()
-        return ctx.services.actions.actionsFor(c).map {
+    override fun actionsFor(ctx: UiActionContext): List<UiActionItem> {
+        val c = ctx.toActionContext()
+        return backend.services.actions.actionsFor(c).map {
             UiActionItem(it.id, it.text, it.iconId, enabled = it.isEnabled(c))
         }
     }
 
-    override fun menuFor(uiCtx: UiActionContext): UiMenuGroup =
-        UiMenuGroup(ctx.services.actions.menuFor(uiCtx.toActionContext()).map { it.toUiMenuNode() })
+    override fun menuFor(ctx: UiActionContext): UiMenuGroup =
+        UiMenuGroup(backend.services.actions.menuFor(ctx.toActionContext()).map { it.toUiMenuNode() })
 
-    override suspend fun invokeAction(id: String, uiCtx: UiActionContext): UiActionResult {
-        val c = uiCtx.toActionContext()
-        val result = withContext(ctx.engineDispatcher) { ctx.services.actions.invoke(id, c) }
+    override suspend fun invokeAction(id: String, ctx: UiActionContext): UiActionResult {
+        val c = ctx.toActionContext()
+        val result = withContext(backend.engineDispatcher) { backend.services.actions.invoke(id, c) }
         return UiActionResult(result.message, result.effects.map { it.toUiEffect() })
     }
 
@@ -38,7 +38,7 @@ internal class ActionBackend(private val ctx: BackendContext) : ActionService {
         val snapshot = this
         return object : ActionContext {
             override val place = ActionPlace(snapshot.place)
-            override val projectRoot: String? = ctx.services.workspaceRoot.toString()
+            override val projectRoot: String? = backend.services.workspaceRoot.toString()
             override val activeFilePath = snapshot.activeFilePath
             override val selectionStart = snapshot.selectionStart
             override val selectionEnd = snapshot.selectionEnd

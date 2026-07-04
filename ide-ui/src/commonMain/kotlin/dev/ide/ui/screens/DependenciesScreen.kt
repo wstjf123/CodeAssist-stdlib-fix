@@ -711,7 +711,11 @@ private fun AddDependencyContent(
                 busy = true; error = null; adding = imported.first().substringAfterLast('/').substringAfterLast('\\')
                 coroutine.launch {
                     var last: UiAddResult? = null
-                    for (p in imported) { last = backend.deps.addLocalLibrary(moduleName, p, scope); if (last?.success != true) break }
+                    for (p in imported) {
+                        val result = backend.deps.addLocalLibrary(moduleName, p, scope)
+                        last = result
+                        if (!result.success) break
+                    }
                     busy = false; adding = null
                     last?.let { if (it.success) onResult(it) else error = it.message }
                 }
@@ -1049,7 +1053,7 @@ private fun EditDependencySheet(
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Box(Modifier.weight(1f)) { SheetField(versionText, "version", codeFont, leading = CaIcons.pkg) { versionText = it } }
                 if (loadingVersions) CircularProgressIndicator(Modifier.size(16.dp), color = Ca.colors.textTertiary, strokeWidth = 2.dp)
-                else if (updateAvailable && newest != null) UpdateHintChip(newest) { versionText = newest }
+                else newest?.takeIf { updateAvailable }?.let { UpdateHintChip(it) { versionText = it } }
             }
             VersionList(versions, selected = versionText, loading = loadingVersions, codeFont = codeFont) { versionText = it }
 
@@ -1312,6 +1316,7 @@ private fun majorOf(v: String): Int? =
     v.trimStart('v', 'V', '[', '(', ' ').takeWhile { it.isDigit() }.toIntOrNull()
 
 /** Wrap [content] with a hover (desktop) / long-press (touch) tooltip showing [text]. */
+@Suppress("DEPRECATION")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WithTooltip(text: String, content: @Composable () -> Unit) {

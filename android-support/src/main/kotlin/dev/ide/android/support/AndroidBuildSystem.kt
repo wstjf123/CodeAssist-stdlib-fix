@@ -529,11 +529,12 @@ class AndroidBuildSystem(
         // L8 release-shrinking against R8's emitted keep rules drops internal `j$.util.*Conversions` helpers
         // that surviving classes still reference ("Missing class"). Keeping all is correct and only slightly
         // larger. It needs only the (config-time) desugar config + runtime jar, so it has no task dependency.
-        if (desugarJson != null && desugaring != null) {
+        desugaring?.let { desugar ->
+            val configJson = desugarJson ?: return@let
             val l8 = step("l8DexDesugarLib")
             tasks.task(l8) {
                 L8DexTask(
-                    l8, desugaring.runtimeJar, desugarJson, layout.desugarKeepRules, sdk.androidJar,
+                    l8, desugar.runtimeJar, configJson, layout.desugarKeepRules, sdk.androidJar,
                     facet.minSdk, release = false, layout.desugarLibDex, shrinker,
                 )
             }

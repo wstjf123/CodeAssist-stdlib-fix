@@ -397,7 +397,7 @@ class JdtSourceAnalyzer(ctx: CompilationContext) : SourceAnalyzer, Disposable {
     /** The file's type/method/field declarations in document order, each with nesting depth — for the
      *  structure view and sticky scroll headers. Syntactic parse only (no bindings needed). */
     override fun fileStructure(file: VirtualFile, text: CharSequence): List<dev.ide.lang.resolve.StructureItem> {
-        val pf = parseSyntactic(file, text) as? JdtParsedFile ?: return emptyList()
+        val pf = parseSyntactic(file, text)
         val out = ArrayList<dev.ide.lang.resolve.StructureItem>()
         @Suppress("UNCHECKED_CAST")
         for (t in pf.cu.types() as List<AbstractTypeDeclaration>) collectStructure(t, 0, out)
@@ -452,7 +452,7 @@ class JdtSourceAnalyzer(ctx: CompilationContext) : SourceAnalyzer, Disposable {
         val node = (pf.nodeAt(offset) as? JdtDomNode)?.node ?: return null
         var n: ASTNode? = node
         while (n != null && n !is Name) n = n.parent
-        val binding = (n as? Name)?.resolveBinding() ?: return null
+        val binding = n?.resolveBinding() ?: return null
         val fmt = dev.ide.lang.resolve.DocFormat.JAVADOC
         return when (binding) {
             is IMethodBinding -> dev.ide.lang.resolve.QuickDocInfo(

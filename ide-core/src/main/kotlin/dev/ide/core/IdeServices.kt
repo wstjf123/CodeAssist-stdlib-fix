@@ -2823,7 +2823,7 @@ class IdeServices private constructor(
         val root = dev.ide.preview.RenderNode().apply { renderer = dev.ide.preview.PlaceholderRenderer; tag = "real-view" }
         return dev.ide.preview.LayoutPreviewResult(
             root, resources, request.density, request.density, renderedImage = png, renderedNativeImage = nativeImage,
-            viewTree = result?.viewTree,
+            viewTree = result.viewTree,
         )
     }
 

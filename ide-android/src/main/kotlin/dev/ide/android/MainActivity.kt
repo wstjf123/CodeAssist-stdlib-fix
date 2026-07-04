@@ -82,7 +82,7 @@ class MainActivity : ComponentActivity() {
                         // concurrent first-run provision would race and corrupt the kotlinc-home). Debug-only +
                         // flag-gated; replaced in Phase 3b by RemoteBuildRunner wired into the UI Run button.
                         if (BuildConfig.DEBUG && BuildDaemonProof.ENABLED) BuildDaemonProof.run(applicationContext)
-                    }.onFailure { e -> error = e.stackTraceToString() ?: e.toString() }
+                    }.onFailure { e -> error = e.stackTraceToString() }
             }
 
             var pendingTarget by remember { mutableStateOf<String?>(null) }

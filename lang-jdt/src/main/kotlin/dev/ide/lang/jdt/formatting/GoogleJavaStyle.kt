@@ -17,6 +17,7 @@ import kotlin.math.roundToInt
  */
 internal object GoogleJavaStyle {
 
+    @Suppress("DEPRECATION")
     fun options(style: FormatStyle, compliance: String): MutableMap<String, String> {
         val o = HashMap(DefaultCodeFormatterConstants.getEclipseDefaultSettings())
 

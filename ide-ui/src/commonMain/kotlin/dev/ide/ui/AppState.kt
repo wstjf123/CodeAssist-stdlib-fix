@@ -283,7 +283,7 @@ class IdeUiState(val backend: IdeBackend, val composePreviewHost: ComposePreview
             val f = openFiles[i]
             val followsFileRename = newPath != null && f.path == activePath
             if (!followsFileRename && f.modified) continue
-            val diskPath = if (followsFileRename) newPath!! else f.path
+            val diskPath = if (followsFileRename) newPath else f.path
             val text = runCatching { backend.files.readFile(diskPath) }.getOrNull() ?: continue
             if (!followsFileRename && text == f.savedText) continue // untouched → preserve session/undo/caret
             val name = diskPath.substringAfterLast('/').substringAfterLast('\\')

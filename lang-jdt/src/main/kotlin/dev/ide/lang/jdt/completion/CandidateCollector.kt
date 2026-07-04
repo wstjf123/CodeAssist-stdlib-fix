@@ -134,10 +134,10 @@ internal object CandidateCollector {
      */
     private fun typeReferences(ctx: AnalyzedContext, index: IndexService, importOffset: Int): List<Candidate> {
         if (ctx.prefix.isEmpty()) return emptyList() // need a prefix to query the index (can't enumerate all types)
-        val rankByType = ctx.expectedType != null && ctx.typeScope != null
+        val rankScope = if (ctx.expectedType != null) ctx.typeScope else null
         val out = ArrayList<Candidate>()
         for (hit in index.fuzzy<ClassNameValue>(CLASS_NAMES, ctx.prefix, 60)) {
-            val resolved = if (rankByType) resolveType(ctx.typeScope!!, hit.value.fqn) else null
+            val resolved = rankScope?.let { resolveType(it, hit.value.fqn) }
             out.add(unimportedTypeCandidate(hit.value, ctx, importOffset, resolved))
         }
         return out
