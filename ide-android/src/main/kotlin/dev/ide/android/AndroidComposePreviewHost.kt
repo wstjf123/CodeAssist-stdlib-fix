@@ -3,6 +3,7 @@ package dev.ide.android
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -23,6 +24,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ide.core.IdeServicesBackend
@@ -122,36 +127,45 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
                 locale?.let { setLocale(java.util.Locale.forLanguageTag(it.replace("-r", "-"))) }
             }
         }
-        CompositionLocalProvider(LocalConfiguration provides cfg) {
-            Box(modifier, contentAlignment = Alignment.Center) {
-                when (val s = state) {
-                    is PreviewState.Loading -> CircularProgressIndicator(Modifier.size(28.dp))
-                    is PreviewState.Ready -> {
-                        // Key the capture on the error's identity, not the instance: the interpreter throws a
-                        // fresh Throwable each pass, so keying on it would relaunch + rewrite state every
-                        // recomposition → a render loop. Same message/type ⇒ same key ⇒ captured once.
-                        val onErr: @Composable (Throwable) -> Unit = { error ->
-                            LaunchedEffect(error.message, error::class) {
-                                if (!useProjectLoader && error.mayNeedProjectLoader()) useProjectLoader = true
-                                renderError = error
-                            }
-                            PreviewRenderError(error)
-                        }
-                        val onPartial: (Throwable?) -> Unit = { e ->
-                            val key = e?.let { "${it::class.java.name}: ${it.message}" }
-                            if (key != partialKey[0]) {
-                                partialKey[0] = key
-                                if (!useProjectLoader && e?.mayNeedProjectLoader() == true) useProjectLoader = true
-                                if (e != null) log.warn("Compose preview partial render", e)
-                                partialError = e
-                            }
-                        }
-                        PreviewVariants(renderer, s.lowered, onErr, onPartial)
+        when (val s = state) {
+            is PreviewState.Ready -> {
+                // Key the capture on the error's identity, not the instance: the interpreter throws a
+                // fresh Throwable each pass, so keying on it would relaunch + rewrite state every
+                // recomposition → a render loop. Same message/type ⇒ same key ⇒ captured once.
+                val onErr: @Composable (Throwable) -> Unit = { error ->
+                    LaunchedEffect(error.message, error::class) {
+                        if (!useProjectLoader && error.mayNeedProjectLoader()) useProjectLoader = true
+                        renderError = error
                     }
-                    is PreviewState.NotInterpretable -> Text(
-                        "Preview not interpretable", color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp, modifier = Modifier.padding(16.dp),
-                    )
+                    PreviewRenderError(error)
+                }
+                val onPartial: (Throwable?) -> Unit = { e ->
+                    val key = e?.let { "${it::class.java.name}: ${it.message}" }
+                    if (key != partialKey[0]) {
+                        partialKey[0] = key
+                        if (!useProjectLoader && e?.mayNeedProjectLoader() == true) useProjectLoader = true
+                        if (e != null) log.warn("Compose preview partial render", e)
+                        partialError = e
+                    }
+                }
+                IsolatedComposePreview(modifier) {
+                    CompositionLocalProvider(LocalConfiguration provides cfg) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            PreviewVariants(renderer, s.lowered, onErr, onPartial)
+                        }
+                    }
+                }
+            }
+            else -> CompositionLocalProvider(LocalConfiguration provides cfg) {
+                Box(modifier, contentAlignment = Alignment.Center) {
+                    when (state) {
+                        is PreviewState.Loading -> CircularProgressIndicator(Modifier.size(28.dp))
+                        is PreviewState.NotInterpretable -> Text(
+                            "Preview not interpretable", color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp, modifier = Modifier.padding(16.dp),
+                        )
+                        is PreviewState.Ready -> Unit
+                    }
                 }
             }
         }
@@ -162,6 +176,36 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
         data class Ready(val lowered: LoweredComposePreview) : PreviewState
         data class NotInterpretable(val reasons: List<String>) : PreviewState
     }
+}
+
+@Composable
+private fun IsolatedComposePreview(
+    modifier: Modifier,
+    content: @Composable () -> Unit,
+) {
+    val density = LocalDensity.current
+    val configuration = LocalConfiguration.current
+    val currentDensity by rememberUpdatedState(density)
+    val currentConfiguration by rememberUpdatedState(configuration)
+    val currentContent by rememberUpdatedState(content)
+    AndroidView(
+        modifier = modifier,
+        factory = { context ->
+            ComposeView(context).apply {
+                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+                isFocusable = true
+                isFocusableInTouchMode = true
+                setContent {
+                    CompositionLocalProvider(
+                        LocalDensity provides currentDensity,
+                        LocalConfiguration provides currentConfiguration,
+                    ) {
+                        currentContent()
+                    }
+                }
+            }
+        },
+    )
 }
 
 private fun Throwable.mayNeedProjectLoader(): Boolean =

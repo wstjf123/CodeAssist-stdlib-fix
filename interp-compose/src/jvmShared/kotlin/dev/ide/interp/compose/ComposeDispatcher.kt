@@ -206,8 +206,25 @@ class ComposeDispatcher(
         ) { _, method, callArgs ->
             when (method.name) {
                 "invoke" -> {
+                    val a = callArgs?.toList() ?: emptyList()
+                    val composerArg = a.firstOrNull { COMPOSER.isInstance(it) }
+                    if (composerArg != null) {
+                        val real = a.takeWhile { !COMPOSER.isInstance(it) }
+                        val prev = composer
+                        composer = composerArg
+                        return@newProxyInstance try {
+                            lambda.invoke(real)
+                        } catch (ce: kotlin.coroutines.cancellation.CancellationException) {
+                            throw ce
+                        } catch (e: Exception) {
+                            contentLambdaError = contentLambdaError ?: e
+                            Unit
+                        } finally {
+                            composer = prev
+                        }
+                    }
                     try {
-                        lambda.invoke(callArgs?.toList() ?: emptyList())
+                        lambda.invoke(a)
                     } catch (ce: kotlin.coroutines.cancellation.CancellationException) {
                         throw ce
                     } catch (e: Exception) {
