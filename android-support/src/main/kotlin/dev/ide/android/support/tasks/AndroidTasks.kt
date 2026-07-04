@@ -435,7 +435,7 @@ internal class GenerateStartupKeepRulesTask(
                 separator = System.lineSeparator(),
                 postfix = if (rules.isEmpty()) "" else System.lineSeparator(),
             )
-            Files.writeString(outFile, text)
+            Files.write(outFile, text.toByteArray(Charsets.UTF_8))
         }
         ctx.logger()("${name.value}: generated ${rules.size} AndroidX Startup keep rule(s)")
         return TaskResult.Success
