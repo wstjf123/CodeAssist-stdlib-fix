@@ -205,8 +205,8 @@ class MainActivity : ComponentActivity() {
     private fun promptInstall(path: String) = runCatching {
         val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", File(path))
         val intent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
-            data = uri
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            setData(uri)
+            setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         startActivity(intent)
     }.getOrElse { Toast.makeText(this, "Couldn't open the installer for ${File(path).name}", Toast.LENGTH_SHORT).show() }

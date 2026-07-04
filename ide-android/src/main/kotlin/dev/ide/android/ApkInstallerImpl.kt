@@ -1,16 +1,12 @@
 package dev.ide.android
 
-import android.app.PendingIntent
 import android.app.Activity
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
-import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import dev.ide.android.daemon.PackageLaunchBridge
 import dev.ide.core.ApkInstaller
 import kotlinx.coroutines.Dispatchers
@@ -19,11 +15,10 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 /**
- * On-device [ApkInstaller]: installs a built APK via Android's [PackageInstaller] and launches it on
- * success, the device "Run" for an android-app. The OS shows its own install-confirmation (this app holds
+ * On-device [ApkInstaller]: opens Android's package installer for a built APK, the device "Run" for an
+ * android-app. The OS shows its own install-confirmation (this app holds
  * `REQUEST_INSTALL_PACKAGES`); if the app isn't yet allowed to install unknown apps, it opens the relevant
- * Settings screen. A per-session receiver handles the pending-user-action prompt, then launches the
- * installed package. Streams progress to the build console via [installAndLaunch]'s `log`.
+ * Settings screen. Streams progress to the build console via [installAndLaunch]'s `log`.
  *
  * Under build-process isolation this runs in the `:build` process (no foreground activity), so the launch is
  * handed to the UI process via [PackageLaunchBridge] — firing the activity from `:build` would trip Android's
@@ -50,74 +45,21 @@ class ApkInstallerImpl(context: Context) : ApkInstaller {
             return@withContext false
         }
 
-        val installer = pm.packageInstaller
-        val sessionId = installer.createSession(
-            PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply { setAppPackageName(packageName) },
-        )
+        val apkUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apk.toFile())
+        val installIntent = Intent(Intent.ACTION_INSTALL_PACKAGE)
+        installIntent.setData(apkUri)
+        installIntent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         runCatching {
-            installer.openSession(sessionId).use { session ->
-                session.openWrite("base.apk", 0, Files.size(apk)).use { out ->
-                    Files.newInputStream(apk).use { it.copyTo(out) }
-                    session.fsync(out)
-                }
-                val action = "$INSTALL_ACTION.$sessionId"
-                registerStatusReceiver(action, packageName, log)
-                val flags = PendingIntent.FLAG_UPDATE_CURRENT or
-                    (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0)
-                val pi = PendingIntent.getBroadcast(context, sessionId, Intent(action).setPackage(context.packageName), flags)
-                session.commit(pi.intentSender)
+            if (launchContext is Activity) {
+                launchContext.startActivity(installIntent)
+            } else {
+                context.startActivity(installIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
-        }.onFailure { log("Install failed: ${it.message}"); installer.runCatching { abandonSession(sessionId) }; return@withContext false }
+        }.onFailure {
+            log("Couldn't open installer: ${it.message ?: it.javaClass.simpleName}")
+            return@withContext false
+        }
         log("Installing ${apk.fileName}…")
         true
-    }
-
-    private fun registerStatusReceiver(action: String, packageName: String, log: (String) -> Unit) {
-        val receiver = object : BroadcastReceiver() {
-            override fun onReceive(ctx: Context, intent: Intent) {
-                when (val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, -1)) {
-                    PackageInstaller.STATUS_PENDING_USER_ACTION -> {
-                        // The OS install-confirmation dialog. If the build runs in :build, forward this to
-                        // the UI process; starting it from the daemon can be treated as a background launch and
-                        // later surface as INSTALL_FAILED_ABORTED / "User rejected permissions".
-                        @Suppress("DEPRECATION") val confirm = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
-                        confirm?.let { uiIntent ->
-                            if (!PackageLaunchBridge.forwardInstall(uiIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))) {
-                                runCatching { startInstallConfirmation(uiIntent) }
-                            }
-                        }
-                    }
-                    PackageInstaller.STATUS_SUCCESS -> {
-                        log("Installed $packageName.")
-                        runCatching { context.unregisterReceiver(this) }
-                        // Prefer the UI process for the launch (it has a foreground activity → no
-                        // background-activity-launch block, and it owns the "Launching…" build-console line).
-                        // Fall back to launching here only when there's no UI to forward to (isolation off /
-                        // unbound) — ApkLauncher then retries while this process's PackageManager catches up.
-                        if (!PackageLaunchBridge.forwardLaunch(packageName)) {
-                            ApkLauncher.launch(context, packageName, log)
-                        }
-                    }
-                    else -> {
-                        val msg = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
-                        log("Install ${if (status == PackageInstaller.STATUS_FAILURE_ABORTED) "cancelled" else "failed"}${if (msg != null) ": $msg" else ""}.")
-                        runCatching { context.unregisterReceiver(this) }
-                    }
-                }
-            }
-        }
-        ContextCompat.registerReceiver(context, receiver, IntentFilter(action), ContextCompat.RECEIVER_NOT_EXPORTED)
-    }
-
-    private fun startInstallConfirmation(intent: Intent) {
-        if (launchContext is Activity) {
-            launchContext.startActivity(Intent(intent).apply { removeFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
-        } else {
-            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        }
-    }
-
-    private companion object {
-        const val INSTALL_ACTION = "dev.ide.android.INSTALL_STATUS"
     }
 }
