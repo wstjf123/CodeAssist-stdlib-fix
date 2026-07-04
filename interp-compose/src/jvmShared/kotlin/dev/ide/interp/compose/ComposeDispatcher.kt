@@ -81,6 +81,7 @@ class ComposeDispatcher(
         val threadable = call.dispatch == DispatchKind.TOP_LEVEL || call.dispatch == DispatchKind.MEMBER ||
             call.dispatch == DispatchKind.EXTENSION
         if (c != null && callee is ResolvedCallable.Library && threadable && callee.ownerFqn != null) {
+            intrinsic(callee.ownerFqn!!, callee.methodName, args)?.let { return it.value }
             // Decide composer-threading by the RUNTIME class — `isComposableCall` reflects the actual method
             // we're about to invoke (a transformed composable has a `Composer` parameter). This is the ground
             // truth, independent of the resolver's decoded `@Composable` flag (which is resolved against the
@@ -154,6 +155,16 @@ class ComposeDispatcher(
         } else {
             eventLambdaProxy(lambda, functionalInterface)
         }
+
+    private class Handled(val value: Any?)
+
+    private fun intrinsic(ownerFqn: String, methodName: String, args: List<Any?>): Handled? {
+        if (ownerFqn != "androidx.compose.runtime.ComposablesKt" || methodName != "remember") return null
+        val calculation = args.lastOrNull() as? InterpretedLambda ?: return null
+        val c = composer ?: return null
+        val invalid = ComposableAbi.argsChanged(c, args.dropLast(1))
+        return Handled(ComposableAbi.cache(c, invalid) { calculation.invoke(emptyList()) })
+    }
 
     /**
      * Wrap a `@Composable` content lambda as a proxy of its transformed functional type (e.g.

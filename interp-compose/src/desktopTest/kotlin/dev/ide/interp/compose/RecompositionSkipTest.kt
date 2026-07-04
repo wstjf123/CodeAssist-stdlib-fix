@@ -52,6 +52,9 @@ class RecompositionSkipTest {
         ItemCapture.items.clear()
         CounterHolder.state.value = 0
         CounterHolder.rootRuns = 0
+        TextFieldCapture.values.clear()
+        TextFieldCapture.onValueChange = null
+        TextFieldCapture.stateCreations = 0
     }
 
     private val span = SourceSpan(0, 0)
@@ -89,6 +92,34 @@ class RecompositionSkipTest {
         // composable that read the mutated state recomposes — isolating harness faults from the interpreter.
     }
 
+    @Test
+    fun rememberedMutableStateSurvivesTextFieldCallbackRecomposition() {
+        val dispatcher = ComposeDispatcher()
+        val runtime = ComposeRuntime(dispatcher)
+        val interpreter = Interpreter(functions = emptyMap(), dispatcher = dispatcher, composableInvoker = runtime)
+        val entry = rememberedTextFieldProgram()
+
+        runInteractiveRecompositionTest(
+            content = {
+                dispatcher.composer = currentComposer
+                try {
+                    runtime.invokeComposable(rootKey + 1, restartable = false, args = emptyList()) {
+                        interpreter.call(entry, emptyList())
+                    }
+                } finally {
+                    dispatcher.composer = null
+                }
+            },
+            interact = {
+                TextFieldCapture.onValueChange?.invoke("a") ?: error("text field callback was not captured")
+            },
+            settled = { TextFieldCapture.values.lastOrNull() == "a" },
+        ) {
+            assertEquals(listOf("", "a"), TextFieldCapture.values, "the typed value should survive recomposition")
+            assertEquals(1, TextFieldCapture.stateCreations, "`remember { mutableStateOf(\"\") }` should create one delegate")
+        }
+    }
+
     /** `fun Root(s: MutableState) { s.value /* subscribe */; Child("x") }`. The state arrives as a param and is
      *  read with `ownerFqn = null` (an instance getter on the receiver), matching the proven device spike. */
     private fun rootReadingStateThenCallingChild(): ResolvedFunction {
@@ -121,6 +152,70 @@ class RecompositionSkipTest {
         )
         val childFn = ResolvedFunction("Child", listOf(RParam(labelSlot, "label", null)), childBody, emptyList(), returnsUnit = true)
         return mapOf("Child/1" to childFn)
+    }
+
+    /** Lowered shape of:
+     *
+     * ```
+     * @Composable fun Editable() {
+     *   var text by remember { mutableStateOf("") }
+     *   StateTextField(value = text, onValueChange = { text = it })
+     * }
+     * ```
+     */
+    private fun rememberedTextFieldProgram(): ResolvedFunction {
+        val delegateSlot = SlotId(0)
+        val inputSlot = SlotId(1)
+        val valueProperty = Binding.Property("value", "androidx.compose.runtime.MutableState", backingField = false)
+        fun delegateRef() = RNode.Name(Binding.Local(delegateSlot, "text", mutable = true), span)
+
+        val stateFactory = RNode.Call(
+            ResolvedCallable.Library(
+                displayName = "newTextState", ownerFqn = "dev.ide.interp.compose.RecompositionSkipTestKt",
+                methodName = "newTextState", paramTypes = listOf(dev.ide.lang.kotlin.symbols.KotlinType("kotlin.String")),
+                isStatic = true, isConstructor = false, isInline = false,
+            ),
+            DispatchKind.TOP_LEVEL, receiver = null, args = listOf(RArg(RNode.Const("", null, span))),
+            callSiteKey = CallSiteKey(201), source = span,
+        )
+        val remember = RNode.Call(
+            ResolvedCallable.Library(
+                displayName = "remember", ownerFqn = "androidx.compose.runtime.ComposablesKt",
+                methodName = "remember", paramTypes = listOf(dev.ide.lang.kotlin.symbols.KotlinType("kotlin.Function0")),
+                isStatic = true, isConstructor = false, isInline = true, isComposable = true,
+                paramNames = listOf("calculation"),
+            ),
+            DispatchKind.TOP_LEVEL, receiver = null,
+            args = listOf(RArg(RNode.Lambda(emptyList(), stateFactory, emptyList(), span), trailingLambda = true)),
+            callSiteKey = CallSiteKey(202), source = span,
+        )
+        val localTextDelegate = RNode.LocalVar(delegateSlot, "text", mutable = true, initializer = remember, source = span)
+        val textRead = RNode.PropertyGet(delegateRef(), valueProperty, span)
+        val onValueChange = RNode.Lambda(
+            params = listOf(RParam(inputSlot, "it", dev.ide.lang.kotlin.symbols.KotlinType("kotlin.String"))),
+            body = RNode.PropertySet(delegateRef(), valueProperty, RNode.Name(Binding.Param(inputSlot, "it"), span), span),
+            captures = listOf(Binding.Local(delegateSlot, "text", mutable = true)),
+            source = span,
+        )
+        val field = RNode.Call(
+            ResolvedCallable.Library(
+                displayName = "StateTextField", ownerFqn = "dev.ide.interp.compose.RecompositionSkipTestKt",
+                methodName = "StateTextField",
+                paramTypes = listOf(
+                    dev.ide.lang.kotlin.symbols.KotlinType("kotlin.String"),
+                    dev.ide.lang.kotlin.symbols.KotlinType("kotlin.Function1"),
+                ),
+                isStatic = true, isConstructor = false, isInline = false, isComposable = true,
+                paramNames = listOf("value", "onValueChange"),
+            ),
+            DispatchKind.TOP_LEVEL, receiver = null,
+            args = listOf(RArg(textRead, name = "value"), RArg(onValueChange, name = "onValueChange")),
+            callSiteKey = CallSiteKey(203), source = span,
+        )
+        return ResolvedFunction(
+            "Editable", emptyList(), RNode.Block(listOf(localTextDelegate, field), isExpression = false, source = span),
+            emptyList(), returnsUnit = true,
+        )
     }
 
     // --- headless recomposition harness ---
@@ -171,6 +266,49 @@ class RecompositionSkipTest {
         }
     }
 
+    private fun runInteractiveRecompositionTest(
+        content: @Composable () -> Unit,
+        interact: () -> Unit,
+        settled: () -> Boolean,
+        verify: () -> Unit,
+    ) {
+        val executor = Executors.newSingleThreadExecutor { Thread(it, "interactive-recompose-test") }
+        val dispatcher = executor.asCoroutineDispatcher()
+        try {
+            runBlocking {
+                withTimeout(30_000) {
+                    val clock = BroadcastFrameClock()
+                    val recomposer = Recomposer(coroutineContext + dispatcher + clock)
+                    val runJob = launch(dispatcher + clock) { recomposer.runRecomposeAndApplyChanges() }
+                    recomposer.currentState.first { it == Recomposer.State.Idle }
+
+                    val composition = withContext(dispatcher) {
+                        Composition(UnitApplier, recomposer).also { c -> c.setContent { content() } }
+                    }
+                    withContext(dispatcher) {
+                        assertEquals(listOf(""), TextFieldCapture.values, "initial composition should read the empty state")
+                        interact()
+                        Snapshot.sendApplyNotifications()
+                    }
+                    var frame = 0L
+                    while (!settled()) {
+                        clock.sendFrame(frame++)
+                        delay(5)
+                    }
+
+                    withContext(dispatcher) {
+                        verify()
+                        composition.dispose()
+                    }
+                    recomposer.cancel()
+                    runJob.cancel()
+                }
+            }
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
     private object UnitApplier : Applier<Unit> {
         override val current: Unit get() = Unit
         override fun down(node: Unit) {}
@@ -196,4 +334,21 @@ object CounterHolder {
 fun ControlReader() {
     CounterHolder.rootRuns++
     @Suppress("UNUSED_EXPRESSION") CounterHolder.state.value
+}
+
+fun newTextState(value: String): MutableState<String> {
+    TextFieldCapture.stateCreations++
+    return mutableStateOf(value)
+}
+
+@Composable
+fun StateTextField(value: String, onValueChange: (String) -> Unit) {
+    TextFieldCapture.values.add(value)
+    TextFieldCapture.onValueChange = onValueChange
+}
+
+object TextFieldCapture {
+    val values = ArrayList<String>()
+    var onValueChange: ((String) -> Unit)? = null
+    var stateCreations = 0
 }
