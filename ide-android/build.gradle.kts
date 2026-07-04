@@ -8,7 +8,6 @@ import dev.ide.build.RelocateTypesInJar
 // package inside a build script — `java.io.File` would parse as `(java extension).io`.
 import java.io.File
 import java.net.URI
-import java.net.URL
 import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.util.Properties
@@ -253,12 +252,16 @@ android {
     // Stage the generated assets (kotlin-stdlib.jar, kotlinc-resources.zip) into the merged assets so the
     // on-device compiler can load them. AGP 9 disallows a Provider here, so register the static dirs the
     // tasks write to; ordering is carried by the `preBuild.dependsOn(...)` below (same pattern as aapt2).
-    sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("kotlin-stdlib-asset").get().asFile)
-    sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("kotlinc-resources-asset").get().asFile)
-    sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("compose-runtime-asset").get().asFile)
-    sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("compose-fonts-asset").get().asFile)
-    sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("compose-strings-asset").get().asFile)
-    sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("r8-dex-asset").get().asFile)
+    sourceSets.getByName("main").assets.directories.addAll(
+        listOf(
+            layout.buildDirectory.dir("kotlin-stdlib-asset").get().asFile,
+            layout.buildDirectory.dir("kotlinc-resources-asset").get().asFile,
+            layout.buildDirectory.dir("compose-runtime-asset").get().asFile,
+            layout.buildDirectory.dir("compose-fonts-asset").get().asFile,
+            layout.buildDirectory.dir("compose-strings-asset").get().asFile,
+            layout.buildDirectory.dir("r8-dex-asset").get().asFile,
+        )
+    )
 
     // Release signing. A checked-in debug keystore is used so CI and local release APKs have the same
     // install/update identity.
@@ -469,7 +472,7 @@ val fetchAndroidBuildTools = tasks.register("fetchAndroidBuildTools") {
             logger.lifecycle("Fetching aapt2 ($abi) from $url")
             val tmp = File.createTempFile("aapt2-$abi", ".bin")
             try {
-                URL(url).openStream().use { input -> tmp.outputStream().use { input.copyTo(it) } }
+                URI(url).toURL().openStream().use { input -> tmp.outputStream().use { input.copyTo(it) } }
                 // Guard against a GitHub error/HTML page silently landing as the binary.
                 val magic = tmp.inputStream().use { it.readNBytes(4) }
                 val isElf = magic.size == 4 && magic[0] == 0x7F.toByte() &&
@@ -625,10 +628,10 @@ dependencies {
     // Core-library desugaring runtime (temporarily enabled — see isCoreLibraryDesugaringEnabled above).
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
-    implementation(compose.runtime)
-    implementation(compose.foundation)
-    implementation(compose.material3)
-    implementation(compose.ui)
+    implementation(libs.compose.runtime)
+    implementation(libs.compose.foundation)
+    implementation(libs.compose.material3)
+    implementation(libs.compose.ui)
     implementation(libs.androidx.activity.compose)
     // FileProvider (androidx.core.content.FileProvider) — hands other apps content:// URIs to our
     // app-private project files for Share / "Open with", and grants read access on inbound intents.
