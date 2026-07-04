@@ -254,12 +254,12 @@ android {
     // tasks write to; ordering is carried by the `preBuild.dependsOn(...)` below (same pattern as aapt2).
     sourceSets.getByName("main").assets.directories.addAll(
         listOf(
-            layout.buildDirectory.dir("kotlin-stdlib-asset").get().asFile,
-            layout.buildDirectory.dir("kotlinc-resources-asset").get().asFile,
-            layout.buildDirectory.dir("compose-runtime-asset").get().asFile,
-            layout.buildDirectory.dir("compose-fonts-asset").get().asFile,
-            layout.buildDirectory.dir("compose-strings-asset").get().asFile,
-            layout.buildDirectory.dir("r8-dex-asset").get().asFile,
+            layout.buildDirectory.dir("kotlin-stdlib-asset").get().asFile.absolutePath,
+            layout.buildDirectory.dir("kotlinc-resources-asset").get().asFile.absolutePath,
+            layout.buildDirectory.dir("compose-runtime-asset").get().asFile.absolutePath,
+            layout.buildDirectory.dir("compose-fonts-asset").get().asFile.absolutePath,
+            layout.buildDirectory.dir("compose-strings-asset").get().asFile.absolutePath,
+            layout.buildDirectory.dir("r8-dex-asset").get().asFile.absolutePath,
         )
     )
 
