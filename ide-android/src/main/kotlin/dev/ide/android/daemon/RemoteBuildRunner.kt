@@ -113,7 +113,7 @@ class RemoteBuildRunner(context: Context, private val services: IdeServices) : B
         },
         onInstallIntent = { intent ->
             mainHandler.post {
-                val foregroundIntent = Intent(intent).removeFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                val foregroundIntent = Intent(intent).apply { removeFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
                 runCatching { uiContext.startActivity(foregroundIntent) }
                     .recoverCatching { appContext.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
                     .onFailure { e -> _buildState.update { it.copy(log = it.log + line("Couldn't open installer: ${e.message}")) } }
