@@ -11,6 +11,7 @@ import dev.ide.android.support.tasks.DexExternalLibsTask
 import dev.ide.android.support.tasks.DexMergeTask
 import dev.ide.android.support.tasks.GenerateLibraryRTask
 import dev.ide.android.support.tasks.GenerateRJarTask
+import dev.ide.android.support.tasks.GenerateStartupKeepRulesTask
 import dev.ide.android.support.tasks.GenerateViewBindingTask
 import dev.ide.android.support.gms.GoogleServices
 import dev.ide.android.support.tasks.BundleTask
@@ -274,6 +275,7 @@ class AndroidBuildSystem(
         val aapt2Compile = step("aapt2Compile")
         val aapt2Link = step("aapt2Link")
         val generateRFile = step("generateRFile")
+        val generateStartupKeepRules = step("generateStartupKeepRules")
         val compileKotlin = step("compileKotlin")
         val compile = step("compileJava")
         // buildFeatures { viewBinding }: generate <Layout>Binding.java from this module's own layouts, fed to
@@ -402,20 +404,25 @@ class AndroidBuildSystem(
 
         if (minify) {
             // Release: R8 shrinks + optimizes + obfuscates + dexes app classes + every library jar in one pass.
-            // Keep-rule sources, in AGP order: aapt2's manifest/layout rules, then the build type's
-            // proguardFiles (bundled defaults + module files), then dependency-lib + AAR consumer rules.
+            // Keep-rule sources, in AGP order: aapt2's manifest/layout rules, AndroidX Startup metadata
+            // rules, then the build type's proguardFiles (bundled defaults + module files), then
+            // dependency-lib + AAR consumer rules.
             val appProguard = resolveProguardFiles(bt.proguardFiles, layout.moduleDir, layout.proguardDefaults)
             val depConsumer = depAndroidLibs.flatMap { lib ->
                 val libDir = Paths.get(lib.outputDir.path).parent.parent
                 val libBt = lib.facets.get(AndroidFacet.KEY)?.buildType?.invoke(variant.buildTypeName)
                 resolveProguardFiles(libBt?.consumerProguardFiles ?: emptyList(), libDir, layout.proguardDefaults)
             }
-            val keepRuleFiles = listOf(layout.aaptProguardRules) + appProguard + depConsumer + libs.consumerProguardFiles
+            tasks.task(generateStartupKeepRules, listOf(processManifest)) {
+                GenerateStartupKeepRulesTask(generateStartupKeepRules, layout.mergedManifest, layout.startupProguardRules)
+            }
+            val keepRuleFiles = listOf(layout.aaptProguardRules, layout.startupProguardRules) +
+                appProguard + depConsumer + libs.consumerProguardFiles
             val inlineRules = bt.proguardRules
             val resourceShrink = if (shrinkResources) ResourceShrink(layout.protoAp, layout.shrunkProtoAp) else null
 
             val minifyTask = TaskName(":${app.name}:minify${v}WithR8")
-            tasks.task(minifyTask, listOf(aapt2Link, generateRFile, compile) + moduleJarProducers) {
+            tasks.task(minifyTask, listOf(aapt2Link, generateRFile, generateStartupKeepRules, compile) + moduleJarProducers) {
                 R8MinifyTask(
                     minifyTask, appProjectClasses + subProjectJars + externalJars + rJars, sdk.androidJar, facet.minSdk,
                     keepRuleFiles, inlineRules, facet.r8FullMode,
@@ -739,6 +746,7 @@ class AndroidBuildSystem(
         val rDex: Path = inter.resolve("r-dex")                 // dexRDex output (the app's R.jar as its own dex layer)
         val resourcesAp: Path = inter.resolve("resources.ap_")
         val aaptProguardRules: Path = inter.resolve("aapt_rules.txt") // keep rules aapt2 derives from the manifest
+        val startupProguardRules: Path = inter.resolve("startup_rules.pro") // keep rules for AndroidX Startup metadata
         val proguardDefaults: Path = inter.resolve("proguard-defaults") // bundled default proguard files, extracted
         val dex: Path = inter.resolve("dex")                    // mergeDex / R8 output (mono-/legacy-multidex)
         val desugarLibDex: Path = inter.resolve("desugar-lib-dex") // L8 output: the core-library desugaring runtime

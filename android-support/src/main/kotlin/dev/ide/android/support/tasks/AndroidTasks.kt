@@ -51,6 +51,7 @@ import java.util.jar.JarEntry
 import java.util.jar.JarOutputStream
 import java.util.stream.Collectors
 import java.util.zip.ZipFile
+import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.io.path.writeText
 
 /**
@@ -409,6 +410,69 @@ internal class Aapt2LinkTask(
         r.log.forEach(ctx.logger())
         ctx.reportToolDiagnostics("aapt2", r.log, DiagnosticKind.RESOURCE)
         return if (r.success) TaskResult.Success else TaskResult.Failed("aapt2 link failed")
+    }
+}
+
+/**
+ * AndroidX Startup initializers are referenced from manifest `<meta-data android:value="androidx.startup">`
+ * entries and loaded reflectively. aapt2's generated keep rules keep the provider itself, but not those
+ * metadata-named initializer classes, so release R8 can shrink them away while leaving the manifest reference.
+ */
+internal class GenerateStartupKeepRulesTask(
+    override val name: TaskName,
+    private val manifest: Path,
+    private val outFile: Path,
+) : Task {
+    override val inputs: TaskInputs get() = TaskInputsImpl().apply { filePaths("manifest", listOf(manifest)) }
+    override val outputs: TaskOutputs get() = TaskOutputsImpl().apply { filePath("rules", outFile) }
+
+    override suspend fun execute(ctx: TaskContext): TaskResult {
+        ctx.checkCanceled()
+        val rules = if (Files.isRegularFile(manifest)) StartupKeepRules.fromManifest(manifest) else emptyList()
+        withContext(Dispatchers.IO) {
+            outFile.parent?.let(Files::createDirectories)
+            val text = rules.joinToString(
+                separator = System.lineSeparator(),
+                postfix = if (rules.isEmpty()) "" else System.lineSeparator(),
+            )
+            Files.writeString(outFile, text)
+        }
+        ctx.logger()("${name.value}: generated ${rules.size} AndroidX Startup keep rule(s)")
+        return TaskResult.Success
+    }
+}
+
+internal object StartupKeepRules {
+    private const val ANDROID_NS = "http://schemas.android.com/apk/res/android"
+    private const val STARTUP_VALUE = "androidx.startup"
+    private val CLASS_NAME = Regex("""[A-Za-z_$][A-Za-z0-9_$]*(\.[A-Za-z_$][A-Za-z0-9_$]*)*""")
+
+    fun fromManifest(manifest: Path): List<String> {
+        val document = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
+            .newDocumentBuilder().parse(manifest.toFile())
+        val packageName = document.documentElement?.getAttribute("package").orEmpty()
+        val out = LinkedHashSet<String>()
+        val nodes = document.getElementsByTagName("meta-data")
+        for (i in 0 until nodes.length) {
+            val element = nodes.item(i) as? org.w3c.dom.Element ?: continue
+            if (androidAttr(element, "value") != STARTUP_VALUE) continue
+            val rawName = androidAttr(element, "name").takeIf { it.isNotBlank() } ?: continue
+            val className = resolveClassName(rawName, packageName) ?: continue
+            out.add("-keep class $className { *; }")
+        }
+        return out.toList()
+    }
+
+    private fun androidAttr(element: org.w3c.dom.Element, localName: String): String =
+        element.getAttributeNS(ANDROID_NS, localName).ifEmpty { element.getAttribute("android:$localName") }
+
+    private fun resolveClassName(name: String, packageName: String): String? {
+        val resolved = when {
+            name.startsWith(".") && packageName.isNotBlank() -> packageName + name
+            "." !in name && packageName.isNotBlank() -> "$packageName.$name"
+            else -> name
+        }
+        return resolved.takeIf { CLASS_NAME.matches(it) }
     }
 }
 
@@ -1791,4 +1855,3 @@ internal class SignApkTask(
         return if (r.success) TaskResult.Success else TaskResult.Failed("apk signing failed")
     }
 }
-
