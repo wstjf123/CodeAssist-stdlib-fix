@@ -1,6 +1,7 @@
 package dev.ide.android.daemon
 
 import android.content.Context
+import android.content.Intent
 import dev.ide.core.BuildRunner
 import dev.ide.core.IdeServices
 import dev.ide.platform.log.Log
@@ -105,6 +106,10 @@ class RemoteBuildRunner(context: Context, private val services: IdeServices) : B
             if (pkg.isNotEmpty()) {
                 dev.ide.android.ApkLauncher.launch(appContext, pkg) { msg -> _buildState.update { it.copy(log = it.log + line(msg)) } }
             }
+        },
+        onInstallIntent = { intent ->
+            runCatching { appContext.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                .onFailure { e -> _buildState.update { it.copy(log = it.log + line("Couldn't open installer: ${e.message}")) } }
         },
         onConnected = ::onDaemonConnected,
         onDeath = {

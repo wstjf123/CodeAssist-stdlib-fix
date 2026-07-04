@@ -204,8 +204,8 @@ class MainActivity : ComponentActivity() {
     /** Hand the APK at [path] to the system package installer (the OS install-confirmation UI). */
     private fun promptInstall(path: String) = runCatching {
         val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", File(path))
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
+        val intent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+            data = uri
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         startActivity(intent)

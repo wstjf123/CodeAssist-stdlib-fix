@@ -72,9 +72,15 @@ class ApkInstallerImpl(context: Context) : ApkInstaller {
             override fun onReceive(ctx: Context, intent: Intent) {
                 when (val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, -1)) {
                     PackageInstaller.STATUS_PENDING_USER_ACTION -> {
-                        // The OS install-confirmation dialog — launch the Intent it handed us.
+                        // The OS install-confirmation dialog. If the build runs in :build, forward this to
+                        // the UI process; starting it from the daemon can be treated as a background launch and
+                        // later surface as INSTALL_FAILED_ABORTED / "User rejected permissions".
                         @Suppress("DEPRECATION") val confirm = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
-                        runCatching { confirm?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)?.let { context.startActivity(it) } }
+                        confirm?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)?.let { uiIntent ->
+                            if (!PackageLaunchBridge.forwardInstall(uiIntent)) {
+                                runCatching { context.startActivity(uiIntent) }
+                            }
+                        }
                     }
                     PackageInstaller.STATUS_SUCCESS -> {
                         log("Installed $packageName.")

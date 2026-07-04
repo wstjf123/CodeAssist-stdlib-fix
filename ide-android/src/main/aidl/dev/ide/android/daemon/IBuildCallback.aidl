@@ -1,6 +1,8 @@
 // IPC for build-process isolation (docs/build-process-isolation.md). Daemon (:build) -> UI events.
 package dev.ide.android.daemon;
 
+import android.content.Intent;
+
 interface IBuildCallback {
     // oneway: fire-and-forget, ordered per-binder, never blocks the daemon. These carry BuildState DELTAS
     // (the UI reassembles the full state on its side). Enums travel as their .name() string, decoded with
@@ -24,4 +26,9 @@ interface IBuildCallback {
     // :build, but firing the installed app's activity from that background process is blocked by Android's
     // background-activity-launch rules — the UI has a foreground activity, so it can.
     oneway void onLaunchPackage(String packageName);
+
+    // The android "Run" needs the OS install-confirmation UI. The PackageInstaller session is created in
+    // :build, but the confirmation activity must be started by the UI process so Android treats it as a
+    // foreground user action instead of aborting the install as rejected/cancelled.
+    oneway void onInstallIntent(in Intent intent);
 }
