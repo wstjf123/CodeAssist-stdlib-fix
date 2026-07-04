@@ -257,6 +257,13 @@ class KotlinScopeFunctionTest {
         assertTrue(diags.any { it.code == "kt.usePropertyAccess" && it.message.contains("label = \"x\"") }, "setLabel(\"x\") should suggest `label = \"x\"`; got $diags")
     }
 
+    @Test fun setterOnlyJavaMethodDoesNotWarnUsePropertyAccess() {
+        assertTrue(
+            "kt.usePropertyAccess" !in codes("import com.example.JavaPanel\nfun f() { JavaPanel().setToastText(\"x\") }"),
+            "setter-only Java methods do not form Kotlin properties",
+        )
+    }
+
     @Test fun explicitIsSetterCallSuggestsTheIsProperty() {
         // setOpen(true) pairs with the isOpen() getter → suggest `isOpen = true` (not `open = true`).
         val diags = diagnostics("import com.example.JavaPanel\nfun f() { JavaPanel().setOpen(true) }")
@@ -350,6 +357,10 @@ class KotlinScopeFunctionTest {
                 visitCode(); visitInsn(Opcodes.ACONST_NULL); visitInsn(Opcodes.ARETURN); visitMaxs(1, 1); visitEnd()
             }
             cw.visitMethod(Opcodes.ACC_PUBLIC, "setLabel", "(Ljava/lang/String;)V", null, null).apply {
+                visitCode(); visitInsn(Opcodes.RETURN); visitMaxs(1, 2); visitEnd()
+            }
+            // public void setToastText(String) — setter only, like android.widget.Toast#setText(...).
+            cw.visitMethod(Opcodes.ACC_PUBLIC, "setToastText", "(Ljava/lang/String;)V", null, null).apply {
                 visitCode(); visitInsn(Opcodes.RETURN); visitMaxs(1, 2); visitEnd()
             }
             // public boolean isOpen() / public void setOpen(boolean) — `is`-accessor pair → property `isOpen`.

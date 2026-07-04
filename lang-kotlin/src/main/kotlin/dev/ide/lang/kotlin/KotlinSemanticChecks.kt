@@ -1318,7 +1318,8 @@ internal class KotlinSemanticChecks(private val service: KotlinSymbolService) {
         if (recvType.isTypeParameter || !service.isJavaType(recvType.qualifiedName)) return null
         // Only when the synthetic property actually resolves — so applying the suggestion can't break the code.
         val prop = candidates.firstOrNull { cand ->
-            service.membersNamedForCheck(recvType.qualifiedName, recvType.typeArguments, cand).any { it.kind == SymbolKind.FIELD }
+            service.membersNamedForCheck(recvType.qualifiedName, recvType.typeArguments, cand).any { it.kind == SymbolKind.FIELD } &&
+                (!isSetter || hasJavaGetterForSyntheticProperty(recvType, cand))
         } ?: return null
         val suggestion = if (isSetter) {
             "$prop = ${call.valueArguments.firstOrNull()?.getArgumentExpression()?.text ?: "value"}"
@@ -1334,6 +1335,18 @@ internal class KotlinSemanticChecks(private val service: KotlinSymbolService) {
     private fun decapitalizeAccessor(suffix: String): String =
         if (suffix.length > 1 && suffix[1].isUpperCase()) suffix
         else suffix.replaceFirstChar { it.lowercaseChar() }
+
+    private fun hasJavaGetterForSyntheticProperty(type: KotlinType, prop: String): Boolean {
+        val getterNames = if (prop.startsWith("is") && prop.length > 2 && prop[2].isUpperCase()) {
+            listOf(prop)
+        } else {
+            listOf("get" + prop.replaceFirstChar { it.uppercaseChar() })
+        }
+        return getterNames.any { getter ->
+            service.membersNamedForCheck(type.qualifiedName, type.typeArguments, getter)
+                .any { it.kind == SymbolKind.METHOD && (it as? KotlinSymbol)?.paramTypes?.isEmpty() == true }
+        }
+    }
 
     /**
      * A bare `name(...)` call where `name` is not callable — it resolves to a VALUE (a local/parameter/property)
