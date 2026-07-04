@@ -99,12 +99,12 @@ class SdkManagerService(
     /** Start downloading one Android **source** package by its sdkmanager id (`sources;android-34`) on the
      *  background scope. Returns immediately; progress streams on [state]. */
     fun installAndroidPackage(path: String): String {
-        if (jobs.containsKey(path)) return "Already downloading $path."
+        if (jobs.containsKey(path)) return "已在下载 $path。"
         // Sources only: the SDK Manager never offers anything else, so reject a stale/foreign id outright.
-        if (!path.startsWith("sources;")) return "Only SDK sources can be installed."
+        if (!path.startsWith("sources;")) return "只能安装 SDK 源码。"
         launchDownload(path, path) {
             val pkg = withContext(Dispatchers.IO) { AndroidSdkInstaller.fetchPackages(fetcher).firstOrNull { it.path == path } }
-                ?: return@launchDownload "Package $path not found in the repository."
+                ?: return@launchDownload "仓库中找不到包 $path。"
             update(path) { it.copy(label = pkg.displayName) }
             val root = androidSdkRoot()
             runCatching { Files.createDirectories(root) }
@@ -117,13 +117,13 @@ class SdkManagerService(
                 onStage = { stage -> update(path) { it.copy(status = stage, fraction = if (stage == "DOWNLOADING") it.fraction else -1.0, detail = if (stage == "DOWNLOADING") it.detail else "") } },
             )
         }
-        return "Downloading $path…"
+        return "正在下载 $path…"
     }
 
     /** Download Temurin JDK [feature] on the background scope and keep its sources for the editor. */
     fun downloadJdkSources(feature: Int): String {
         val id = "jdk-$feature"
-        if (jobs.containsKey(id)) return "Already downloading JDK $feature."
+        if (jobs.containsKey(id)) return "已在下载 JDK $feature。"
         launchDownload(id, "JDK $feature sources") {
             withContext(Dispatchers.IO) {
                 jdk.downloadJdkSources(feature) { read, total ->
@@ -132,7 +132,7 @@ class SdkManagerService(
                 }
             }
         }
-        return "Downloading JDK $feature sources…"
+        return "正在下载 JDK $feature 源码…"
     }
 
     /** Cancel an in-flight download by id (the package path, or `jdk-<feature>`). The flag stops the blocking
@@ -165,25 +165,25 @@ class SdkManagerService(
      * active engine re-attaches the new sources. Returns a human-readable status.
      */
     fun downloadAndroidSources(): String {
-        val sdkRoot = AndroidSdk.findSdkRoot(workspaceRoot) ?: return "No Android SDK found."
-        val sdk = AndroidSdk.detect(sdkRoot) ?: return "No installed Android platform."
-        val platform = sdk.androidJar.parent?.fileName?.toString() ?: return "Couldn't determine the platform."
-        if (AndroidSdk.platformSourcesDir(sdkRoot, platform) != null) return "Sources for $platform are already installed."
+        val sdkRoot = AndroidSdk.findSdkRoot(workspaceRoot) ?: return "未找到 Android SDK。"
+        val sdk = AndroidSdk.detect(sdkRoot) ?: return "未安装 Android 平台。"
+        val platform = sdk.androidJar.parent?.fileName?.toString() ?: return "无法确定平台。"
+        if (AndroidSdk.platformSourcesDir(sdkRoot, platform) != null) return "$platform 的源码已安装。"
         val sdkmanager = findSdkmanager(sdkRoot)
-            ?: return "sdkmanager not found — install the sources via Android Studio's SDK Manager (SDK Platforms → Sources for Android $platform)."
+            ?: return "未找到 sdkmanager——请通过 Android Studio 的 SDK Manager 安装源码（SDK Platforms → Sources for Android $platform）。"
         return runCatching {
             val proc = ProcessBuilder(sdkmanager.toString(), "sources;$platform")
                 .directory(sdkRoot.toFile()).redirectErrorStream(true).start()
             proc.outputStream.bufferedWriter().use { w -> repeat(50) { runCatching { w.write("y\n"); w.flush() } } }
             val done = proc.waitFor(4, java.util.concurrent.TimeUnit.MINUTES)
             if (!done) {
-                proc.destroyForcibly(); return "Timed out downloading sources for $platform."
+                proc.destroyForcibly(); return "下载 $platform 源码超时。"
             }
             if (proc.exitValue() == 0) {
                 notifyChanged() // pick up the freshly-installed sources (active engine re-attaches + reindexes)
                 "Installed sources for $platform."
-            } else "sdkmanager failed (exit ${proc.exitValue()}) installing sources for $platform."
-        }.getOrElse { "Couldn't run sdkmanager: ${it.message}" }
+            } else "sdkmanager 安装 $platform 源码失败（退出码 ${proc.exitValue()}）。"
+        }.getOrElse { "无法运行 sdkmanager：${it.message}" }
     }
 
     /** Locate `sdkmanager` under the SDK (cmdline-tools preferred, then legacy tools). */
@@ -222,7 +222,7 @@ class SdkManagerService(
             } catch (c: CancellationException) {
                 null // handled below via the cancelled flag
             } catch (e: Exception) {
-                "Download failed: ${e.message}"
+                "下载失败：${e.message}"
             }
             when {
                 id in cancelled -> finish(id, "FAILED", "Cancelled")

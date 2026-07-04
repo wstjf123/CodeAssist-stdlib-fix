@@ -32,10 +32,10 @@ internal fun BottomNav(selected: RailDestination, onSelect: (RailDestination) ->
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            BottomNavItem(CaIcons.docText, "Files", selected == RailDestination.Files) { onSelect(RailDestination.Files) }
-            BottomNavItem(CaIcons.search, "Search", selected == RailDestination.Search) { onSelect(RailDestination.Search) }
-            BottomNavItem(CaIcons.gitBranch, "Source", selected == RailDestination.Source) { onSelect(RailDestination.Source) }
-            BottomNavItem(CaIcons.ellipsis, "More", selected == RailDestination.More) { onSelect(RailDestination.More) }
+            BottomNavItem(CaIcons.docText, "文件", selected == RailDestination.Files) { onSelect(RailDestination.Files) }
+            BottomNavItem(CaIcons.search, "搜索", selected == RailDestination.Search) { onSelect(RailDestination.Search) }
+            BottomNavItem(CaIcons.gitBranch, "源码", selected == RailDestination.Source) { onSelect(RailDestination.Source) }
+            BottomNavItem(CaIcons.ellipsis, "更多", selected == RailDestination.More) { onSelect(RailDestination.More) }
         }
     }
 }

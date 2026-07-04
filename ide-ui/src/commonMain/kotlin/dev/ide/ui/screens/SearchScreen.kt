@@ -54,7 +54,7 @@ import kotlinx.coroutines.delay
 private enum class SearchTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     Symbols("Symbols", CaIcons.code),
     Members("Members", CaIcons.layers),
-    Text("Text", CaIcons.docText),
+    Text("文本", CaIcons.docText),
 }
 
 /**
@@ -95,7 +95,7 @@ fun SearchScreen(
     Column(modifier.fillMaxSize().background(Ca.colors.bg)) {
         // Title + search field
         Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp)) {
-            Text("Search", color = Ca.colors.textPrimary, style = Ca.type.headline, fontWeight = FontWeight.SemiBold)
+            Text("搜索", color = Ca.colors.textPrimary, style = Ca.type.headline, fontWeight = FontWeight.SemiBold)
             Row(
                 Modifier.fillMaxWidth().padding(top = 10.dp)
                     .background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.control))

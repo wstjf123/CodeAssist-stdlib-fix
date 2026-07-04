@@ -391,7 +391,7 @@ fun CodeAssistApp(
                             // The logs viewer is an editor overlay; only meaningful with a project open.
                             onOpenLogs = { if (epoch > 0) { state.logsOpen = true; screen = Screen.Editor } },
                             view = if (hubReturn == Screen.Editor) SettingsView.All else SettingsView.Global,
-                            title = "Settings",
+                            title = "设置",
                             codeFont = codeFont,
                             fileActions = fileActions,
                         )

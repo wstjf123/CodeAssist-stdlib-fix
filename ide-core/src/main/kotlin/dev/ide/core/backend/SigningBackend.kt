@@ -29,13 +29,13 @@ internal class SigningBackend(private val ctx: BackendContext) : SigningService 
 
     override suspend fun createKeystore(spec: UiKeystoreSpec): UiKeystoreResult = withContext(Dispatchers.IO) {
         ctx.keystoreRegistry?.let { KeystoreRegistryOps.createKeystore(it, spec) }
-            ?: UiKeystoreResult(false, "No keystore registry available.")
+            ?: UiKeystoreResult(false, "没有可用的密钥库注册表。")
     }
 
     override suspend fun importKeystore(filePath: String, name: String, storePass: String, keyAlias: String, keyPass: String): UiKeystoreResult =
         withContext(Dispatchers.IO) {
             ctx.keystoreRegistry?.let { KeystoreRegistryOps.importKeystore(it, filePath, name, storePass, keyAlias, keyPass) }
-                ?: UiKeystoreResult(false, "No keystore registry available.")
+                ?: UiKeystoreResult(false, "没有可用的密钥库注册表。")
         }
 
     override suspend fun validateKeystore(filePath: String, storePass: String): UiKeystoreValidation =
@@ -51,7 +51,7 @@ internal class SigningBackend(private val ctx: BackendContext) : SigningService 
     override suspend fun assignSigning(moduleName: String, buildType: String, keystoreId: String?): UiConfigResult =
         withContext(Dispatchers.IO) {
             val signing = ctx.servicesOrNull?.signing
-                ?: return@withContext UiConfigResult(false, "Open a project to assign signing.")
+                ?: return@withContext UiConfigResult(false, "请先打开项目再分配签名。")
             signing.assignSigning(moduleName, buildType, keystoreId).also { if (it.success) ctx.bumpFileSystemEpoch() }
         }
 }

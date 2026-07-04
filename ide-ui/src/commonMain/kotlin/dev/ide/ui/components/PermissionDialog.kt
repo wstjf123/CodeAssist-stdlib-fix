@@ -67,13 +67,13 @@ private fun PermissionCard(req: UiPermissionRequest, answer: (UiPermissionDecisi
         Text(req.detail, color = Ca.colors.textPrimary, style = Ca.type.footnote, fontWeight = FontWeight.Medium)
         Spacer(Modifier.height(16.dp))
 
-        PermButton("Allow once", PermKind.Neutral) { answer(UiPermissionDecision.ALLOW_ONCE) }
+        PermButton("仅允许一次", PermKind.Neutral) { answer(UiPermissionDecision.ALLOW_ONCE) }
         Spacer(Modifier.height(8.dp))
-        PermButton("Allow for this run", PermKind.Accent) { answer(UiPermissionDecision.ALLOW_RUN) }
+        PermButton("本次运行允许", PermKind.Accent) { answer(UiPermissionDecision.ALLOW_RUN) }
         Spacer(Modifier.height(8.dp))
-        PermButton("Always allow in this project", PermKind.Neutral) { answer(UiPermissionDecision.ALLOW_ALWAYS) }
+        PermButton("始终允许此项目", PermKind.Neutral) { answer(UiPermissionDecision.ALLOW_ALWAYS) }
         Spacer(Modifier.height(8.dp))
-        PermButton("Deny", PermKind.Danger) { answer(UiPermissionDecision.DENY) }
+        PermButton("拒绝", PermKind.Danger) { answer(UiPermissionDecision.DENY) }
     }
 }
 

@@ -17,7 +17,7 @@ internal object AndroidTemplateSupport {
     /** The minSdk picker offered by both Android templates. */
     val minSdkParam = TemplateParameter.Choice(
         key = "minSdk",
-        label = "Minimum SDK",
+        label = "最低 SDK",
         options = listOf(
             TemplateParameter.Choice.Option("21", "API 21 · Android 5.0"),
             TemplateParameter.Choice.Option("23", "API 23 · Android 6.0"),
@@ -29,32 +29,32 @@ internal object AndroidTemplateSupport {
             TemplateParameter.Choice.Option("34", "API 34 · Android 14"),
         ),
         defaultIndex = 2,
-        help = "Lowest Android version the app supports.",
+        help = "应用支持的最低 Android 版本。",
     )
 
     /** The targetSdk picker — the API level the app is tested/optimised against. */
     val targetSdkParam = TemplateParameter.Choice(
         key = "targetSdk",
-        label = "Target SDK",
+        label = "目标 SDK",
         options = listOf(
             TemplateParameter.Choice.Option("30", "API 30 · Android 11"),
             TemplateParameter.Choice.Option("33", "API 33 · Android 13"),
             TemplateParameter.Choice.Option("34", "API 34 · Android 14"),
         ),
         defaultIndex = 2,
-        help = "The API level the app is built and optimised against.",
+        help = "应用构建和优化所针对的 API 级别。",
     )
 
     /** Source language for the generated starter code. */
     val languageParam = TemplateParameter.Choice(
         key = "language",
-        label = "Language",
+        label = "语言",
         options = listOf(
             TemplateParameter.Choice.Option("java", "Java"),
             TemplateParameter.Choice.Option("kotlin", "Kotlin"),
         ),
         defaultIndex = 0,
-        help = "Language of the starter source files.",
+        help = "起始源码文件使用的语言。",
     )
 
     const val COMPILE_SDK = 34
@@ -92,8 +92,8 @@ internal object AndroidTemplateSupport {
  */
 object AndroidAppTemplate : ProjectTemplate {
     override val id = TemplateId("android-app")
-    override val displayName = "Android App"
-    override val description = "A native Android application that builds to an installable APK."
+    override val displayName = "Android 应用"
+    override val description = "可构建为可安装 APK 的原生 Android 应用。"
     override val category = TemplateCategory.ANDROID
     override val iconId = "module.android"
 
@@ -246,8 +246,8 @@ object AndroidAppTemplate : ProjectTemplate {
  */
 object MaterialYouAppTemplate : ProjectTemplate {
     override val id = TemplateId("android-material-you")
-    override val displayName = "Material You App"
-    override val description = "A Material 3 app with dynamic colour theming and a Floating Action Button."
+    override val displayName = "Material You 应用"
+    override val description = "带动态色彩主题和悬浮操作按钮的 Material 3 应用。"
     override val category = TemplateCategory.ANDROID
     override val iconId = "module.android"
 
@@ -440,8 +440,8 @@ object MaterialYouAppTemplate : ProjectTemplate {
  */
 object AndroidLibraryTemplate : ProjectTemplate {
     override val id = TemplateId("android-library")
-    override val displayName = "Android Library"
-    override val description = "A reusable Android library module (AAR) with its own resources."
+    override val displayName = "Android 库"
+    override val description = "可复用的 Android 库模块（AAR），包含自己的资源。"
     override val category = TemplateCategory.ANDROID
     override val iconId = "module.android"
 

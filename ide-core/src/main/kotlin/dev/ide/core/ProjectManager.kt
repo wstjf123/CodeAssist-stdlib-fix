@@ -141,7 +141,7 @@ class ProjectManager private constructor(
 
     /** Create a new project from [templateId] with the collected [args]; returns the opened engine. */
     fun create(templateId: String, args: Map<String, String>): IdeServices {
-        val name = args[TemplateArgs.NAME]?.takeIf { it.isNotBlank() } ?: "Untitled"
+        val name = args[TemplateArgs.NAME]?.takeIf { it.isNotBlank() } ?: "未命名"
         val dir = uniqueProjectDir(name)
         return IdeServices.createProjectAt(dir, templateId, args, sdk(), languageLevel, androidTools, dexRunner, apkInstaller, customViewRuntime, realViewRuntime = realViewRuntime, kotlinPluginLoader = kotlinPluginLoader, sharedCachesRoot = homeDir, env = env)
     }
@@ -360,7 +360,7 @@ class ProjectManager private constructor(
             r8Shrinker: dev.ide.android.support.tools.Shrinker? = null,
             /** The host's forked-VM D8 dexer for the dex merge step (debug-path memory peak). Null → in-process. */
             r8MergeDexer: dev.ide.android.support.tools.Dexer? = null,
-            /** Max class-dex per merge batch on a large app (the "Dex merge batch size" setting); read per build. */
+            /** Max class-dex per merge batch on a large app (the "Dex 合并批量大小" setting); read per build. */
             mergeChunkProvider: () -> Int = { dev.ide.core.settings.BuiltInSettingsPages.DEX_MERGE_BATCH_DEFAULT },
         ): ProjectManager {
 

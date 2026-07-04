@@ -91,7 +91,7 @@ fun SettingsScreen(
     onSettingsChanged: () -> Unit,
     onOpenLogs: () -> Unit,
     view: SettingsView = SettingsView.All,
-    title: String = "Settings",
+    title: String = "设置",
     codeFont: FontFamily = FontFamily.Monospace,
     fileActions: FileActions = FileActions.None,
 ) {
@@ -137,7 +137,7 @@ fun SettingsScreen(
             Box(Modifier.fillMaxWidth().height(1.dp).background(Ca.colors.separator))
             if (pages.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No settings available.", color = Ca.colors.textTertiary, style = Ca.type.subhead)
+                    Text("没有可用设置。", color = Ca.colors.textTertiary, style = Ca.type.subhead)
                 }
             } else {
                 BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -352,7 +352,7 @@ private fun SettingsHeader(onBack: () -> Unit, title: String) {
             Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            IconButtonCa(CaIcons.chevronLeft, "Back", onBack)
+            IconButtonCa(CaIcons.chevronLeft, "返回", onBack)
             Icon(CaIcons.gear, null, Modifier.size(20.dp), tint = Ca.colors.accent)
             Text(title, color = Ca.colors.textPrimary, style = Ca.type.headline, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
         }

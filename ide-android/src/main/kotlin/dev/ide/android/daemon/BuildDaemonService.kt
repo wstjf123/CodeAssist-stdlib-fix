@@ -220,7 +220,7 @@ class BuildDaemonService : Service() {
             val running = bs.steps.firstOrNull { it.status == StepStatus.Running }?.name
             val module = bs.moduleName.ifBlank { "project" }
             buildNotif = NotifContent(
-                title = "Building $module",
+                title = "正在构建 $module",
                 text = when {
                     running != null -> humanizeStep(running)
                     total > 0 -> "$settled of $total steps"
@@ -264,7 +264,7 @@ class BuildDaemonService : Service() {
             runNotif = when (rc.phase) {
                 RunPhase.Building -> NotifContent("Building $runModule", "Preparing to run…", 0, 0, true)
                 RunPhase.Running -> NotifContent(
-                    title = "Running $runModule",
+                    title = "正在运行 $runModule",
                     text = rc.mainClass.substringAfterLast('.').ifBlank { "Running…" },
                     progress = 0, progressMax = 0, indeterminate = true,
                 )
@@ -353,7 +353,7 @@ class BuildDaemonService : Service() {
         if (nm != null && nm.getNotificationChannel(CHANNEL_ID) == null) {
             nm.createNotificationChannel(
                 NotificationChannel(CHANNEL_ID, "Builds", NotificationManager.IMPORTANCE_LOW).apply {
-                    description = "Shown while CodeAssist is building or running your project"
+                    description = "当 CodeAssist 正在构建或运行项目时显示"
                 },
             )
         }

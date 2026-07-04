@@ -126,7 +126,7 @@ internal class SettingsBackend(private val ctx: BackendContext) : SettingsServic
             UiInspection(
                 id = a.id.value,
                 displayName = a.displayName,
-                language = a.languages.firstOrNull()?.id?.let(::prettyLang) ?: "All",
+                language = a.languages.firstOrNull()?.id?.let(::prettyLang) ?: "全部",
                 tier = a.tier.name.lowercase().replaceFirstChar { it.uppercase() },
                 enabled = profile.isEnabled(a.id),
                 severity = (profile.severityOverrides[a.id] ?: a.defaultSeverity).toUiSeverity(),
@@ -197,7 +197,7 @@ internal class SettingsBackend(private val ctx: BackendContext) : SettingsServic
             id = page.id,
             title = page.title,
             iconId = page.iconId,
-            scope = if (project) "project" else "app",
+            scope = if (project) "项目" else "app",
             controls = controls,
             inspectionsSection = BuiltInSettingsPages.isInspectionsPage(page),
         )
@@ -222,24 +222,24 @@ internal class SettingsBackend(private val ctx: BackendContext) : SettingsServic
 
         val out = ArrayList<UiSettingControl>()
         out += UiSettingControl.Toggle(
-            BuiltInSettingsPages.SEPARATE_PROCESS, "Build in a separate process",
-            "Run builds and your program in an isolated process so an out-of-memory crash can't take down the IDE. Off = build in-process (uses less memory, no isolation). Takes effect the next time you open a project.",
+            BuiltInSettingsPages.SEPARATE_PROCESS, "在独立进程中构建",
+            "在隔离进程中运行构建和你的程序，避免内存溢出崩溃拖垮 IDE。关闭后在进程内构建（内存占用更少，但无隔离）。下次打开项目时生效。",
             sepOn, false, null,
         )
 
         val modeDesc = when {
             mode == BuiltInSettingsPages.R8_MODE_INPROCESS ->
-                "R8 runs inside the IDE, capped at this app's memory limit (~$appHeapMb MB). Pick Forked VM to give R8 more by running it in a separate VM."
+                "R8 在 IDE 进程内运行，受应用内存限制（约 $appHeapMb MB）。选择独立 VM 可让 R8 在单独 VM 中获得更多内存。"
             ceiling == 0 ->
-                "This device can't run R8 in a separate VM, so it runs in-process (~$appHeapMb MB). Large apps may run out of memory; there's nothing to tune here."
+                "此设备无法在独立 VM 中运行 R8，因此会在进程内运行（约 $appHeapMb MB）。大型应用可能内存不足，此处没有可调整项。"
             else ->
-                "Forked VM (default) runs R8 in a separate VM with more memory than this app's ~$appHeapMb MB limit, so large apps don't run out of memory; it falls back to in-process if the device can't. Android only."
+                "独立 VM（默认）会在单独 VM 中运行 R8，内存高于此应用约 $appHeapMb MB 的限制，避免大型应用内存不足；如果设备不支持，会回退到进程内。仅 Android 可用。"
         }
         out += UiSettingControl.Choice(
-            BuiltInSettingsPages.R8_MODE, "R8 execution", modeDesc, mode,
+            BuiltInSettingsPages.R8_MODE, "R8 执行方式", modeDesc, mode,
             listOf(
-                UiSettingControl.Choice.Option(BuiltInSettingsPages.R8_MODE_FORKED, "Forked VM"),
-                UiSettingControl.Choice.Option(BuiltInSettingsPages.R8_MODE_INPROCESS, "In-process"),
+                UiSettingControl.Choice.Option(BuiltInSettingsPages.R8_MODE_FORKED, "独立 VM"),
+                UiSettingControl.Choice.Option(BuiltInSettingsPages.R8_MODE_INPROCESS, "进程内"),
             ),
             false, null,
         )
@@ -250,48 +250,48 @@ internal class SettingsBackend(private val ctx: BackendContext) : SettingsServic
             val saved = ctx.manager?.preference(settingKey(pid, BuiltInSettingsPages.R8_MAX_HEAP))?.trim()?.toIntOrNull()
             // Default to the device limit (the max) so the user only ever scales DOWN; clamp the displayed value.
             val value = (saved ?: max).coerceIn(R8_MIN_MB, max)
-            val limitNote = if (ceiling != null) "This device's limit is $ceiling MB." else "Measuring this device's limit…"
+            val limitNote = if (ceiling != null) "此设备限制为 $ceiling MB。" else "正在测量此设备限制…"
             val warn = if (ceiling != null && saved != null && saved > ceiling)
-                " ⚠ Your saved value ($saved MB) is above the device limit; R8 will use $ceiling MB."
+                " ⚠ 已保存值（$saved MB）高于设备限制；R8 将使用 $ceiling MB。"
             else ""
             out += UiSettingControl.Slider(
-                BuiltInSettingsPages.R8_MAX_HEAP, "R8 forked-VM heap",
-                "Heap for R8's forked VM. $limitNote$warn",
+                BuiltInSettingsPages.R8_MAX_HEAP, "R8 独立 VM 堆大小",
+                "R8 独立 VM 的堆大小。$limitNote$warn",
                 value, R8_MIN_MB, max, 128, "MB", false, null,
             )
         }
 
         // Debug-build dexing memory knobs (the R8 controls above govern the release/minify path). Both are
         // advanced and Android-only, grouped apart so they don't read as part of R8.
-        val dexGroup = "Debug build (dexing)"
+        val dexGroup = "调试构建（dex）"
         val forkable = mode != BuiltInSettingsPages.R8_MODE_INPROCESS && ceiling != 0
         val offHeap = (ctx.manager?.preference(settingKey(pid, BuiltInSettingsPages.DEX_OFFHEAP_MB))?.trim()?.toIntOrNull()
             ?: BuiltInSettingsPages.DEX_OFFHEAP_MB_DEFAULT).coerceIn(2, 64)
         val offHeapDesc = if (forkable)
-            "On a clean build the dexer turns your whole project (and large libraries) into Dalvik bytecode — heavy work that normally runs inside the IDE. When one of those steps is at least this big, it's moved to the separate VM instead (the same one R8 uses), keeping it off the IDE's ~$appHeapMb MB heap. Lower = safer on low-memory devices but more short-lived VMs (slightly slower); higher = fewer VMs but more pressure on the IDE. Small edits always stay in-process."
+            "全量构建时，dex 工具会把整个项目（以及大型库）转换为 Dalvik 字节码——这通常是在 IDE 内执行的重任务。当其中某个步骤达到此大小时，会移动到独立 VM（与 R8 使用的相同）中执行，避免占用 IDE 约 $appHeapMb MB 的堆。较低更适合低内存设备但会启动更多短生命周期 VM（略慢）；较高会减少 VM 数量但增加 IDE 压力。小改动始终在进程内执行。"
         else
-            "Moves large dexing steps off the IDE's heap into a separate VM on a clean build. Inactive while R8 execution is In-process (or the device can't fork a VM) — everything dexes in-process then."
+            "全量构建时将大型 dex 步骤从 IDE 堆移动到独立 VM。R8 执行方式为进程内（或设备无法启动独立 VM）时不生效——此时所有 dex 都在进程内执行。"
         out += UiSettingControl.Slider(
-            BuiltInSettingsPages.DEX_OFFHEAP_MB, "Off-heap dexing threshold",
+            BuiltInSettingsPages.DEX_OFFHEAP_MB, "堆外 dex 阈值",
             offHeapDesc, offHeap, 2, 64, 2, "MB", true, dexGroup,
         )
 
         val mergeBatch = (ctx.manager?.preference(settingKey(pid, BuiltInSettingsPages.DEX_MERGE_BATCH))?.trim()?.toIntOrNull()
             ?: BuiltInSettingsPages.DEX_MERGE_BATCH_DEFAULT).coerceIn(1000, 20000)
         out += UiSettingControl.Slider(
-            BuiltInSettingsPages.DEX_MERGE_BATCH, "Dex merge batch size",
-            "On a very large app the final dexing step merges classes in batches so it doesn't need all of them in memory at once. Smaller batches keep that memory low (good for low-memory devices) but make the APK slightly larger (less shared compression across classes); larger batches pack tighter but need more memory per merge. Most apps never reach this — it only kicks in past a few thousand classes.",
-            mergeBatch, 1000, 20000, 1000, "classes", true, dexGroup,
+            BuiltInSettingsPages.DEX_MERGE_BATCH, "Dex 合并批量大小",
+            "对于超大型应用，最终 dex 步骤会分批合并 class，避免一次性将所有内容载入内存。较小批量可降低内存占用（适合低内存设备），但 APK 可能略大；较大批量压缩更紧凑，但每次合并需要更多内存。大多数应用不会触发此项——通常在超过数千个 class 后才生效。",
+            mergeBatch, 1000, 20000, 1000, "个 class", true, dexGroup,
         )
 
         val forkConc = (ctx.manager?.preference(settingKey(pid, BuiltInSettingsPages.DEX_FORK_CONCURRENCY))?.trim()?.toIntOrNull()
             ?: BuiltInSettingsPages.DEX_FORK_CONCURRENCY_DEFAULT).coerceIn(0, 4)
         val forkConcDesc = if (forkable)
-            "How many of these separate dexing VMs may run at once. The dex merge splits across a few of them, so several libraries dex in parallel instead of one at a time. 0 = automatic (chosen from your device's free memory and the VM heap above). Higher is faster on devices with plenty of RAM but commits more memory at once; lower (or 0) is safer on tight devices. Takes effect the next time the build starts."
+            "允许同时运行多少个独立 dex VM。dex 合并会拆分到其中几个 VM 中，因此多个库可以并行 dex，而不是逐个处理。0 = 自动（根据设备可用内存和上方 VM 堆大小选择）。内存充足的设备上数值越高越快，但会一次占用更多内存；较低（或 0）对内存紧张设备更安全。下次构建开始时生效。"
         else
-            "Caps how many separate dexing VMs run at once. Inactive while R8 execution is In-process (or the device can't fork a VM) — everything dexes in-process then."
+            "限制同时运行的独立 dex VM 数。R8 执行方式为进程内（或设备无法启动独立 VM）时不生效——此时所有 dex 都在进程内执行。"
         out += UiSettingControl.Slider(
-            BuiltInSettingsPages.DEX_FORK_CONCURRENCY, "Max concurrent dex forks",
+            BuiltInSettingsPages.DEX_FORK_CONCURRENCY, "最大并发 dex VM 数",
             forkConcDesc, forkConc, 0, 4, 1, null, true, dexGroup,
         )
         return out

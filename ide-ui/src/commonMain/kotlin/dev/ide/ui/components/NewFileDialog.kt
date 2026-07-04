@@ -114,7 +114,7 @@ private fun NewEntryPanel(
         Text(if (isFolder) "New folder" else "New file", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(4.dp))
         val selPkg = req.packages.firstOrNull { it.dirPath == targetDir }?.packageName
-        Text("in ${selPkg ?: req.dirLabel}", color = Ca.colors.textTertiary, style = Ca.type.caption2)
+        Text("位于 ${selPkg ?: req.dirLabel}", color = Ca.colors.textTertiary, style = Ca.type.caption2)
         Spacer12()
 
         PackageChips(req.packages, targetDir, onSelect = { targetDir = it })
@@ -139,8 +139,8 @@ private fun NewEntryPanel(
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Spacer(Modifier.weight(1f))
-            DialogButton("Cancel", primary = false, enabled = true, onClick = onDismiss)
-            DialogButton("Create", primary = true, enabled = valid, onClick = ::submit)
+            DialogButton("取消", primary = false, enabled = true, onClick = onDismiss)
+            DialogButton("创建", primary = true, enabled = valid, onClick = ::submit)
         }
     }
 }
@@ -255,7 +255,7 @@ private fun NewSourcePanel(
         )
         Spacer(Modifier.height(4.dp))
         val selPkg = req.packages.firstOrNull { it.dirPath == targetDir }?.packageName
-        Text("in ${selPkg ?: req.dirLabel}", color = Ca.colors.textTertiary, style = Ca.type.caption2)
+        Text("位于 ${selPkg ?: req.dirLabel}", color = Ca.colors.textTertiary, style = Ca.type.caption2)
         Spacer12()
 
         PackageChips(req.packages, targetDir, onSelect = { targetDir = it })
@@ -279,8 +279,8 @@ private fun NewSourcePanel(
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Spacer(Modifier.weight(1f))
-            DialogButton("Cancel", primary = false, enabled = true, onClick = onDismiss)
-            DialogButton("Create", primary = true, enabled = valid, onClick = ::submit)
+            DialogButton("取消", primary = false, enabled = true, onClick = onDismiss)
+            DialogButton("创建", primary = true, enabled = valid, onClick = ::submit)
         }
     }
 }
@@ -444,8 +444,8 @@ private fun NewXmlPanel(
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Spacer(Modifier.weight(1f))
-            DialogButton("Cancel", primary = false, enabled = true, onClick = onDismiss)
-            DialogButton("Create", primary = true, enabled = valid, onClick = ::submit)
+            DialogButton("取消", primary = false, enabled = true, onClick = onDismiss)
+            DialogButton("创建", primary = true, enabled = valid, onClick = ::submit)
         }
     }
 }
@@ -568,9 +568,9 @@ private fun AddSourceRootPanel(
             .border(1.dp, Ca.colors.glassEdge, RoundedCornerShape(Ca.radius.xl))
             .padding(20.dp),
     ) {
-        Text("Add source root", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
+        Text("添加源码根目录", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(4.dp))
-        Text("to ${req.moduleName}", color = Ca.colors.textTertiary, style = Ca.type.caption2)
+        Text("到 ${req.moduleName}", color = Ca.colors.textTertiary, style = Ca.type.caption2)
         Spacer12()
 
         // Source-set selector: existing sets + a "New set…" toggle that reveals a name field.
@@ -629,8 +629,8 @@ private fun AddSourceRootPanel(
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Spacer(Modifier.weight(1f))
-            DialogButton("Cancel", primary = false, enabled = true, onClick = onDismiss)
-            DialogButton("Add", primary = true, enabled = valid, onClick = ::submit)
+            DialogButton("取消", primary = false, enabled = true, onClick = onDismiss)
+            DialogButton("添加", primary = true, enabled = valid, onClick = ::submit)
         }
     }
 }

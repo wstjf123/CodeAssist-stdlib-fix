@@ -34,7 +34,7 @@ internal object XmlQuickFixes {
 
     /** Extract the hardcoded string [value] (occupying [range]) to a generated `@string` resource (host I/O). */
     fun extractToString(host: XmlResourceHost, range: TextRange, value: String): QuickFix = object : QuickFix {
-        override val title = "Extract to @string resource"
+        override val title = "提取到 @string 资源"
         override val kind = CodeActionKind.QUICK_FIX
         override suspend fun computeEdits(ctx: FixContext): WorkspaceEdit {
             val name = host.appendValueResource(ctx.target.file, "string", snakeName(value), value)

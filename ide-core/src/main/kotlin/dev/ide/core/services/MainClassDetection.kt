@@ -82,7 +82,7 @@ internal object MainClassDetection {
     }
 }
 
-/** True when [module] is a console-runnable (non-Android) module — the ones the "Run" configuration
+/** True when [module] is a console-runnable (non-Android) module — the ones the "运行" configuration
  *  (main class) applies to. Android app/library modules run through the APK pipeline instead. */
 internal fun isConsoleRunModule(module: Module): Boolean =
     module.type.id != "android-app" && module.type.id != "android-lib"

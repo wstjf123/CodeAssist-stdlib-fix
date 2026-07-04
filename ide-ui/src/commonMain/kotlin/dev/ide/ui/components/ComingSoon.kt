@@ -32,7 +32,7 @@ fun ComingSoon(
     title: String,
     description: String,
     modifier: Modifier = Modifier,
-    footnote: String? = "Coming soon",
+    footnote: String? = "即将推出",
 ) {
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(

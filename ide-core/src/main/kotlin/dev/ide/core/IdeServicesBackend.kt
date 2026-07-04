@@ -102,7 +102,7 @@ class IdeServicesBackend(
             }
         }
 
-    /** The app-global "Build in a separate process" setting (default ON; see [BuiltInSettingsPages]). Read once
+    /** The app-global "在独立进程中构建" setting (default ON; see [BuiltInSettingsPages]). Read once
      *  per engine (the cache above freezes the choice), so toggling it applies on the next project open —
      *  which keeps the build-state flow and the build methods bound to one consistent runner. */
     private fun separateBuildProcessEnabled(): Boolean =
@@ -118,7 +118,7 @@ class IdeServicesBackend(
      * reachable surfaces read [activeServices] directly and handle null.
      */
     override val services: IdeServices
-        get() = activeServices ?: error("No project is open")
+        get() = activeServices ?: error("未打开项目")
 
     override val servicesOrNull: IdeServices? get() = activeServices
 
@@ -221,7 +221,7 @@ class IdeServicesBackend(
     private val errorDialogSink = LogSink { record ->
         val t = record.throwable
         if (record.level == LogLevel.ERROR && t != null) {
-            showError(t.javaClass.simpleName.ifEmpty { "Error" }, record.message, stackTraceString(t))
+            showError(t.javaClass.simpleName.ifEmpty { "错误" }, record.message, stackTraceString(t))
         }
     }
 
@@ -388,7 +388,7 @@ class IdeServicesBackend(
     fun installCrashReporting() {
         Thread.setDefaultUncaughtExceptionHandler { thread, t ->
             runCatching { Log.logger("uncaught").warn("Uncaught exception on ${thread.name}", t) } // ring/console only
-            runCatching { showError("Application error", t.message ?: t.javaClass.simpleName, stackTraceString(t)) }
+            runCatching { showError("应用错误", t.message ?: t.javaClass.simpleName, stackTraceString(t)) }
             runCatching {
                 analytics.track(
                     dev.ide.analytics.AnalyticsEvent(

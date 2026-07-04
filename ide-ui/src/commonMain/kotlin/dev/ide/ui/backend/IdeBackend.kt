@@ -150,7 +150,7 @@ enum class UiStoreItemKind { Template, Sample, Community }
 
 /**
  * One entry in the Projects Store, neutral to where the catalog came from (bundled templates today, a remote
- * backend later). [category] buckets it for filtering ("Android", "Java", "Kotlin", "Games", ...); [iconId]
+ * backend later). [category] buckets it for filtering ("Android", "Java", "Kotlin", "游戏", ...); [iconId]
  * resolves through the UI's `TreeIcons` registry; [accentColor] is an optional ARGB brand color for the
  * featured hero. [available] false marks a preview/coming-soon item that can be browsed but not yet installed.
  */
@@ -173,7 +173,7 @@ data class UiStoreItem(
     val available: Boolean = true,
 )
 
-/** A titled shelf of store items (e.g. "Starter templates", "Sample projects"). */
+/** A titled shelf of store items (e.g. "入门模板", "示例项目"). */
 data class UiStoreSection(
     val id: String,
     val title: String,
@@ -668,7 +668,7 @@ enum class TreeViewMode { Project, AllFiles }
 enum class UiSourceRootRole { Source, Resource, AndroidRes, Assets, Aidl }
 
 /**
- * A typed source-file template the file-tree "New" submenu can scaffold. The prefix names the language
+ * A typed source-file template the file-tree "新建" submenu can scaffold. The prefix names the language
  * (Java → `.java`, Kotlin → `.kt`); the backend prepends the package resolved from the target directory.
  */
 enum class UiNewFileTemplate {
@@ -1131,7 +1131,7 @@ data class UiCodeStyle(
 /**
  * One inspection (analyzer) in the Analysis settings list. [enabled] off = the check never runs; [severity]
  * is its effective level (overridable from [defaultSeverity]). [language] is a display tag
- * ("Java"/"Kotlin"/"XML"/"All"); [tier] is "Syntax"/"Semantic"/"Project" for grouping.
+ * ("Java"/"Kotlin"/"XML"/"全部"); [tier] is "Syntax"/"Semantic"/"Project" for grouping.
  */
 data class UiInspection(
     val id: String,
@@ -1196,7 +1196,7 @@ sealed interface UiSettingControl {
 
     data class Action(
         override val key: String, override val title: String, override val description: String? = null,
-        val buttonLabel: String = "Run", val destructive: Boolean = false,
+        val buttonLabel: String = "运行", val destructive: Boolean = false,
         override val advanced: Boolean = false, override val group: String? = null,
     ) : UiSettingControl
 }

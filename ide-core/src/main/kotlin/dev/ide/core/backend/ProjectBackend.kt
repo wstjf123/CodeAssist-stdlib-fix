@@ -69,13 +69,13 @@ internal class ProjectBackend(private val ctx: BackendContext) : ProjectService 
         (ctx.servicesOrNull?.projectTemplates() ?: ctx.manager?.projectTemplates() ?: emptyList()).map(::toUiTemplate)
 
     override suspend fun createProject(templateId: String, args: Map<String, String>): UiProjectResult {
-        val mgr = ctx.manager ?: return UiProjectResult(false, "Project creation not supported by this backend")
+        val mgr = ctx.manager ?: return UiProjectResult(false, "此后端不支持创建项目")
         return withContext(Dispatchers.IO) {
             runCatching {
                 val next = mgr.create(templateId, args)
                 ctx.swapEngine(next)
-                UiProjectResult(true, "Created ${next.projectDisplayName()}", next.workspaceRoot.toString())
-            }.getOrElse { e -> UiProjectResult(false, e.message ?: "Failed to create project") }
+                UiProjectResult(true, "已创建 ${next.projectDisplayName()}", next.workspaceRoot.toString())
+            }.getOrElse { e -> UiProjectResult(false, e.message ?: "创建项目失败") }
         }
     }
 

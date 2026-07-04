@@ -284,8 +284,8 @@ private fun DepPaneToolbar(
         // Force a fresh resolve of the declared deps — clears the reconcile marker so resolver changes
         // (e.g. new variant/constraint handling) actually re-apply to a project whose deps are unchanged.
         IconButtonCa(CaIcons.refresh, "Re-resolve dependencies", onClick = { if (!resolving) onResolve() })
-        IconButtonCa(CaIcons.pkg, "Repositories", onClick = onRepos)
-        PrimaryButton("Add", onClick = onAdd, icon = CaIcons.plus, iconOnly = compact)
+        IconButtonCa(CaIcons.pkg, "仓库", onClick = onRepos)
+        PrimaryButton("添加", onClick = onAdd, icon = CaIcons.plus, iconOnly = compact)
     }
 }
 
@@ -304,9 +304,9 @@ private fun RepositoriesContent(backend: IdeBackend, codeFont: FontFamily, modif
     }
 
     Column(modifier) {
-        Text("Repositories", color = Ca.colors.textPrimary, style = Ca.type.title3, fontWeight = FontWeight.SemiBold)
+        Text("仓库", color = Ca.colors.textPrimary, style = Ca.type.title3, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(4.dp))
-        Text("Where libraries resolve from. Built-in repos can't be removed.", color = Ca.colors.textTertiary, style = Ca.type.caption)
+        Text("库解析来源。内置仓库无法移除。", color = Ca.colors.textTertiary, style = Ca.type.caption)
         Spacer(Modifier.height(12.dp))
         LazyColumn(Modifier.fillMaxWidth().heightIn(max = 240.dp)) {
             items(repos, key = { it.url }) { r -> RepoRow(r) { if (backend.deps.removeRepository(r.url)) repos = backend.deps.repositories() } }
@@ -317,7 +317,7 @@ private fun RepositoriesContent(backend: IdeBackend, codeFont: FontFamily, modif
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(Modifier.weight(1f)) { RepoField("https://repo.example.com/maven", url, codeFont) { url = it; error = null } }
-            PrimaryButton("Add", onClick = add, icon = CaIcons.plus)
+            PrimaryButton("添加", onClick = add, icon = CaIcons.plus)
         }
         error?.let {
             Spacer(Modifier.height(8.dp))
@@ -338,7 +338,7 @@ private fun RepoRow(repo: dev.ide.ui.backend.UiRepository, onRemove: () -> Unit)
             Text(repo.url, color = Ca.colors.textTertiary, style = Ca.type.caption2, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (!repo.builtin) IconButtonCa(CaIcons.close, "Remove ${repo.name}", onClick = onRemove, boxSize = 28, iconSize = 16, tint = Ca.colors.textTertiary)
-        else Text("built-in", color = Ca.colors.textTertiary, style = Ca.type.caption2)
+        else Text("内置", color = Ca.colors.textTertiary, style = Ca.type.caption2)
     }
 }
 
@@ -398,7 +398,7 @@ private fun ResolvingPanel(state: DepsResolveState) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             CircularProgressIndicator(Modifier.size(30.dp), color = Ca.colors.accent, strokeWidth = 3.dp)
-            Text("Resolving dependencies", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
+            Text("正在解析依赖", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
             Text(state.message.ifBlank { "Downloading POMs & artifacts…" }, color = Ca.colors.textSecondary,
                 style = Ca.type.caption, maxLines = 2, overflow = TextOverflow.Ellipsis)
             ResolveBar(state.fraction)
@@ -571,10 +571,10 @@ private fun DependencyRow(
         Column(Modifier.weight(1f)) {
             DepPrimary(node, codeFont, dimmed = unresolved)
             when {
-                unresolved -> Text("not resolved — check the version/repository or re-resolve", color = Ca.colors.error, style = Ca.type.caption2, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                unresolved -> Text("未解析——请检查版本/仓库或重新解析", color = Ca.colors.error, style = Ca.type.caption2, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 !node.compatible && node.incompatibleReason != null ->
                     Text(node.incompatibleReason, color = Ca.colors.error, style = Ca.type.caption2, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                cycle -> Text("cycle — already shown above", color = Ca.colors.warning, style = Ca.type.caption2)
+                cycle -> Text("循环依赖——已在上方显示", color = Ca.colors.warning, style = Ca.type.caption2)
                 else -> DepSubtitle(node)
             }
         }
@@ -602,7 +602,7 @@ private fun TransitiveRow(node: UiDependencyNode, codeFont: FontFamily, depth: I
             DepPrimary(node, codeFont, dimmed = true)
             DepSubtitle(node)
         }
-        Text("transitive", color = Ca.colors.textTertiary, style = Ca.type.caption2)
+        Text("传递依赖", color = Ca.colors.textTertiary, style = Ca.type.caption2)
         if (onExclude != null) RowActionMenu("More actions for ${node.name}", "Exclude ${node.name}", CaIcons.close) { onExclude(node) }
     }
 }
@@ -720,7 +720,7 @@ private fun AddDependencyContent(
     }
 
     Column(modifier) {
-        Text("Add dependency", color = Ca.colors.textPrimary, style = Ca.type.title3, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 12.dp))
+        Text("添加依赖", color = Ca.colors.textPrimary, style = Ca.type.title3, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 12.dp))
 
         // Library / Platform (BOM) / Module / Local toggle — scrolls horizontally so chips never squish.
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -747,7 +747,7 @@ private fun AddDependencyContent(
 
         // scope selector — libraries + module deps (a platform carries no scope)
         if (mode != AddMode.Platform) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("scope", color = Ca.colors.textTertiary, style = Ca.type.caption, modifier = Modifier.padding(end = 4.dp))
+            Text("作用域", color = Ca.colors.textTertiary, style = Ca.type.caption, modifier = Modifier.padding(end = 4.dp))
             scopeOptions.forEach { s -> ScopeChip(s, s == scope) { if (!busy) scope = s } }
         } else Spacer(Modifier.height(10.dp))
 
@@ -758,7 +758,7 @@ private fun AddDependencyContent(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("variant", color = Ca.colors.textTertiary, style = Ca.type.caption, modifier = Modifier.padding(end = 4.dp))
+            Text("变体", color = Ca.colors.textTertiary, style = Ca.type.caption, modifier = Modifier.padding(end = 4.dp))
             ScopeChip("All variants", variant == null) { if (!busy) variant = null }
             variants.forEach { v -> ScopeChip(v, v == variant) { if (!busy) variant = v } }
         }
@@ -773,7 +773,7 @@ private fun AddDependencyContent(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("suggested", color = Ca.colors.textTertiary, style = Ca.type.caption, modifier = Modifier.padding(end = 4.dp))
+            Text("建议", color = Ca.colors.textTertiary, style = Ca.type.caption, modifier = Modifier.padding(end = 4.dp))
             val quickAdd: (String, suspend () -> UiAddResult) -> Unit = { label, action ->
                 if (!busy) {
                     busy = true; error = null; adding = label
@@ -807,7 +807,7 @@ private fun AddDependencyContent(
                 Column(Modifier.fillMaxWidth().heightIn(min = 160.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Spacer(Modifier.height(20.dp))
                     CircularProgressIndicator(Modifier.size(28.dp), color = Ca.colors.accent, strokeWidth = 3.dp)
-                    Text("Adding ${adding?.let(::shortCoord) ?: ""}", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
+                    Text("正在添加 ${adding?.let(::shortCoord) ?: ""}", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
                     Text(resolveState.message.ifBlank { "Resolving transitive dependencies…" }, color = Ca.colors.textSecondary, style = Ca.type.caption, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     ResolveBar(resolveState.fraction)
                 }
@@ -907,14 +907,14 @@ private fun LocalLibraryBody(
             ) {
                 Icon(CaIcons.plus, null, Modifier.size(18.dp), tint = Ca.colors.accent)
                 Column(Modifier.weight(1f)) {
-                    Text("Choose a .jar or .aar file", color = Ca.colors.accent, style = Ca.type.footnote, fontWeight = FontWeight.SemiBold)
-                    Text("Copied into the module's libs/ folder", color = Ca.colors.textTertiary, style = Ca.type.caption2)
+                    Text("选择 .jar 或 .aar 文件", color = Ca.colors.accent, style = Ca.type.footnote, fontWeight = FontWeight.SemiBold)
+                    Text("将复制到模块的 libs/ 文件夹", color = Ca.colors.textTertiary, style = Ca.type.caption2)
                 }
             }
         }
         if (candidates.isNotEmpty()) {
             item("from-project") {
-                Text("Already in the project", color = Ca.colors.textTertiary, style = Ca.type.caption,
+                Text("已在项目中", color = Ca.colors.textTertiary, style = Ca.type.caption,
                     fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
             }
             items(candidates, key = { "local:$it" }) { path ->
@@ -989,15 +989,15 @@ private fun ConfirmRemoveDialog(coordinate: String?, moduleName: String?, onDism
                 .background(Ca.colors.glassThick, RoundedCornerShape(Ca.radius.xl))
                 .border(1.dp, Ca.colors.glassEdge, RoundedCornerShape(Ca.radius.xl)).padding(20.dp),
         ) {
-            Text("Remove dependency", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
+            Text("移除依赖", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
-            Text("Remove ${shown?.let(::shortCoord) ?: ""} from ${moduleName ?: ""}? Its resolved classpath will be detached from the module.",
+            Text("要从 ${moduleName ?: ""} 移除 ${shown?.let(::shortCoord) ?: ""} 吗？它已解析的 classpath 将从模块中分离。",
                 color = Ca.colors.textSecondary, style = Ca.type.footnote)
             Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Spacer(Modifier.weight(1f))
-                DialogButton("Cancel", destructive = false, onClick = onDismiss)
-                DialogButton("Remove", destructive = true, onClick = onConfirm)
+                DialogButton("取消", destructive = false, onClick = onDismiss)
+                DialogButton("移除", destructive = true, onClick = onConfirm)
             }
         }
     }
@@ -1040,7 +1040,7 @@ private fun EditDependencySheet(
                 .then(if (expanded) Modifier.background(Ca.colors.glassThick, RoundedCornerShape(Ca.radius.xl)).border(1.dp, Ca.colors.glassEdge, RoundedCornerShape(Ca.radius.xl)) else Modifier)
                 .padding(if (expanded) 20.dp else 4.dp),
         ) {
-            Text("Edit dependency", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
+            Text("编辑依赖", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
             Text(shortCoord(node.coordinate), color = Ca.colors.textSecondary, style = Ca.type.caption.copy(fontFamily = codeFont))
 
@@ -1061,7 +1061,7 @@ private fun EditDependencySheet(
 
             // ---- exclusions ----
             SheetSection("Exclusions")
-            Text("Transitive group:name entries to drop (either side may be *), comma/space separated.",
+            Text("要排除的传递 group:name 条目（任一侧可为 *），用逗号或空格分隔。",
                 color = Ca.colors.textTertiary, style = Ca.type.caption2)
             Spacer(Modifier.height(8.dp))
             SheetField(exclText, "e.g. com.google.guava:guava, org.json:*", codeFont, leading = CaIcons.close, singleLine = false) { exclText = it }
@@ -1069,8 +1069,8 @@ private fun EditDependencySheet(
             Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Spacer(Modifier.weight(1f))
-                DialogButton("Cancel", destructive = false, onClick = onDismiss)
-                DialogButton("Save", destructive = false, onClick = {
+                DialogButton("取消", destructive = false, onClick = onDismiss)
+                DialogButton("保存", destructive = false, onClick = {
                     onSave(versionText.trim(), scope, exclText.split(',', ' ', '\n', '\t').map { it.trim() }.filter { it.isNotEmpty() })
                 })
             }
@@ -1125,8 +1125,8 @@ private fun UpdateHintChip(newest: String, onClick: () -> Unit) {
 private fun VersionList(versions: List<String>, selected: String, loading: Boolean, codeFont: FontFamily, onSelect: (String) -> Unit) {
     Spacer(Modifier.height(8.dp))
     when {
-        loading -> Text("Loading versions…", color = Ca.colors.textTertiary, style = Ca.type.caption2, modifier = Modifier.padding(vertical = 6.dp))
-        versions.isEmpty() -> Text("Couldn't load versions — type one above.", color = Ca.colors.textTertiary, style = Ca.type.caption2, modifier = Modifier.padding(vertical = 6.dp))
+        loading -> Text("正在加载版本…", color = Ca.colors.textTertiary, style = Ca.type.caption2, modifier = Modifier.padding(vertical = 6.dp))
+        versions.isEmpty() -> Text("无法加载版本——请在上方手动输入。", color = Ca.colors.textTertiary, style = Ca.type.caption2, modifier = Modifier.padding(vertical = 6.dp))
         else -> Column(
             Modifier.fillMaxWidth().heightIn(max = 188.dp).verticalScroll(rememberScrollState())
                 .background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.control))

@@ -69,7 +69,7 @@ class AddImportQuickFixProvider : QuickFixProvider {
 
         return candidates.map { fqn ->
             object : QuickFix {
-                override val title = "Import $fqn"
+                override val title = "导入 $fqn"
                 override val kind = CodeActionKind.QUICK_FIX
                 override suspend fun computeEdits(ctx: FixContext): WorkspaceEdit {
                     val t = ctx.target.parsed.text().toString()
@@ -89,7 +89,7 @@ class RemoveUnusedImportQuickFixProvider : QuickFixProvider {
 
     override fun fixes(diagnostic: Diagnostic, target: AnalysisTarget): List<QuickFix> = listOf(
         object : QuickFix {
-            override val title = "Remove unused import"
+            override val title = "移除未使用的导入"
             override val kind = CodeActionKind.QUICK_FIX
             override suspend fun computeEdits(ctx: FixContext): WorkspaceEdit {
                 val text = ctx.target.parsed.text()
@@ -135,7 +135,7 @@ class IntroduceVariableActionProvider : ActionProvider {
         val name = freshVariableName(exprText, text)
         return listOf(
             object : QuickFix {
-                override val title = "Introduce local variable '$name'"
+                override val title = "引入局部变量 '$name'"
                 override val kind = CodeActionKind.REFACTOR
                 override suspend fun computeEdits(ctx: FixContext): WorkspaceEdit {
                     val imports = LinkedHashSet<String>()
@@ -158,7 +158,7 @@ class IntroduceVariableActionProvider : ActionProvider {
     }
 }
 
-/** "Surround with try/catch": wrap the enclosing statement in `try { … } catch (Exception e) { … }`. */
+/** "用 try/catch 包围": wrap the enclosing statement in `try { … } catch (Exception e) { … }`. */
 class SurroundWithTryCatchActionProvider : ActionProvider {
     override val languages = setOf(JAVA)
 
@@ -171,7 +171,7 @@ class SurroundWithTryCatchActionProvider : ActionProvider {
         val stmtText = text.subSequence(stmt.range.start, stmt.range.end).toString()
         return listOf(
             object : QuickFix {
-                override val title = "Surround with try/catch"
+                override val title = "用 try/catch 包围"
                 override val kind = CodeActionKind.REFACTOR
                 override suspend fun computeEdits(ctx: FixContext): WorkspaceEdit {
                     val body = stmtText.replace("\n", "\n    ") // re-indent the wrapped statement one level

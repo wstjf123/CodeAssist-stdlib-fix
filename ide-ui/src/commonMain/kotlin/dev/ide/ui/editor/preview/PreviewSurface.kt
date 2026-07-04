@@ -219,7 +219,7 @@ fun PreviewSurface(
                 if (compact) {
                     Icon(CaIcons.moon, "Night mode", Modifier.size(15.dp), tint = if (state.night) Ca.colors.accent else Ca.colors.textTertiary)
                 } else {
-                    Text("Night", color = if (state.night) Ca.colors.accent else Ca.colors.textTertiary, style = Ca.type.caption, modifier = Modifier.padding(horizontal = Ca.spacing.s1))
+                    Text("夜间", color = if (state.night) Ca.colors.accent else Ca.colors.textTertiary, style = Ca.type.caption, modifier = Modifier.padding(horizontal = Ca.spacing.s1))
                 }
             }
             topBarExtras(compact)
@@ -229,9 +229,9 @@ fun PreviewSurface(
         GlassBar(Modifier.align(Alignment.BottomCenter).padding(Ca.spacing.s4)) {
             PillButton({ val b = if (state.userScale <= 0f) fit else state.userScale; state.userScale = (b / 1.25f).coerceIn(0.2f, 5f) }) { MinusGlyph() }
             Text("${(scale * 100f).roundToInt()}%", color = Ca.colors.textSecondary, style = Ca.type.caption, modifier = Modifier.width(44.dp), textAlign = TextAlign.Center)
-            PillButton({ val b = if (state.userScale <= 0f) fit else state.userScale; state.userScale = (b * 1.25f).coerceIn(0.2f, 5f) }) { Icon(CaIcons.plus, "Zoom in", Modifier.size(16.dp), tint = Ca.colors.textPrimary) }
+            PillButton({ val b = if (state.userScale <= 0f) fit else state.userScale; state.userScale = (b * 1.25f).coerceIn(0.2f, 5f) }) { Icon(CaIcons.plus, "放大", Modifier.size(16.dp), tint = Ca.colors.textPrimary) }
             Divider()
-            PillButton({ state.userScale = 0f; state.offset = Offset.Zero }) { Icon(CaIcons.refresh, "Fit", Modifier.size(15.dp), tint = Ca.colors.textSecondary) }
+            PillButton({ state.userScale = 0f; state.offset = Offset.Zero }) { Icon(CaIcons.refresh, "适应", Modifier.size(15.dp), tint = Ca.colors.textSecondary) }
             bottomBarExtras(compact)
         }
 
@@ -285,7 +285,7 @@ fun PreviewProblemChip(issues: List<PreviewIssue>, modifier: Modifier) {
                     PillButton({ clipboard.setText(AnnotatedString(copyText)) }) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(CaIcons.copy, "Copy problems", Modifier.size(13.dp), tint = Ca.colors.textSecondary)
-                            Text(" Copy", color = Ca.colors.textSecondary, style = Ca.type.caption)
+                            Text(" 复制", color = Ca.colors.textSecondary, style = Ca.type.caption)
                         }
                     }
                 }

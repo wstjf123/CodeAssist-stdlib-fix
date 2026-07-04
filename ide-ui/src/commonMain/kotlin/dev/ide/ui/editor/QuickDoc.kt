@@ -73,7 +73,7 @@ private fun parseTags(tagLines: List<String>, codeStyle: SpanStyle): List<DocSec
             "@throws", "@exception" -> throws.add(named(rest))
             "@see" -> if (rest.isNotEmpty()) see.add(inlineMarkup(rest, codeStyle))
             "@deprecated" -> other.add(buildAnnotatedString {
-                withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append("Deprecated. ") }
+                withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append("已弃用。") }
                 append(inlineMarkup(rest, codeStyle))
             })
             else -> {} // @since/@author/@version etc. omitted to keep the popup focused

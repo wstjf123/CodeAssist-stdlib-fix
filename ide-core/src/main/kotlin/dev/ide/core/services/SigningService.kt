@@ -56,30 +56,30 @@ internal class SigningService(private val ctx: EngineContext) {
     fun assignSigning(moduleName: String, buildType: String, keystoreId: String?): UiConfigResult {
         val module = ctx.modules().firstOrNull { it.name == moduleName } ?: return UiConfigResult(
             false,
-            "No module '$moduleName'."
+            "没有模块 '$moduleName'。"
         )
         val facet = module.facets.get(AndroidFacet.KEY) ?: return UiConfigResult(
             false,
             "'$moduleName' is not an Android module."
         )
         val project =
-            ctx.projectOf(module) ?: return UiConfigResult(false, "No project owns '$moduleName'.")
+            ctx.projectOf(module) ?: return UiConfigResult(false, "没有项目拥有模块 '$moduleName'。")
         if (keystoreId != null && ctx.keystoreRegistry.get(keystoreId) == null) {
-            return UiConfigResult(false, "Unknown keystore '$keystoreId'.")
+            return UiConfigResult(false, "未知密钥库 '$keystoreId'。")
         }
         if (facet.buildTypes.none { it.name == buildType }) return UiConfigResult(
             false, "No build type '$buildType'."
         )
         val newTypes =
             facet.buildTypes.map { if (it.name == buildType) it.copy(signingConfig = keystoreId) else it }
-        if (newTypes == facet.buildTypes) return UiConfigResult(true, "No change.")
+        if (newTypes == facet.buildTypes) return UiConfigResult(true, "没有变化。")
         try {
             project.beginModification().apply {
                 module(module.id).putFacet(facet.copy(buildTypes = newTypes))
                 commit()
             }
         } catch (e: Exception) {
-            return UiConfigResult(false, "Update failed: ${e.message}")
+            return UiConfigResult(false, "更新失败：${e.message}")
         }
         ctx.store.save()
         val target = keystoreId?.let { ctx.keystoreRegistry.get(it)?.name } ?: "debug (default)"

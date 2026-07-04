@@ -89,7 +89,7 @@ fun RunScreen(
         )
         if (rc == null) {
             Box(Modifier.fillMaxSize(), Alignment.Center) {
-                Text("No active run.", color = Ca.colors.textTertiary, style = Ca.type.footnote)
+                Text("当前没有运行任务。", color = Ca.colors.textTertiary, style = Ca.type.footnote)
             }
             return@Column
         }
@@ -117,11 +117,11 @@ private fun RunTopBar(console: RunConsoleUi?, buildFailed: Boolean, onBack: () -
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        IconButtonCa(CaIcons.chevronLeft, "Back", onBack, boxSize = iconBox)
+        IconButtonCa(CaIcons.chevronLeft, "返回", onBack, boxSize = iconBox)
         Icon(CaIcons.terminal, null, Modifier.size(18.dp), tint = Ca.colors.textSecondary)
         Column(Modifier.weight(1f)) {
             Text(
-                console?.moduleName?.ifEmpty { "Run" } ?: "Run",
+                console?.moduleName?.ifEmpty { "运行" } ?: "运行",
                 style = Ca.type.subhead, fontWeight = FontWeight.SemiBold, color = Ca.colors.textPrimary,
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
@@ -287,7 +287,7 @@ private fun InputBar(onSend: (String) -> Unit, onEof: () -> Unit, modifier: Modi
                 .border(1.dp, Ca.colors.hairline, RoundedCornerShape(Ca.radius.control))
                 .padding(horizontal = 10.dp, vertical = 9.dp),
         ) {
-            if (field.text.isEmpty()) Text("Type input, press Enter…", color = Ca.colors.textTertiary, style = Ca.type.code)
+            if (field.text.isEmpty()) Text("输入内容后按 Enter…", color = Ca.colors.textTertiary, style = Ca.type.code)
             BasicTextField(
                 value = field,
                 onValueChange = { field = it },

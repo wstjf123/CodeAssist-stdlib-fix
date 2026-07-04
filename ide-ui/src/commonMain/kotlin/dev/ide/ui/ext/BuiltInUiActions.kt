@@ -4,7 +4,7 @@ import dev.ide.ui.backend.UiActionPlaces
 
 /**
  * The app's built-in UI-side actions, registered through [UiActionRegistry] the same way an in-UI plugin
- * would. Currently the "More" menu's secondary actions; the command palette's UI-navigation commands and the
+ * would. Currently the "更多" menu's secondary actions; the command palette's UI-navigation commands and the
  * top-bar's stateful buttons move here in later increments.
  */
 object BuiltInUiActions {
@@ -20,37 +20,37 @@ object BuiltInUiActions {
         val moreAndPalette = setOf(UiActionPlaces.MORE_MENU, palette)
 
         UiActionRegistry.register(
-            SimpleUiAction("ui.hub", "Settings & Tools", moreAndPalette, "Settings · code style · SDK manager · keystore manager", "gear", 10) {
+            SimpleUiAction("ui.hub", "设置与工具", moreAndPalette, "设置 · 代码样式 · SDK 管理器 · 密钥库管理器", "gear", 10) {
                 it.navigate(UiDestinations.HUB)
             },
         )
         UiActionRegistry.register(
-            SimpleUiAction("ui.modules", "Modules", more, "Add/remove modules · Java version · dependencies · repositories", "layers", 20) {
+            SimpleUiAction("ui.modules", "模块", more, "添加/移除模块 · Java 版本 · 依赖 · 仓库", "layers", 20) {
                 it.navigate(UiDestinations.MODULES)
             },
         )
         UiActionRegistry.register(
-            SimpleUiAction("ui.dependencies", "Manage dependencies", setOf(palette), iconId = "layers", order = 25) {
+            SimpleUiAction("ui.dependencies", "管理依赖", setOf(palette), iconId = "layers", order = 25) {
                 it.navigate(UiDestinations.DEPENDENCIES)
             },
         )
         UiActionRegistry.register(
-            SimpleUiAction("ui.reindex", "Re-index project", more, "Rebuild symbol & completion indexes", "refresh", 40) {
+            SimpleUiAction("ui.reindex", "重新索引项目", more, "重建符号与补全索引", "refresh", 40) {
                 it.backend.search.reindex()
             },
         )
         UiActionRegistry.register(
-            SimpleUiAction("ui.logs", "View logs", more, "Editor, analysis & build logs — share when something's off", "terminal", 50) {
+            SimpleUiAction("ui.logs", "查看日志", more, "编辑器、分析与构建日志——出现问题时可用于分享", "terminal", 50) {
                 it.navigate(UiDestinations.LOGS)
             },
         )
         UiActionRegistry.register(
-            SimpleUiAction("ui.toggleTheme", "Toggle theme", moreAndPalette, "Switch between light and dark", "eye", 60) {
+            SimpleUiAction("ui.toggleTheme", "切换主题", moreAndPalette, "在浅色和深色主题之间切换", "eye", 60) {
                 it.toggleTheme()
             },
         )
         UiActionRegistry.register(
-            SimpleUiAction("ui.closeProject", "Close project", more, "Back to all projects", "close", 70) {
+            SimpleUiAction("ui.closeProject", "关闭项目", more, "返回所有项目", "close", 70) {
                 it.navigate(UiDestinations.PROJECTS)
             },
         )

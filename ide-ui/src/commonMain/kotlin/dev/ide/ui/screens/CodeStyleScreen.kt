@@ -97,8 +97,8 @@ fun CodeStyleScreen(backend: IdeBackend, hasProject: Boolean, onBack: () -> Unit
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            IconButtonCa(CaIcons.chevronLeft, "Back", onBack, boxSize = iconBox)
-            Text("Code Style", style = Ca.type.title3, fontWeight = FontWeight.SemiBold, color = Ca.colors.textPrimary, modifier = Modifier.weight(1f))
+            IconButtonCa(CaIcons.chevronLeft, "返回", onBack, boxSize = iconBox)
+            Text("代码样式", style = Ca.type.title3, fontWeight = FontWeight.SemiBold, color = Ca.colors.textPrimary, modifier = Modifier.weight(1f))
         }
 
         Column(
@@ -107,7 +107,7 @@ fun CodeStyleScreen(backend: IdeBackend, hasProject: Boolean, onBack: () -> Unit
         ) {
             SettingsCard(null) {
                 SettingsChoiceRow(
-                    "Language", "Each language keeps its own profile", language,
+                    "语言", "Each language keeps its own profile", language,
                     listOf(LANG_JAVA to "Java", LANG_KOTLIN to "Kotlin"),
                 ) { language = it }
                 SettingsDivider()

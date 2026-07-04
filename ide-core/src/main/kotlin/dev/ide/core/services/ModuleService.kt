@@ -96,19 +96,19 @@ internal class ModuleService(private val ctx: EngineContext) {
     /** Persist [edit] (language level + facet values) to [moduleName] through a model transaction + save. */
     fun updateModuleConfig(moduleName: String, edit: UiModuleConfigEdit): UiConfigResult {
         val module = ctx.modules().firstOrNull { it.name == moduleName } ?: return UiConfigResult(
-            false, "No module '$moduleName'."
+            false, "没有模块 '$moduleName'。"
         )
         val project =
-            ctx.projectOf(module) ?: return UiConfigResult(false, "No project owns '$moduleName'.")
+            ctx.projectOf(module) ?: return UiConfigResult(false, "没有项目拥有模块 '$moduleName'。")
         val newLevel =
             edit.languageLevel?.let { runCatching { LanguageLevel.valueOf(it) }.getOrNull() }
         if (edit.languageLevel != null && newLevel == null) return UiConfigResult(
-            false, "Unknown language level '${edit.languageLevel}'."
+            false, "未知语言级别 '${edit.languageLevel}'。"
         )
         val facets = ArrayList<dev.ide.model.Facet>()
         for ((table, values) in edit.facetValues) {
             val facet = ctx.store.facetCodecs.decode(dev.ide.model.impl.FacetData(table, values))
-                ?: return UiConfigResult(false, "No codec registered for facet '$table'.")
+                ?: return UiConfigResult(false, "没有为 facet '$table' 注册编解码器。")
             facets += facet
         }
         try {
@@ -119,7 +119,7 @@ internal class ModuleService(private val ctx: EngineContext) {
                 commit()
             }
         } catch (e: Exception) {
-            return UiConfigResult(false, "Update failed: ${e.message}")
+            return UiConfigResult(false, "更新失败：${e.message}")
         }
         // The Run main-class override is a project preference (independent of the model transaction above);
         // a non-null value sets it, blank clears it back to auto-detect.
@@ -128,7 +128,7 @@ internal class ModuleService(private val ctx: EngineContext) {
         ctx.invalidateAnalyzers()       // language level + facets affect the compile classpath/source sets
         ctx.invalidateSyntheticClasses() // an Android facet change can move the R package
         ctx.resyncIndex()
-        return UiConfigResult(true, "Saved ${module.name}")
+        return UiConfigResult(true, "已保存 ${module.name}")
     }
 
     /** The Android `buildFeatures` of [moduleName] as toggle descriptors, or null for a non-Android module. */
@@ -166,28 +166,28 @@ internal class ModuleService(private val ctx: EngineContext) {
     ): UiConfigResult {
         val module = ctx.modules().firstOrNull { it.name == moduleName } ?: return UiConfigResult(
             false,
-            "No module '$moduleName'."
+            "没有模块 '$moduleName'。"
         )
         val facet = module.facets.get(AndroidFacet.KEY) ?: return UiConfigResult(
             false,
             "'$moduleName' is not an Android module."
         )
         val project =
-            ctx.projectOf(module) ?: return UiConfigResult(false, "No project owns '$moduleName'.")
+            ctx.projectOf(module) ?: return UiConfigResult(false, "没有项目拥有模块 '$moduleName'。")
         val bf = facet.buildFeatures
         val updated = when (feature) {
             "viewBinding" -> bf.copy(viewBinding = enabled)
             "compose" -> bf.copy(compose = enabled)
-            else -> return UiConfigResult(false, "Unknown build feature '$feature'.")
+            else -> return UiConfigResult(false, "未知构建特性 '$feature'。")
         }
-        if (updated == bf) return UiConfigResult(true, "No change.")
+        if (updated == bf) return UiConfigResult(true, "没有变化。")
         try {
             project.beginModification().apply {
                 module(module.id).putFacet(facet.copy(buildFeatures = updated))
                 commit()
             }
         } catch (e: Exception) {
-            return UiConfigResult(false, "Update failed: ${e.message}")
+            return UiConfigResult(false, "更新失败：${e.message}")
         }
         ctx.store.save()
 
@@ -225,7 +225,7 @@ internal class ModuleService(private val ctx: EngineContext) {
             }
             if (present) continue
             val r = ctx.dependencies.addDependency(moduleName, coord, "implementation")
-            if (!r.success && !r.message.contains("already a dependency")) failures += coord
+            if (!r.success && !r.message.contains("already a dependency") && !r.message.contains("已是")) failures += coord
         }
         return failures
     }
@@ -331,22 +331,22 @@ internal class ModuleService(private val ctx: EngineContext) {
             false, "Invalid module name — start with a letter; use letters, digits, '-' or '_'."
         )
         if (ctx.modules().any { it.name == moduleName }) return UiConfigResult(
-            false, "A module named '$moduleName' already exists."
+            false, "名为 '$moduleName' 的模块已存在。"
         )
         val type = moduleTypeRegistry().byId(typeId) ?: return UiConfigResult(
-            false, "Unknown module type '$typeId'."
+            false, "未知模块类型 '$typeId'。"
         )
         val project = ctx.store.workspace.projects.firstOrNull() ?: return UiConfigResult(
             false, "No project to add a module to."
         )
         val level = languageLevel?.let { runCatching { LanguageLevel.valueOf(it) }.getOrNull() }
         if (languageLevel != null && level == null) return UiConfigResult(
-            false, "Unknown language level '$languageLevel'."
+            false, "未知语言级别 '$languageLevel'。"
         )
         val facets = ArrayList<dev.ide.model.Facet>()
         for ((table, values) in facetValues) {
             val facet = ctx.store.facetCodecs.decode(dev.ide.model.impl.FacetData(table, values))
-                ?: return UiConfigResult(false, "No codec registered for facet '$table'.")
+                ?: return UiConfigResult(false, "没有为 facet '$table' 注册编解码器。")
             facets += facet
         }
         try {
@@ -368,7 +368,7 @@ internal class ModuleService(private val ctx: EngineContext) {
                 commit()
             }
         } catch (e: Exception) {
-            return UiConfigResult(false, "Couldn't create module: ${e.message}")
+            return UiConfigResult(false, "无法创建模块：${e.message}")
         }
         ctx.store.save()
         // Lay down the default source-set directories so the tree shows them immediately.
@@ -378,7 +378,7 @@ internal class ModuleService(private val ctx: EngineContext) {
         ctx.invalidateAnalyzers()
         ctx.invalidateSyntheticClasses()
         ctx.resyncIndex()
-        return UiConfigResult(true, "Created module '$moduleName'")
+        return UiConfigResult(true, "已创建模块 '$moduleName'")
     }
 
     /**

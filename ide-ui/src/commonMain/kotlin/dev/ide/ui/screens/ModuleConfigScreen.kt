@@ -94,7 +94,7 @@ private data class ConfigToast(val text: String, val error: Boolean)
 
 /** The tabs of a module's detail view. */
 enum class ModulesTab(val label: String) {
-    Settings("Settings"),
+    Settings("设置"),
     BuildFeatures("Build Features"),
     Signing("Signing"),
     Dependencies("Dependencies"),
@@ -135,7 +135,7 @@ private fun ModulesHeader(title: String, icon: ImageVector, onBack: () -> Unit, 
             Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            IconButtonCa(CaIcons.chevronLeft, "Back", onBack)
+            IconButtonCa(CaIcons.chevronLeft, "返回", onBack)
             Icon(icon, null, Modifier.size(20.dp), tint = Ca.colors.accent)
             Text(title, color = Ca.colors.textPrimary, style = Ca.type.headline, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -157,13 +157,13 @@ private fun ModulesList(backend: IdeBackend, codeFont: FontFamily, onOpen: (Stri
 
     Box(Modifier.fillMaxSize().background(Ca.colors.bg)) {
         Column(Modifier.fillMaxSize()) {
-            ModulesHeader("Modules", CaIcons.layers, onBack) {
-                IconButtonCa(CaIcons.plus, "New module", onClick = { newOpen = true }, active = true)
+            ModulesHeader("模块", CaIcons.layers, onBack) {
+                IconButtonCa(CaIcons.plus, "新建模块", onClick = { newOpen = true }, active = true)
             }
             Box(Modifier.fillMaxWidth().height(1.dp).background(Ca.colors.separator))
             if (modules.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No modules. Tap + to add one.", color = Ca.colors.textTertiary, style = Ca.type.subhead)
+                    Text("没有模块。点击 + 添加一个。", color = Ca.colors.textTertiary, style = Ca.type.subhead)
                 }
             } else {
                 LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -363,7 +363,7 @@ private fun SigningPane(backend: IdeBackend, moduleName: String, onOpenKeystoreM
         when {
             loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(color = Ca.colors.accent) }
             d == null -> Box(Modifier.fillMaxSize().padding(32.dp), Alignment.Center) {
-                Text("Signing applies to Android modules only.", color = Ca.colors.textTertiary, style = Ca.type.subhead)
+                Text("签名仅适用于 Android 模块。", color = Ca.colors.textTertiary, style = Ca.type.subhead)
             }
             else -> LazyColumn(
                 Modifier.fillMaxSize(),
@@ -383,7 +383,7 @@ private fun SigningPane(backend: IdeBackend, moduleName: String, onOpenKeystoreM
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             Icon(CaIcons.key, null, Modifier.size(15.dp), tint = Ca.colors.accent)
-                            Text("Manage keystores", style = Ca.type.footnote, fontWeight = FontWeight.SemiBold, color = Ca.colors.accent)
+                            Text("管理密钥库", style = Ca.type.footnote, fontWeight = FontWeight.SemiBold, color = Ca.colors.accent)
                         }
                     }
                 }
@@ -401,7 +401,7 @@ private fun SigningPane(backend: IdeBackend, moduleName: String, onOpenKeystoreM
                     }
                 }
                 if (d.keystores.isEmpty()) item("empty") {
-                    Text("No keystores yet — create one in the Keystore Manager to sign release builds.",
+                    Text("还没有密钥库——请在密钥库管理器中创建一个，用于签名 release 构建。",
                         color = Ca.colors.textTertiary, style = Ca.type.caption2)
                 }
             }
@@ -510,15 +510,15 @@ private fun ConfirmModuleRemove(moduleName: String?, onDismiss: () -> Unit, onCo
                 .background(Ca.colors.glassThick, RoundedCornerShape(Ca.radius.xl))
                 .border(1.dp, Ca.colors.glassEdge, RoundedCornerShape(Ca.radius.xl)).padding(20.dp),
         ) {
-            Text("Remove module", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
+            Text("移除模块", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
-            Text("Remove '${shown ?: ""}' from the project? Its files are left on disk; other modules' dependencies on it are dropped.",
+            Text("要从项目中移除 '${shown ?: ""}' 吗？文件会保留在磁盘上，其他模块对它的依赖将被移除。",
                 color = Ca.colors.textSecondary, style = Ca.type.footnote)
             Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Spacer(Modifier.weight(1f))
-                DialogTextButton("Cancel", destructive = false, onClick = onDismiss)
-                DialogTextButton("Remove", destructive = true, onClick = onConfirm)
+                DialogTextButton("取消", destructive = false, onClick = onDismiss)
+                DialogTextButton("移除", destructive = true, onClick = onConfirm)
             }
         }
     }
@@ -550,7 +550,7 @@ private fun NewModuleDialog(
                 .border(1.dp, Ca.colors.glassEdge, RoundedCornerShape(Ca.radius.xl)).padding(20.dp),
         ) {
             if (types.isEmpty()) {
-                Text("No module types available.", color = Ca.colors.textTertiary, style = Ca.type.subhead)
+                Text("没有可用的模块类型。", color = Ca.colors.textTertiary, style = Ca.type.subhead)
             } else {
                 var name by remember { mutableStateOf("") }
                 var typeIdx by remember { mutableStateOf(0) }
@@ -559,14 +559,14 @@ private fun NewModuleDialog(
                 // Facet forms are rebuilt when the chosen type changes (each type has its own default facets).
                 val forms = remember(type.id) { type.defaultFacets.map { it.toForm() } }
 
-                Text("New module", color = Ca.colors.textPrimary, style = Ca.type.title3, fontWeight = FontWeight.SemiBold)
+                Text("新建模块", color = Ca.colors.textPrimary, style = Ca.type.title3, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(12.dp))
                 LazyColumn(Modifier.fillMaxWidth().heightIn(max = 440.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     item("name") {
                         LabeledField("Name") {
                             Box(Modifier.fillMaxWidth().background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.control))
                                 .border(1.dp, Ca.colors.hairline, RoundedCornerShape(Ca.radius.control)).padding(horizontal = 12.dp, vertical = 10.dp)) {
-                                if (name.isEmpty()) Text("e.g. feature, core", color = Ca.colors.textTertiary, style = Ca.type.footnote)
+                                if (name.isEmpty()) Text("例如 feature、core", color = Ca.colors.textTertiary, style = Ca.type.footnote)
                                 BasicTextField(name, { name = it }, singleLine = true,
                                     textStyle = Ca.type.footnote.copy(color = Ca.colors.textPrimary, fontFamily = codeFont),
                                     cursorBrush = SolidColor(Ca.colors.accent), modifier = Modifier.fillMaxWidth())
@@ -581,7 +581,7 @@ private fun NewModuleDialog(
                         }
                     }
                     item("level") {
-                        LabeledField("Java version") {
+                        LabeledField("Java 版本") {
                             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 type.languageLevels.forEach { lvl -> LevelChip(prettyLevel(lvl), lvl == level) { level = lvl } }
                             }
@@ -592,8 +592,8 @@ private fun NewModuleDialog(
                 Spacer(Modifier.height(12.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Spacer(Modifier.weight(1f))
-                    DialogTextButton("Cancel", destructive = false, onClick = onDismiss)
-                    PrimaryButton("Create", icon = CaIcons.check, onClick = {
+                    DialogTextButton("取消", destructive = false, onClick = onDismiss)
+                    PrimaryButton("创建", icon = CaIcons.check, onClick = {
                         onCreate(name.trim(), type.id, level, forms.associate { it.table to it.toValues() })
                     })
                 }
@@ -623,7 +623,7 @@ private fun ConfigBody(
                 CircularProgressIndicator(Modifier.size(28.dp), color = Ca.colors.accent, strokeWidth = 3.dp)
             }
             config == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Couldn't load module configuration.", color = Ca.colors.textTertiary, style = Ca.type.subhead)
+                Text("无法加载模块配置。", color = Ca.colors.textTertiary, style = Ca.type.subhead)
             }
             else -> ConfigForm(config, codeFont, projectRoot, missingProguard, onAddSourceRoot, onRemoveSourceRoot, onCreateProguard, onSave)
         }
@@ -658,7 +658,7 @@ private fun ConfigForm(
                         style = Ca.type.caption.copy(fontFamily = codeFont), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Spacer(Modifier.height(2.dp))
-                Text("Java version", color = Ca.colors.textSecondary, style = Ca.type.caption, fontWeight = FontWeight.Medium)
+                Text("Java 版本", color = Ca.colors.textSecondary, style = Ca.type.caption, fontWeight = FontWeight.Medium)
                 Row(Modifier.fillMaxWidth().padding(top = 2.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     config.languageLevels.forEach { lvl -> LevelChip(prettyLevel(lvl), lvl == level) { level = lvl } }
                 }
@@ -673,10 +673,10 @@ private fun ConfigForm(
         // ---- Source sets (add / remove typed roots) ----
         item("sourceSets") {
             SectionCard("Source sets", action = {
-                IconButtonCa(CaIcons.plus, "Add source root", onClick = onAddSourceRoot, boxSize = 26, iconSize = 16, active = true)
+                IconButtonCa(CaIcons.plus, "添加源码根目录", onClick = onAddSourceRoot, boxSize = 26, iconSize = 16, active = true)
             }) {
                 if (config.sourceSets.isEmpty()) {
-                    Text("No source sets yet.", color = Ca.colors.textTertiary, style = Ca.type.caption2)
+                    Text("还没有源码集。", color = Ca.colors.textTertiary, style = Ca.type.caption2)
                 }
                 config.sourceSets.forEach { ss -> SourceSetRow(ss, codeFont, projectRoot) { root -> onRemoveSourceRoot(ss.name, root) } }
             }
@@ -692,7 +692,7 @@ private fun ConfigForm(
 
         item("save") {
             Row(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 8.dp), horizontalArrangement = Arrangement.End) {
-                PrimaryButton(if (dirty) "Save changes" else "Save", icon = CaIcons.check, onClick = {
+                PrimaryButton(if (dirty) "Save changes" else "保存", icon = CaIcons.check, onClick = {
                     onSave(UiModuleConfigEdit(
                         languageLevel = level,
                         facetValues = forms.associate { it.table to it.toValues() },
@@ -711,7 +711,7 @@ private fun ConfigForm(
  */
 @Composable
 private fun RunConfigCard(rc: UiRunConfig, mainClass: MutableState<String>, codeFont: FontFamily) {
-    SectionCard("Run") {
+    SectionCard("运行") {
         Text(
             "The main class the Run button launches for this module. Leave blank to auto-detect.",
             color = Ca.colors.textSecondary, style = Ca.type.caption,
@@ -770,7 +770,7 @@ private fun MissingProguardCard(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Icon(CaIcons.warning, null, Modifier.size(18.dp), tint = Ca.colors.warning)
-            Text("Missing keep-rule files", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
+            Text("缺少 keep 规则文件", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
         }
         Text(
             "These files are referenced by a build type but don't exist, so R8 skips them when minify is on.",
@@ -802,7 +802,7 @@ private fun CreateRuleButton(onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         Icon(CaIcons.plus, null, Modifier.size(14.dp), tint = Ca.colors.accent)
-        Text("Create", color = Ca.colors.accent, style = Ca.type.caption, fontWeight = FontWeight.SemiBold)
+        Text("创建", color = Ca.colors.accent, style = Ca.type.caption, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -840,7 +840,7 @@ private fun SourceSetRow(ss: UiSourceSetInfo, codeFont: FontFamily, projectRoot:
             Text(ss.name, color = Ca.colors.textPrimary, style = Ca.type.footnote, fontWeight = FontWeight.SemiBold)
             Chip(ss.scope.lowercase(), fill = Ca.colors.accentSoft, textColor = Ca.colors.accent)
         }
-        if (ss.roots.isEmpty()) Text("no roots", color = Ca.colors.textTertiary, style = Ca.type.caption2)
+        if (ss.roots.isEmpty()) Text("没有根目录", color = Ca.colors.textTertiary, style = Ca.type.caption2)
         ss.roots.forEach { r ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(shortenPath(r, projectRoot), color = Ca.colors.textTertiary, style = Ca.type.caption2.copy(fontFamily = codeFont),
@@ -956,7 +956,7 @@ private fun StringListEditor(values: SnapshotStateList<String>, codeFont: FontFa
             ) {
                 Text(v, color = Ca.colors.textPrimary, style = Ca.type.caption.copy(fontFamily = codeFont), modifier = Modifier.weight(1f),
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
-                IconButtonCa(CaIcons.close, "Remove", { values.removeAt(i) }, boxSize = 24, iconSize = 14, tint = Ca.colors.textTertiary)
+                IconButtonCa(CaIcons.close, "移除", { values.removeAt(i) }, boxSize = 24, iconSize = 14, tint = Ca.colors.textTertiary)
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -964,12 +964,12 @@ private fun StringListEditor(values: SnapshotStateList<String>, codeFont: FontFa
                 Modifier.weight(1f).background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.sm))
                     .border(1.dp, Ca.colors.hairline, RoundedCornerShape(Ca.radius.sm)).padding(horizontal = 10.dp, vertical = 7.dp),
             ) {
-                if (draft.isEmpty()) Text("Add…", color = Ca.colors.textTertiary, style = Ca.type.caption)
+                if (draft.isEmpty()) Text("添加…", color = Ca.colors.textTertiary, style = Ca.type.caption)
                 BasicTextField(draft, { draft = it }, singleLine = true,
                     textStyle = Ca.type.caption.copy(color = Ca.colors.textPrimary, fontFamily = codeFont),
                     cursorBrush = SolidColor(Ca.colors.accent), modifier = Modifier.fillMaxWidth())
             }
-            IconButtonCa(CaIcons.plus, "Add", { if (draft.isNotBlank()) { values.add(draft.trim()); draft = "" } }, boxSize = 30, iconSize = 16, active = true)
+            IconButtonCa(CaIcons.plus, "添加", { if (draft.isNotBlank()) { values.add(draft.trim()); draft = "" } }, boxSize = 30, iconSize = 16, active = true)
         }
     }
 }
@@ -983,7 +983,7 @@ private fun TableListEditor(field: FieldState.TableF, codeFont: FontFamily) {
 
     Column(Modifier.fillMaxWidth().animateContentSize(tween(Motion.BASE, easing = Motion.spring)), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(field.label, color = Ca.colors.textSecondary, style = Ca.type.caption, fontWeight = FontWeight.Medium)
-        if (field.rows.isEmpty()) Text("No ${singular}s yet — add one below.", color = Ca.colors.textTertiary, style = Ca.type.caption2)
+        if (field.rows.isEmpty()) Text("还没有 ${singular}，请在下方添加。", color = Ca.colors.textTertiary, style = Ca.type.caption2)
         field.rows.forEachIndexed { i, row ->
             val isNew = i == justAdded
             val borderColor by animateColorAsState(if (isNew) Ca.colors.accent else Ca.colors.hairline, tween(Motion.SLOW), label = "newRowBorder")
@@ -995,7 +995,7 @@ private fun TableListEditor(field: FieldState.TableF, codeFont: FontFamily) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(rowTitle(row, i), color = Ca.colors.textPrimary, style = Ca.type.footnote, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                     if (isNew) Chip("new", fill = Ca.colors.accentSoft, textColor = Ca.colors.accent)
-                    IconButtonCa(CaIcons.close, "Remove", { val at = i; field.rows.removeAt(at); if (justAdded == at) justAdded = -1 }, boxSize = 24, iconSize = 14, tint = Ca.colors.textTertiary)
+                    IconButtonCa(CaIcons.close, "移除", { val at = i; field.rows.removeAt(at); if (justAdded == at) justAdded = -1 }, boxSize = 24, iconSize = 14, tint = Ca.colors.textTertiary)
                 }
                 row.forEach { FieldEditor(it, codeFont) }
             }

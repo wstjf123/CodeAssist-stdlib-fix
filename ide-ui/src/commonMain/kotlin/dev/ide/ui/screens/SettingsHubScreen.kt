@@ -52,9 +52,9 @@ fun SettingsHubScreen(
                     Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 10.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    IconButtonCa(CaIcons.chevronLeft, "Back", onBack)
+                    IconButtonCa(CaIcons.chevronLeft, "返回", onBack)
                     Icon(CaIcons.gear, null, Modifier.size(20.dp), tint = Ca.colors.accent)
-                    Text("Settings & Tools", color = Ca.colors.textPrimary, style = Ca.type.headline, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    Text("设置与工具", color = Ca.colors.textPrimary, style = Ca.type.headline, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                 }
             }
             Box(Modifier.fillMaxWidth().height(1.dp).background(Ca.colors.separator))
@@ -64,10 +64,10 @@ fun SettingsHubScreen(
                     .padding(horizontal = 16.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                HubRow(CaIcons.gear, "Settings", "Appearance, editor, completion & analysis", onOpenGlobalSettings)
-                HubRow(CaIcons.braces, "Code Style", "Per-language formatting profiles & live preview", onOpenCodeStyle)
-                HubRow(CaIcons.pkg, "SDK Manager", "Download Android SDK & JDK sources", onOpenSdkManager)
-                HubRow(CaIcons.key, "Keystore Manager", "Create, import & manage signing keystores", onOpenKeystoreManager)
+                HubRow(CaIcons.gear, "设置", "Appearance, editor, completion & analysis", onOpenGlobalSettings)
+                HubRow(CaIcons.braces, "代码样式", "Per-language formatting profiles & live preview", onOpenCodeStyle)
+                HubRow(CaIcons.pkg, "SDK 管理器", "Download Android SDK & JDK sources", onOpenSdkManager)
+                HubRow(CaIcons.key, "密钥库管理器", "Create, import & manage signing keystores", onOpenKeystoreManager)
             }
         }
     }

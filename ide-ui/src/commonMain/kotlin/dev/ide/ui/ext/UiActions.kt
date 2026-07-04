@@ -8,7 +8,7 @@ import dev.ide.ui.backend.IdeBackend
  * engine operations, or third-party dex plugins) cross the boundary as data through `IdeBackend.actionsFor` /
  * `invokeAction`. But some actions act on the **running UI** itself: navigate to a screen, toggle the theme,
  * open a file. Those can't be expressed as neutral engine data, so they live here, in a Compose-side registry
- * the app and in-UI plugins contribute to. The UI surfaces (the "More" menu, the command palette) render both
+ * the app and in-UI plugins contribute to. The UI surfaces (the "更多" menu, the command palette) render both
  * sources together.
  *
  * Modeled on the one already-extensible UI piece, `TreeIcons`: a process-global, Compose-observable registry.
@@ -60,7 +60,7 @@ object UiDestinations {
 /**
  * A UI-side action. Parallels the engine-side `IdeAction` (plugin-api) but its [perform] receives a
  * [UiActionHost] so it can drive navigation/theme/app state. [places] reuses the `UiActionPlaces` ids.
- * [description] is an optional subtitle for list-style menus (the "More" sheet renders it).
+ * [description] is an optional subtitle for list-style menus (the "更多" sheet renders it).
  */
 interface UiHostAction {
     val id: String

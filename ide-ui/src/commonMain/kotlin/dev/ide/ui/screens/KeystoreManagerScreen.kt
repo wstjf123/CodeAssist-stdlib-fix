@@ -84,8 +84,8 @@ fun KeystoreManagerScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            IconButtonCa(CaIcons.chevronLeft, "Back", onBack, boxSize = 38)
-            Text("Keystore Manager", style = Ca.type.title3, fontWeight = FontWeight.SemiBold, color = Ca.colors.textPrimary, modifier = Modifier.weight(1f))
+            IconButtonCa(CaIcons.chevronLeft, "返回", onBack, boxSize = 38)
+            Text("密钥库管理器", style = Ca.type.title3, fontWeight = FontWeight.SemiBold, color = Ca.colors.textPrimary, modifier = Modifier.weight(1f))
         }
         status?.let {
             Text(it, style = Ca.type.footnote, color = if (statusError) Ca.colors.error else Ca.colors.accent, modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp))
@@ -93,7 +93,7 @@ fun KeystoreManagerScreen(
 
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             KsCard {
-                Text("Signing keystores", style = Ca.type.subhead, fontWeight = FontWeight.SemiBold, color = Ca.colors.textPrimary)
+                Text("签名密钥库", style = Ca.type.subhead, fontWeight = FontWeight.SemiBold, color = Ca.colors.textPrimary)
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "Create or import the keystores you sign release builds with. They're stored once and shared " +
@@ -102,9 +102,9 @@ fun KeystoreManagerScreen(
                 )
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    KsButton("Create", CaIcons.plus, accent = true) { onCreate() }
+                    KsButton("创建", CaIcons.plus, accent = true) { onCreate() }
                     if (fileActions.canPickFile) {
-                        KsButton("Import", CaIcons.download, accent = false) {
+                        KsButton("导入", CaIcons.download, accent = false) {
                             fileActions.pickFile { path -> if (path != null) onImport(path) }
                         }
                     }
@@ -118,7 +118,7 @@ fun KeystoreManagerScreen(
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Icon(CaIcons.layers, null, Modifier.size(15.dp), tint = Ca.colors.accent)
-                        Text("Assign to a build (project signing)", style = Ca.type.footnote, fontWeight = FontWeight.SemiBold, color = Ca.colors.accent)
+                        Text("分配给构建（项目签名）", style = Ca.type.footnote, fontWeight = FontWeight.SemiBold, color = Ca.colors.accent)
                     }
                 }
             }
@@ -167,7 +167,7 @@ fun KeystoreCreateScreen(backend: IdeBackend, onBack: () -> Unit, onDone: () -> 
         error?.let { Spacer(Modifier.height(6.dp)); Text(it, style = Ca.type.footnote, color = Ca.colors.error) }
         Spacer(Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            KsButton("Create keystore", CaIcons.check, accent = true, enabled = !busy) {
+            KsButton("创建密钥库", CaIcons.check, accent = true, enabled = !busy) {
                 error = null; busy = true
                 scope.launch {
                     val r = backend.signing.createKeystore(
@@ -181,7 +181,7 @@ fun KeystoreCreateScreen(backend: IdeBackend, onBack: () -> Unit, onDone: () -> 
                     if (r.success) onDone() else error = r.message
                 }
             }
-            KsButton("Cancel", null, accent = false, enabled = !busy, onClick = onBack)
+            KsButton("取消", null, accent = false, enabled = !busy, onClick = onBack)
             if (busy) CircularProgressIndicator(Modifier.size(22.dp), color = Ca.colors.accent, strokeWidth = 2.dp)
         }
     }
@@ -209,7 +209,7 @@ fun KeystoreImportScreen(backend: IdeBackend, path: String, onBack: () -> Unit, 
         error?.let { Spacer(Modifier.height(6.dp)); Text(it, style = Ca.type.footnote, color = Ca.colors.error) }
         Spacer(Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            KsButton("Import", CaIcons.check, accent = true, enabled = !busy) {
+            KsButton("导入", CaIcons.check, accent = true, enabled = !busy) {
                 error = null; busy = true
                 scope.launch {
                     val r = backend.signing.importKeystore(path, name.trim(), password, alias.trim(), keyPass)
@@ -217,7 +217,7 @@ fun KeystoreImportScreen(backend: IdeBackend, path: String, onBack: () -> Unit, 
                     if (r.success) onDone() else error = r.message
                 }
             }
-            KsButton("Cancel", null, accent = false, enabled = !busy, onClick = onBack)
+            KsButton("取消", null, accent = false, enabled = !busy, onClick = onBack)
             if (busy) CircularProgressIndicator(Modifier.size(22.dp), color = Ca.colors.accent, strokeWidth = 2.dp)
         }
     }
@@ -245,7 +245,7 @@ private fun KeystoreCard(ks: UiKeystore, onDelete: () -> Unit) {
             if (parts.isNotEmpty()) Text(parts.joinToString("   "), style = Ca.type.caption2, color = Ca.colors.textTertiary)
         } else {
             Spacer(Modifier.height(6.dp))
-            Text("Couldn't read the certificate (password may have changed).", style = Ca.type.caption2, color = Ca.colors.warning)
+            Text("无法读取证书（密码可能已更改）。", style = Ca.type.caption2, color = Ca.colors.warning)
         }
     }
 }
@@ -260,7 +260,7 @@ private fun FormScaffold(title: String, onBack: () -> Unit, body: @Composable Co
             Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            IconButtonCa(CaIcons.chevronLeft, "Back", onBack, boxSize = 38)
+            IconButtonCa(CaIcons.chevronLeft, "返回", onBack, boxSize = 38)
             Text(title, style = Ca.type.title3, fontWeight = FontWeight.SemiBold, color = Ca.colors.textPrimary, modifier = Modifier.weight(1f))
         }
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {

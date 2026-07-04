@@ -86,7 +86,7 @@ internal fun RenamePopup(
             .border(1.dp, Ca.colors.glassEdge, RoundedCornerShape(Ca.radius.lg))
             .padding(16.dp),
     ) {
-        Text("Rename ${state.kind}", color = Ca.colors.textSecondary, style = Ca.type.caption, fontWeight = FontWeight.SemiBold)
+        Text("重命名 ${state.kind}", color = Ca.colors.textSecondary, style = Ca.type.caption, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.size(8.dp))
         Box(
             Modifier.fillMaxWidth().background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.control))
@@ -146,7 +146,7 @@ internal fun GoToLinePopup(
             .border(1.dp, Ca.colors.glassEdge, RoundedCornerShape(Ca.radius.lg))
             .padding(16.dp),
     ) {
-        Text("Go to line", color = Ca.colors.textSecondary, style = Ca.type.caption, fontWeight = FontWeight.SemiBold)
+        Text("跳转到行", color = Ca.colors.textSecondary, style = Ca.type.caption, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.size(8.dp))
         Box(
             Modifier.fillMaxWidth().background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.control))
@@ -170,7 +170,7 @@ internal fun GoToLinePopup(
             )
         }
         Spacer(Modifier.size(6.dp))
-        Text("Line 1–$lineCount  (line or line:column)", color = Ca.colors.textTertiary, style = Ca.type.caption2)
+        Text("第 1–$lineCount 行（行号或 行:列）", color = Ca.colors.textTertiary, style = Ca.type.caption2)
     }
 }
 
@@ -204,7 +204,7 @@ internal fun QuickDocPopup(doc: UiQuickDoc, modifier: Modifier = Modifier) {
         Spacer(Modifier.size(10.dp))
         Column(Modifier.verticalScroll(rememberScrollState())) {
             if (content == null) {
-                Text("No documentation", style = Ca.type.body, color = Ca.colors.textTertiary)
+                Text("没有文档", style = Ca.type.body, color = Ca.colors.textTertiary)
             } else {
                 if (content.description.isNotEmpty()) {
                     Text(content.description, style = Ca.type.body, color = Ca.colors.textSecondary)

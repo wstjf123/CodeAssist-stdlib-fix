@@ -207,13 +207,13 @@ class AndroidDeviceTools(
     /** On-device D8 dexer for the dex MERGE step (the debug-path memory peak), run in a forked VM so it gets a
      *  heap above the app cap. Null → the in-process merge. Supplied by :ide-android; self-falls-back. */
     val r8MergeDexer: dev.ide.android.support.tools.Dexer? = null,
-    /** Max class-dex merged in one batch on a large app (the "Dex merge batch size" setting). Read per build so
+    /** Max class-dex merged in one batch on a large app (the "Dex 合并批量大小" setting). Read per build so
      *  a change applies on the next build; defaults to [dev.ide.core.settings.BuiltInSettingsPages.DEX_MERGE_BATCH_DEFAULT]. */
     val mergeChunkProvider: () -> Int = { dev.ide.core.settings.BuiltInSettingsPages.DEX_MERGE_BATCH_DEFAULT },
 )
 
 /**
- * Installs (and then launches) a freshly built APK: the on-device "Run" for an android-app. Supplied by
+ * Installs (and then launches) a freshly built APK: the on-device "运行" for an android-app. Supplied by
  * :ide-android (it needs Android's `PackageInstaller` + the OS install-confirmation UI); null on the
  * desktop, where the android task stops at producing the signed artifact. [installAndLaunch] returns once
  * the install is initiated and streams progress + the eventual launch to [log].
@@ -1194,7 +1194,7 @@ class IdeServices private constructor(
                 removed++
             }
         }
-        return if (removed == 0) "Caches already clear" else "Freed ${humanBytes(freed)}"
+        return if (removed == 0) "缓存已清空" else "已释放 ${humanBytes(freed)}"
     }
 
     private fun humanBytes(bytes: Long): String = when {
@@ -1756,11 +1756,11 @@ class IdeServices private constructor(
         file: Path, text: String, functionName: String
     ): PreviewRunResult {
         val module =
-            moduleForEditableFile(file) ?: return PreviewRunResult(false, "No module for this file")
+            moduleForEditableFile(file) ?: return PreviewRunResult(false, "此文件没有对应模块")
         val analyzer = analyzerFor(
             module, KotlinLanguageBackend.LANGUAGE_ID
         ) as? dev.ide.lang.kotlin.KotlinSourceAnalyzer ?: return PreviewRunResult(
-            false, "Not a Kotlin file"
+            false, "不是 Kotlin 文件"
         )
         val vf = store.vfs.fileFor(file)
         analyzer.incrementalParser.parseFull(EditorDocument(vf, docVersion.incrementAndGet(), text))
@@ -1770,12 +1770,12 @@ class IdeServices private constructor(
         val model = previewModelFor(module, vf, analyzer)
         val program = model?.program ?: emptyMap()
         val entry = previewEntry(program, functionName, 0) ?: return PreviewRunResult(
-            false, "`$functionName` not found as a @Composable"
+            false, "未找到 @Composable `$functionName`"
         )
         if (!entry.isComplete) {
             val why = entry.diagnostics.joinToString("; ") { it.reason }
                 .ifBlank { "unsupported constructs" }
-            return PreviewRunResult(false, "Cannot preview `$functionName`: $why")
+            return PreviewRunResult(false, "无法预览 `$functionName`：$why")
         }
         composePreviewRunner?.let { return it.render(entry, program) }
         return PreviewRunResult(
@@ -1802,7 +1802,7 @@ class IdeServices private constructor(
         if (analyzer.hasSyntaxErrors(vf)) return listOf("the file has syntax errors — fix them to preview")
         val program = previewModelFor(module, vf, analyzer)?.program ?: emptyMap()
         val entry = previewEntry(program, functionName, arity)
-            ?: return listOf("`$functionName` not found as a @Composable (lowered: ${program.keys.joinToString()})")
+            ?: return listOf("未找到 @Composable `$functionName`（lowered: ${program.keys.joinToString()}）")
         entry.diagnostics.map { d ->
             val snippet = text.substring(
                 d.source.start.coerceIn(0, text.length), d.source.end.coerceIn(0, text.length)
@@ -1812,7 +1812,7 @@ class IdeServices private constructor(
             .ifEmpty { listOf("`$functionName` lowered with no diagnostics — it may render; if not, the failure is in the render path") }
     } catch (t: Throwable) {
         // NEVER return empty on a failure path — a bare "can't be interpreted" with no reason is useless.
-        listOf("analysis failed: ${t::class.java.simpleName}: ${t.message ?: "no message"}")
+        listOf("分析失败：${t::class.java.simpleName}: ${t.message ?: "无消息"}")
     }
 
     /** Lower the `@Preview` composable [functionName] in [file] (buffer [text]) to a renderable tree + the
@@ -1978,12 +1978,12 @@ class IdeServices private constructor(
         if (!isValidJavaIdentifier(name)) return RenameOutcome(
             false, "'$newName' is not a valid Java identifier."
         )
-        if (analysisDisabled(file)) return RenameOutcome(false, "Java analysis is unavailable.")
+        if (analysisDisabled(file)) return RenameOutcome(false, "Java 分析不可用。")
         val module = moduleForFile(file) ?: return RenameOutcome(
-            false, "This file is not in a source module."
+            false, "此文件不在源码模块中。"
         )
         val analyzer = analyzerFor(module) as? JdtSourceAnalyzer ?: return RenameOutcome(
-            false, "Rename is only supported for Java."
+            false, "重命名目前仅支持 Java。"
         )
         val fileAbs = file.toAbsolutePath().normalize()
 
@@ -1993,10 +1993,10 @@ class IdeServices private constructor(
         try {
             val parsed = analyzer.parse(store.vfs.fileFor(file), text)
             target = JdtRename.targetAt(parsed, offset) ?: return RenameOutcome(
-                false, "Place the caret on a symbol to rename."
+                false, "请将光标放在要重命名的符号上。"
             )
             if (name == target.oldName) return RenameOutcome(
-                false, "The new name is the same as the current one."
+                false, "新名称与当前名称相同。"
             )
 
             fun editsFor(ranges: List<TextRange>) =
@@ -2026,7 +2026,7 @@ class IdeServices private constructor(
             }
         } catch (e: LinkageError) {
             analysisUnavailable.add(languageFor(file))
-            return RenameOutcome(false, "Java analysis is unavailable.")
+            return RenameOutcome(false, "Java 分析不可用。")
         }
         if (editsByPath.isEmpty()) return RenameOutcome(
             false, "No occurrences of '${target.oldName}' found."
@@ -2228,7 +2228,7 @@ class IdeServices private constructor(
         )
         val abs = normPath(target)
         if (!Files.exists(abs)) return RenameOutcome(false, "'${abs.fileName}' no longer exists.")
-        val parent = abs.parent ?: return RenameOutcome(false, "Can't rename the workspace root.")
+        val parent = abs.parent ?: return RenameOutcome(false, "无法重命名工作区根目录。")
 
         // Java class-aware path: when the file actually declares a top-level type matching its name, rename the
         // type (and every reference) — which also moves the backing file — instead of a bare filesystem rename.
@@ -2243,14 +2243,14 @@ class IdeServices private constructor(
         }
 
         val dest = parent.resolve(name)
-        if (dest == abs) return RenameOutcome(false, "The new name is the same as the current one.")
+        if (dest == abs) return RenameOutcome(false, "新名称与当前名称相同。")
         if (Files.exists(dest)) return RenameOutcome(false, "'$name' already exists here.")
         return runCatching {
             Files.move(abs, dest)
             rekeyOverlays(abs, dest)
             invalidateAnalyzers(); resyncIndex()
-            RenameOutcome(true, "Renamed to '$name'", newPath = dest.toString())
-        }.getOrElse { RenameOutcome(false, "Rename failed: ${it.message}") }
+            RenameOutcome(true, "已重命名为 '$name'", newPath = dest.toString())
+        }.getOrElse { RenameOutcome(false, "重命名失败：${it.message}") }
     }
 
     /** Move a file or directory into [destDir]. Returns the new path, or null on conflict/failure. */
@@ -2806,7 +2806,7 @@ class IdeServices private constructor(
             // Fine render stages ("Dexing"/"Inflating"/"Drawing") from the runtime drive the status chip.
             stageListener = { _realViewProgress.value = dev.ide.ui.backend.PreviewProgress(it) }
         }
-        _realViewProgress.value = dev.ide.ui.backend.PreviewProgress("Rendering")
+        _realViewProgress.value = dev.ide.ui.backend.PreviewProgress("正在渲染")
         val result = runCatching { runtime.render(req) }.getOrElse { t ->
             dev.ide.preview.impl.RealViewResult(null, error = t.message ?: t.javaClass.simpleName)
         }
@@ -3343,7 +3343,7 @@ class IdeServices private constructor(
     }
 
     companion object {
-        /** Cache subdirs under `.platform/caches` the "Clear caches" action removes — all regenerable, none
+        /** Cache subdirs under `.platform/caches` the "清理缓存" action removes — all regenerable, none
          *  shared across projects (the static SDK/library index segments live under the shared caches root). */
         private val CLEARABLE_CACHE_DIRS =
             listOf("kotlin-ext", "custom-views", "preview", "preview-libs", "build", "source-index")

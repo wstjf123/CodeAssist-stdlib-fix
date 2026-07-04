@@ -25,8 +25,8 @@ internal object KeystoreRegistryOps {
     fun keystores(reg: KeystoreRegistry): List<UiKeystore> = reg.all().map(::uiKeystore)
 
     fun createKeystore(reg: KeystoreRegistry, spec: UiKeystoreSpec): UiKeystoreResult {
-        if (spec.commonName.isBlank()) return UiKeystoreResult(false, "A certificate name (CN) is required.")
-        if (spec.storePass.length < 6) return UiKeystoreResult(false, "The keystore password must be at least 6 characters.")
+        if (spec.commonName.isBlank()) return UiKeystoreResult(false, "必须填写证书名称（CN）。")
+        if (spec.storePass.length < 6) return UiKeystoreResult(false, "密钥库密码至少需要 6 个字符。")
         val r = reg.create(
             spec.name,
             KeystoreCreateSpec(
@@ -37,8 +37,8 @@ internal object KeystoreRegistryOps {
             ),
         )
         return r.fold(
-            { UiKeystoreResult(true, "Created ${it.name}", it.id) },
-            { UiKeystoreResult(false, it.message ?: "Keystore creation failed.") },
+            { UiKeystoreResult(true, "已创建 ${it.name}", it.id) },
+            { UiKeystoreResult(false, it.message ?: "密钥库创建失败。") },
         )
     }
 
@@ -47,8 +47,8 @@ internal object KeystoreRegistryOps {
     ): UiKeystoreResult {
         val r = reg.import(name, Paths.get(filePath), storePass, keyAlias, keyPass)
         return r.fold(
-            { UiKeystoreResult(true, "Imported ${it.name}", it.id) },
-            { UiKeystoreResult(false, it.message ?: "Keystore import failed.") },
+            { UiKeystoreResult(true, "已导入 ${it.name}", it.id) },
+            { UiKeystoreResult(false, it.message ?: "密钥库导入失败。") },
         )
     }
 

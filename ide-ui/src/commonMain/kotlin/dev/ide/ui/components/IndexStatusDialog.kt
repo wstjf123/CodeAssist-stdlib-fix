@@ -180,7 +180,7 @@ private fun ReindexButton(onClick: () -> Unit) {
     ) {
         Icon(CaIcons.refresh, null, Modifier.size(15.dp), tint = Ca.colors.accent)
         Text(
-            "Re-index project", color = Ca.colors.accent, style = Ca.type.footnote,
+            "重新索引项目", color = Ca.colors.accent, style = Ca.type.footnote,
             fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center,
         )
     }

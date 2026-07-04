@@ -90,8 +90,8 @@ fun SdkManagerScreen(backend: IdeBackend, onBack: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            IconButtonCa(CaIcons.chevronLeft, "Back", onBack, boxSize = iconBox)
-            Text("SDK Manager", style = Ca.type.title3, fontWeight = FontWeight.SemiBold, color = Ca.colors.textPrimary, modifier = Modifier.weight(1f))
+            IconButtonCa(CaIcons.chevronLeft, "返回", onBack, boxSize = iconBox)
+            Text("SDK 管理器", style = Ca.type.title3, fontWeight = FontWeight.SemiBold, color = Ca.colors.textPrimary, modifier = Modifier.weight(1f))
             IconButtonCa(CaIcons.refresh, "Refresh", { scope.launch { reload() } }, boxSize = iconBox)
         }
         status?.let { Text(it, style = Ca.type.footnote, color = if (statusIsError) Ca.colors.error else Ca.colors.accent, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) }
@@ -99,7 +99,7 @@ fun SdkManagerScreen(backend: IdeBackend, onBack: () -> Unit) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             // Purpose: these downloads power editor docs, not building.
             Card {
-                Text("Sources & documentation", style = Ca.type.subhead, fontWeight = FontWeight.SemiBold, color = Ca.colors.textPrimary)
+                Text("源码与文档", style = Ca.type.subhead, fontWeight = FontWeight.SemiBold, color = Ca.colors.textPrimary)
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "Download SDK platform sources and JDK sources so the editor can show javadoc, parameter " +
@@ -115,7 +115,7 @@ fun SdkManagerScreen(backend: IdeBackend, onBack: () -> Unit) {
                     SectionHeader("Downloads", small = true)
                     Spacer(Modifier.weight(1f))
                     if (progress.downloads.any { it.status == "DONE" || it.status == "FAILED" }) {
-                        PillButton("Clear finished", null, accent = false) { backend.sdk.clearSdkDownloads() }
+                        PillButton("清除已完成", null, accent = false) { backend.sdk.clearSdkDownloads() }
                     }
                 }
                 Card {
@@ -137,7 +137,7 @@ fun SdkManagerScreen(backend: IdeBackend, onBack: () -> Unit) {
                 if (jdk?.srcZip != null) {
                     StatusTag(CaIcons.check, "Sources available — android.* and java.* docs are on.", Ca.colors.run)
                 } else {
-                    Text("No JDK sources found. Download a JDK that bundles them:", style = Ca.type.footnote, color = Ca.colors.textSecondary)
+                    Text("未找到 JDK 源码。请下载包含源码的 JDK：", style = Ca.type.footnote, color = Ca.colors.textSecondary)
                     Spacer(Modifier.height(10.dp))
                     // FlowRow so the buttons wrap onto another line on a narrow phone instead of clipping.
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -158,10 +158,10 @@ fun SdkManagerScreen(backend: IdeBackend, onBack: () -> Unit) {
             if (loading && packages.isEmpty()) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = Ca.colors.accent)
-                    Text("Loading package list…", style = Ca.type.footnote, color = Ca.colors.textSecondary)
+                    Text("正在加载包列表…", style = Ca.type.footnote, color = Ca.colors.textSecondary)
                 }
             } else if (packages.isEmpty()) {
-                Text("No packages. Check your connection, then Refresh.", style = Ca.type.footnote, color = Ca.colors.textTertiary)
+                Text("没有可用包。请检查网络连接后刷新。", style = Ca.type.footnote, color = Ca.colors.textTertiary)
             } else {
                 Card {
                     val sorted = packages.sortedByDescending { it.path }
@@ -222,7 +222,7 @@ private fun DownloadRow(d: UiSdkDownload, onCancel: () -> Unit) {
                 )
             }
             Spacer(Modifier.width(10.dp))
-            if (active) PillButton("Cancel", CaIcons.stop, accent = false, onClick = onCancel)
+            if (active) PillButton("取消", CaIcons.stop, accent = false, onClick = onCancel)
         }
         if (active) {
             Spacer(Modifier.height(8.dp))
@@ -256,11 +256,11 @@ private fun PackageRow(p: UiSdkPackage, downloading: Boolean, onInstall: () -> U
         when {
             downloading -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Ca.colors.accent)
-                IconButtonCa(CaIcons.stop, "Cancel", onCancel, boxSize = if (isMobilePlatform) 40 else 32, iconSize = 18)
+                IconButtonCa(CaIcons.stop, "取消", onCancel, boxSize = if (isMobilePlatform) 40 else 32, iconSize = 18)
             }
             p.installed -> StatusTag(CaIcons.check, "Installed", Ca.colors.run)
-            p.incomplete -> PillButton("Resume", CaIcons.refresh, accent = true, enabled = p.installable, onClick = onInstall)
-            else -> PillButton("Install", CaIcons.download, accent = true, enabled = p.installable, onClick = onInstall)
+            p.incomplete -> PillButton("继续", CaIcons.refresh, accent = true, enabled = p.installable, onClick = onInstall)
+            else -> PillButton("安装", CaIcons.download, accent = true, enabled = p.installable, onClick = onInstall)
         }
     }
 }

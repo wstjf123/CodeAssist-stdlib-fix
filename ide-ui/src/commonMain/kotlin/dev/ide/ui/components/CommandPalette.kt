@@ -67,11 +67,11 @@ class PaletteEntry(val section: String, val label: String, val sub: String?, val
  * section labels this tab keeps (empty = keep all); Tab cycles forward through them.
  */
 enum class PaletteFilter(val label: String, val sections: Set<String>) {
-    All("All", emptySet()),
-    Commands("Commands", setOf("Commands", "Run")),
-    Files("Files", setOf("Files", "Go to")),
-    Symbols("Symbols", setOf("Symbols")),
-    Members("Members", setOf("Members"));
+    All("全部", emptySet()),
+    Commands("命令", setOf("命令", "运行")),
+    Files("文件", setOf("文件", "跳转")),
+    Symbols("符号", setOf("符号")),
+    Members("成员", setOf("成员"));
 
     fun keeps(section: String): Boolean = sections.isEmpty() || section in sections
     val wantsSymbols: Boolean get() = this == All || this == Symbols
@@ -118,7 +118,7 @@ fun CommandPalette(
             }
         }
     }
-    // Only hit the index for the kinds the active scope actually shows — picking "Files" shouldn't pay for a
+    // Only hit the index for the kinds the active scope actually shows — picking "文件" shouldn't pay for a
     // member scan. Re-runs when the scope changes so switching tabs fills in results that were skipped.
     LaunchedEffect(query, filter) {
         val q = query.trim()
@@ -132,22 +132,22 @@ fun CommandPalette(
     val allEntries = buildList {
         if (q.isEmpty()) {
             // Engine commands (Run/Stop/Re-index + dex plugins) and UI commands (nav/theme + in-UI plugins).
-            pluginCommands.forEach { cmd -> add(PaletteEntry("Commands", cmd.text, null) { runCommand(cmd.id) }) }
-            uiCommands.forEach { cmd -> add(PaletteEntry("Commands", cmd.text, null) { cmd.perform(uiHost) }) }
-            files.take(12).forEach { f -> add(PaletteEntry("Go to", f.name, null) { onOpenFile(f) }) }
+            pluginCommands.forEach { cmd -> add(PaletteEntry("命令", cmd.text, null) { runCommand(cmd.id) }) }
+            uiCommands.forEach { cmd -> add(PaletteEntry("命令", cmd.text, null) { cmd.perform(uiHost) }) }
+            files.take(12).forEach { f -> add(PaletteEntry("跳转", f.name, null) { onOpenFile(f) }) }
         } else {
             symbols.forEach { s ->
-                add(PaletteEntry("Symbols", s.name, s.detail) {
+                add(PaletteEntry("符号", s.name, s.detail) {
                     if (s.filePath != null && s.offset != null) onOpenAt(s.filePath, s.offset)
                 })
             }
             files.filter { it.name.contains(q, ignoreCase = true) }.take(8)
-                .forEach { f -> add(PaletteEntry("Files", f.name, null) { onOpenFile(f) }) }
-            members.forEach { m -> add(PaletteEntry("Members", m.name, m.detail) {}) }
+                .forEach { f -> add(PaletteEntry("文件", f.name, null) { onOpenFile(f) }) }
+            members.forEach { m -> add(PaletteEntry("成员", m.name, m.detail) {}) }
             pluginCommands.filter { it.text.contains(q, ignoreCase = true) }
-                .forEach { cmd -> add(PaletteEntry("Commands", cmd.text, null) { runCommand(cmd.id) }) }
+                .forEach { cmd -> add(PaletteEntry("命令", cmd.text, null) { runCommand(cmd.id) }) }
             uiCommands.filter { it.text.contains(q, ignoreCase = true) }
-                .forEach { cmd -> add(PaletteEntry("Commands", cmd.text, null) { cmd.perform(uiHost) }) }
+                .forEach { cmd -> add(PaletteEntry("命令", cmd.text, null) { cmd.perform(uiHost) }) }
         }
     }
     val entries = allEntries.filter { filter.keeps(it.section) }
@@ -170,7 +170,7 @@ fun CommandPalette(
             Icon(CaIcons.command, null, Modifier.size(20.dp), tint = Ca.colors.accent)
             Box(Modifier.weight(1f)) {
                 if (query.isEmpty()) {
-                    Text("Run a command, jump to a file or symbol…", color = Ca.colors.textTertiary, style = Ca.type.body)
+                    Text("运行命令，跳转到文件或符号…", color = Ca.colors.textTertiary, style = Ca.type.body)
                 }
                 BasicTextField(
                     value = query,
@@ -205,7 +205,7 @@ fun CommandPalette(
             Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 22.dp)) {
                 Text(
                     if (q.isEmpty() && filter != PaletteFilter.All) "Type to search ${filter.label.lowercase()}…"
-                    else "No matches",
+                    else "没有匹配项",
                     color = Ca.colors.textTertiary, style = Ca.type.subhead,
                 )
             }

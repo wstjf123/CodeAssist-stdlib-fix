@@ -39,9 +39,9 @@ internal class StoreBackend(private val ctx: BackendContext) : StoreService {
             add(CATEGORY_COMMUNITY)
         }
         val sections = listOf(
-            UiStoreSection("templates", "Starter templates", "Spin up a new project from a curated scaffold", templateItems),
-            UiStoreSection("samples", "Sample projects", "Full example apps to read and run", SAMPLE_ITEMS),
-            UiStoreSection("community", "Community", "Projects shared by the community", emptyList()),
+            UiStoreSection("templates", "入门模板", "从精选脚手架快速创建新项目", templateItems),
+            UiStoreSection("samples", "示例项目", "可阅读和运行的完整示例应用", SAMPLE_ITEMS),
+            UiStoreSection("community", "社区", "社区分享的项目", emptyList()),
         )
         UiStoreCatalog(featured = featured, categories = categories, sections = sections)
     }
@@ -55,7 +55,7 @@ internal class StoreBackend(private val ctx: BackendContext) : StoreService {
     override suspend fun install(id: String, args: Map<String, String>): UiStoreInstallResult {
         // Template items are created through the Create-Project flow (the UI routes them there with the
         // configure form), never here. Sample/community downloads are filled in by the remote-catalog seam.
-        return UiStoreInstallResult(false, "Sample and community projects are coming soon")
+        return UiStoreInstallResult(false, "示例和社区项目即将推出")
     }
 
     private fun matchesCategory(item: UiStoreItem, category: String?): Boolean = when (category) {
@@ -92,52 +92,52 @@ internal class StoreBackend(private val ctx: BackendContext) : StoreService {
     private data class Curation(val featured: Boolean = false, val accent: Long? = null, val tags: List<String> = emptyList())
 
     private companion object {
-        const val CATEGORY_SAMPLES = "Samples"
-        const val CATEGORY_COMMUNITY = "Community"
+        const val CATEGORY_SAMPLES = "示例"
+        const val CATEGORY_COMMUNITY = "社区"
 
         val CURATION: Map<String, Curation> = mapOf(
             "compose-app" to Curation(featured = true, accent = 0xFF3FBDD9, tags = listOf("Jetpack Compose", "Material 3", "Kotlin")),
-            "android-material-you" to Curation(featured = true, accent = 0xFFB487F7, tags = listOf("Material You", "Views", "Kotlin")),
-            "android-app" to Curation(featured = true, accent = 0xFF3DDC84, tags = listOf("Android", "Activity", "XML layouts")),
-            "kotlin-console" to Curation(tags = listOf("Kotlin", "Console")),
-            "java-console" to Curation(tags = listOf("Java", "Console")),
+            "android-material-you" to Curation(featured = true, accent = 0xFFB487F7, tags = listOf("Material You", "视图", "Kotlin")),
+            "android-app" to Curation(featured = true, accent = 0xFF3DDC84, tags = listOf("Android", "Activity", "XML 布局")),
+            "kotlin-console" to Curation(tags = listOf("Kotlin", "控制台")),
+            "java-console" to Curation(tags = listOf("Java", "控制台")),
             "android-library" to Curation(tags = listOf("Android", "AAR")),
         )
 
         // Curated preview samples (browse-only until the remote catalog wires downloads). Marked unavailable
-        // so the detail sheet shows "Coming soon" rather than a working install.
+        // so the detail sheet shows "即将推出" rather than a working install.
         val SAMPLE_ITEMS: List<UiStoreItem> = listOf(
             UiStoreItem(
-                id = "sample:notes", kind = UiStoreItemKind.Sample, title = "Notes",
-                summary = "A Material 3 notes app with a list/detail flow.",
-                description = "A complete note-taking app: a Material 3 list/detail flow, swipe-to-delete, and " +
-                    "local persistence. A good tour of state handling and navigation.",
+                id = "sample:notes", kind = UiStoreItemKind.Sample, title = "便签",
+                summary = "使用列表/详情流程的 Material 3 便签应用。",
+                description = "完整的记事应用：Material 3 列表/详情流程、滑动删除，以及 " +
+                    "本地持久化。适合了解状态处理和导航。",
                 category = "Android", iconId = "module.android", author = "CodeAssist",
-                tags = listOf("Material 3", "CRUD", "Navigation"), accentColor = 0xFF3DDC84, available = false,
+                tags = listOf("Material 3", "CRUD", "导航"), accentColor = 0xFF3DDC84, available = false,
             ),
             UiStoreItem(
-                id = "sample:weather", kind = UiStoreItemKind.Sample, title = "Weather",
-                summary = "Fetches a forecast over HTTP and renders it in Compose.",
-                description = "A small Compose app that loads a forecast over HTTP and renders an hourly + daily " +
-                    "view. Shows networking, loading/error states, and lists.",
+                id = "sample:weather", kind = UiStoreItemKind.Sample, title = "天气",
+                summary = "通过 HTTP 获取天气预报并用 Compose 渲染。",
+                description = "一个小型 Compose 应用，通过 HTTP 加载预报并渲染逐小时 + 每日 " +
+                    "视图。展示网络请求、加载/错误状态和列表。",
                 category = "Android", iconId = "module.android", author = "CodeAssist",
-                tags = listOf("Compose", "Networking", "Coroutines"), accentColor = 0xFF3FBDD9, available = false,
+                tags = listOf("Compose", "网络", "Coroutines"), accentColor = 0xFF3FBDD9, available = false,
             ),
             UiStoreItem(
-                id = "sample:snake", kind = UiStoreItemKind.Sample, title = "Snake",
-                summary = "A classic Snake game drawn on a Compose canvas.",
-                description = "The classic Snake game: a game loop, gesture input, and Canvas drawing. A compact " +
-                    "example of frame-driven UI.",
-                category = "Games", iconId = "kotlin", author = "CodeAssist",
-                tags = listOf("Canvas", "Game loop", "Kotlin"), accentColor = 0xFFB487F7, available = false,
+                id = "sample:snake", kind = UiStoreItemKind.Sample, title = "贪吃蛇",
+                summary = "在 Compose 画布上绘制的经典贪吃蛇游戏。",
+                description = "经典贪吃蛇游戏：游戏循环、手势输入和 Canvas 绘制。一个紧凑的 " +
+                    "帧驱动 UI 示例。",
+                category = "游戏", iconId = "kotlin", author = "CodeAssist",
+                tags = listOf("Canvas", "游戏循环", "Kotlin"), accentColor = 0xFFB487F7, available = false,
             ),
             UiStoreItem(
-                id = "sample:calc", kind = UiStoreItemKind.Sample, title = "Calculator",
-                summary = "An expression-parsing calculator, console + tests.",
-                description = "A Java console calculator with an expression parser and a JUnit test suite. A clean " +
-                    "starting point for parsing and unit testing.",
+                id = "sample:calc", kind = UiStoreItemKind.Sample, title = "计算器",
+                summary = "表达式解析计算器，包含控制台和测试。",
+                description = "带表达式解析器和 JUnit 测试套件的 Java 控制台计算器。一个清晰的 " +
+                    "解析与单元测试起点。",
                 category = "Java", iconId = "java", author = "CodeAssist",
-                tags = listOf("Parsing", "JUnit", "Console"), available = false,
+                tags = listOf("解析", "JUnit", "控制台"), available = false,
             ),
         )
     }

@@ -230,7 +230,7 @@ private fun TabChip() {
 @Composable
 private fun BetaChip() {
     Box(Modifier.clip(RoundedCornerShape(50)).background(Ca.colors.info.copy(alpha = 0.16f)).padding(horizontal = 7.dp, vertical = 2.dp)) {
-        Text("BETA", color = Ca.colors.info, fontFamily = Ca.type.uiFamily, fontSize = 9.5f.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.4.sp)
+        Text("测试版", color = Ca.colors.info, fontFamily = Ca.type.uiFamily, fontSize = 9.5f.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.4.sp)
     }
 }
 
@@ -337,7 +337,7 @@ internal fun IdeMock() {
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
             ) {
                 Icon(CaIcons.play, null, Modifier.size(14.dp), tint = Color.White)
-                Text("Run", color = Color.White, fontFamily = Ca.type.uiFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.SemiBold)
+                Text("运行", color = Color.White, fontFamily = Ca.type.uiFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.SemiBold)
             }
         }
         // Tab strip with an active underline + modified dot.
@@ -362,7 +362,7 @@ internal fun IdeMock() {
         Box(Modifier.fillMaxWidth().height(1.dp).background(Ca.colors.separator))
         // The pinned() stream.
         Column(Modifier.padding(start = 4.dp, top = 6.dp)) {
-            MockCodeLine(14, with(s) { listOf(kw("public "), ty("List<Note> "), fn("pinned"), pn("() {")) })
+            MockCodeLine(14, with(s) { listOf(kw("public "), ty("List<Note> "), fn("已固定"), pn("() {")) })
             MockCodeLine(15, with(s) { listOf(df("  "), kw("return "), df("notes"), pn("."), fn("stream"), pn("()")) })
             MockCodeLine(16, with(s) { listOf(df("    "), pn("."), fn("filter"), pn("("), df("n "), pn("-> "), df("n"), pn("."), fn("isPinned"), pn("())")) }, current = true)
             MockCodeLine(17, with(s) { listOf(df("    "), pn("."), fn("collect"), pn("("), ty("Collectors"), pn("."), fn("toList"), pn("());")) })
@@ -411,7 +411,7 @@ internal fun BlocksMock() {
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Box(Modifier.size(6.dp).background(Ca.colors.run, CircleShape))
-            Text("live projection · synced with Code", color = Ca.colors.textTertiary, fontFamily = Ca.type.uiFamily, fontSize = 11.sp)
+            Text("实时投影 · 与代码同步", color = Ca.colors.textTertiary, fontFamily = Ca.type.uiFamily, fontSize = 11.sp)
         }
     }
 }
@@ -443,7 +443,7 @@ private fun MethodHatBlock() {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Icon(CaIcons.caretDown, null, Modifier.size(14.dp), tint = Color.White.copy(alpha = 0.8f))
-        Text("pinned", color = Color.White, fontFamily = Ca.type.codeFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Medium)
+        Text("已固定", color = Color.White, fontFamily = Ca.type.codeFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Medium)
         Text("()", color = Color.White.copy(alpha = 0.85f), fontFamily = Ca.type.codeFamily, fontSize = 12.5f.sp)
         BlockSocket("List<Note>", blockColor(BlockCat.Method), white = true)
     }
@@ -496,7 +496,7 @@ internal fun BuildConsoleMock() {
     Column(Modifier.fillMaxSize().background(Ca.colors.bg).padding(horizontal = 16.dp, vertical = 14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
             Icon(CaIcons.terminal, null, Modifier.size(17.dp), tint = Ca.colors.textSecondary)
-            Text("Build", color = Ca.colors.textPrimary, fontFamily = Ca.type.uiFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.SemiBold)
+            Text("构建", color = Ca.colors.textPrimary, fontFamily = Ca.type.uiFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.SemiBold)
             Text("app", color = Ca.colors.textTertiary, fontFamily = Ca.type.codeFamily, fontSize = 11.5f.sp)
             Spacer(Modifier.weight(1f))
             Row(
@@ -505,7 +505,7 @@ internal fun BuildConsoleMock() {
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
             ) {
                 Icon(CaIcons.check, null, Modifier.size(12.dp), tint = Ca.colors.run)
-                Text("Succeeded", color = Ca.colors.run, fontFamily = Ca.type.uiFamily, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                Text("成功", color = Ca.colors.run, fontFamily = Ca.type.uiFamily, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
             }
             Text("3.2s", color = Ca.colors.textTertiary, fontFamily = Ca.type.codeFamily, fontSize = 11.5f.sp)
         }
@@ -656,14 +656,14 @@ internal fun ComposePreviewMock() {
             horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
             Box(Modifier.size(6.dp).background(Ca.colors.run, CircleShape))
-            Text("LIVE", color = Ca.colors.run, fontFamily = Ca.type.uiFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.Bold)
+            Text("实时", color = Ca.colors.run, fontFamily = Ca.type.uiFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.Bold)
         }
         // The device frame, centered.
         Box(Modifier.align(Alignment.Center)) {
             Column(
                 Modifier.width(168.dp).clip(RoundedCornerShape(18.dp)).background(Ca.colors.editorBg).border(1.dp, Ca.colors.separator, RoundedCornerShape(18.dp)).padding(14.dp),
             ) {
-                Text("Notes", color = Ca.colors.textPrimary, fontFamily = Ca.type.uiFamily, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text("便签", color = Ca.colors.textPrimary, fontFamily = Ca.type.uiFamily, fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(10.dp))
                 NoteCard(pinned = true)
                 Spacer(Modifier.height(8.dp))
@@ -715,8 +715,8 @@ internal fun FilesAccessMock() {
                     contentAlignment = Alignment.Center,
                 ) { Icon(CaIcons.folder, null, Modifier.size(18.dp), tint = Ca.colors.accent) }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text("Your project files", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
-                    Text("Open in any file manager — add icons, layouts, assets.", color = Ca.colors.textTertiary, style = Ca.type.caption2, maxLines = 2)
+                    Text("你的项目文件", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
+                    Text("可用任意文件管理器打开——添加图标、布局和素材。", color = Ca.colors.textTertiary, style = Ca.type.caption2, maxLines = 2)
                 }
             }
             Row(
@@ -732,7 +732,7 @@ internal fun FilesAccessMock() {
             ) {
                 Icon(CaIcons.share, null, Modifier.size(15.dp), tint = Ca.colors.accent)
                 Spacer(Modifier.width(6.dp))
-                Text("Open in file manager", color = Ca.colors.accent, style = Ca.type.footnote, fontWeight = FontWeight.SemiBold)
+                Text("在文件管理器中打开", color = Ca.colors.accent, style = Ca.type.footnote, fontWeight = FontWeight.SemiBold)
             }
         }
     }

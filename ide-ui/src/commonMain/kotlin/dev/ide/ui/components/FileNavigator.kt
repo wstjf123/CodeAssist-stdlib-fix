@@ -159,7 +159,7 @@ fun FileNavigator(
             }
             if (onOpenInFiles != null) IconButtonCa(
                 CaIcons.folderOpen,
-                "Open in file manager",
+                "在文件管理器中打开",
                 onClick = onOpenInFiles,
                 boxSize = 34,
                 iconSize = 18
@@ -592,14 +592,14 @@ private fun TreeRow(
                 FileActionItem(CaIcons.layers, "Dependencies") {
                     menuOpen = false; onViewDependencies(node)
                 }
-                FileActionItem(CaIcons.plus, "Add source root") {
+                FileActionItem(CaIcons.plus, "添加源码根目录") {
                     menuOpen = false; onAddSourceRoot(
                     node
                 )
                 }
             }
             if (canNew) CaSubmenuItem(
-                label = "New",
+                label = "新建",
                 icon = CaIcons.plus,
                 expanded = openSubmenu == "new",
                 onExpandedChange = { openSubmenu = if (it) "new" else null },
@@ -630,7 +630,7 @@ private fun TreeRow(
                 FileActionItem(CaIcons.docText, "Rename") { menuOpen = false; ctx.onRename(node) }
                 FileActionItem(CaIcons.arrowRight, "Move") { menuOpen = false; ctx.onMove(node) }
                 FileActionItem(CaIcons.copy, "Copy") { menuOpen = false; ctx.onCopy(node) }
-                FileActionItem(CaIcons.close, "Delete", danger = true) {
+                FileActionItem(CaIcons.close, "删除", danger = true) {
                     menuOpen = false; ctx.onDelete(node)
                 }
             }
@@ -789,7 +789,7 @@ private fun NewHoverButton(
 ) {
     var open by remember { mutableStateOf(false) }
     Box {
-        IconButtonCa(CaIcons.plus, "New", onClick = { open = true }, boxSize = 22, iconSize = 14)
+        IconButtonCa(CaIcons.plus, "新建", onClick = { open = true }, boxSize = 22, iconSize = 14)
         CaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             NewActionItems(
                 node,

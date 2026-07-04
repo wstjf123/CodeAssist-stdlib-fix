@@ -23,16 +23,16 @@ internal class SdkBackend(private val ctx: BackendContext) : SdkService {
     override val sdkManagerState: StateFlow<UiSdkManagerState> get() = ctx.sdkManager?.state ?: empty
     override suspend fun sdkPackages(): List<UiSdkPackage> = ctx.sdkManager?.androidPackages() ?: emptyList()
     override suspend fun installSdkPackage(path: String): String =
-        ctx.sdkManager?.installAndroidPackage(path) ?: "No SDK manager available."
+        ctx.sdkManager?.installAndroidPackage(path) ?: "没有可用的 SDK 管理器。"
     override fun cancelSdkDownload(id: String) { ctx.sdkManager?.cancelSdkDownload(id) }
     override fun clearSdkDownloads() { ctx.sdkManager?.clearSdkDownloads() }
     override fun jdkInfo(): UiJdkInfo? = ctx.sdkManager?.jdkInfo()
     override suspend fun downloadJdkSources(feature: Int): String =
-        ctx.sdkManager?.downloadJdkSources(feature) ?: "No SDK manager available."
+        ctx.sdkManager?.downloadJdkSources(feature) ?: "没有可用的 SDK 管理器。"
 
     override fun androidSourcesInfo(): UiAndroidSourcesInfo? =
         ctx.sdkManager?.androidSourcesInfo()?.let { UiAndroidSourcesInfo(it.platform, it.installed, it.downloadable) }
 
     override suspend fun downloadAndroidSources(): String =
-        withContext(Dispatchers.IO) { ctx.sdkManager?.downloadAndroidSources() ?: "No SDK manager available." }
+        withContext(Dispatchers.IO) { ctx.sdkManager?.downloadAndroidSources() ?: "没有可用的 SDK 管理器。" }
 }

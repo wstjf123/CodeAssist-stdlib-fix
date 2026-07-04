@@ -182,10 +182,10 @@ internal class BuildService(private val ctx: EngineContext) : Disposable {
                 // ...the dex merge (debug-path memory peak) in a forked VM too...
                 mergeDexer = t.r8MergeDexer,
                 // ...and the same forked D8 as the dexBuilder ARCHIVE dexer (it's an OffHeapArchiveDexer): a big
-                // project jar / cold library archives off the app heap above the "Off-heap dexing threshold", and
+                // project jar / cold library archives off the app heap above the "堆外 dex 阈值", and
                 // cold libraries archive several at once. Small incremental archives still stay in-process.
                 dexer = t.r8MergeDexer,
-                // The "Dex merge batch size" setting (app-scoped); read per build via the host's provider.
+                // The "Dex 合并批量大小" setting (app-scoped); read per build via the host's provider.
                 mergeChunk = t.mergeChunkProvider,
             )
         }
@@ -440,7 +440,7 @@ internal class BuildService(private val ctx: EngineContext) : Disposable {
             if (runnableMainFor(m) == null) continue
             add(
                 RunTaskOption(
-                    "run:${m.name}", "Run ${m.name}", "run"
+                    "run:${m.name}", "运行 ${m.name}", "run"
                 )
             )
         }
@@ -450,7 +450,7 @@ internal class BuildService(private val ctx: EngineContext) : Disposable {
                 // On device, the android Run builds + installs + launches; on desktop it stops at assemble.
                 if (ctx.apkInstaller != null) add(
                     RunTaskOption(
-                        "androidRun:${m.name}:${v.name}", "Run $cap · ${m.name}", "android"
+                        "androidRun:${m.name}:${v.name}", "运行 $cap · ${m.name}", "android"
                     )
                 )
                 else add(
@@ -480,9 +480,9 @@ internal class BuildService(private val ctx: EngineContext) : Disposable {
                 id.startsWith("run:") -> {
                     val moduleName = id.removePrefix("run:")
                     val module = ctx.modules().firstOrNull { it.name == moduleName }
-                        ?: return fail("No module '$moduleName'.")
+                        ?: return fail("没有模块 '$moduleName'。")
                     val target = runnableMainFor(module)
-                        ?: return fail("No runnable main() found for ${module.name}. Set one in Module Settings ▸ Run.")
+                        ?: return fail("未找到 ${module.name} 的可运行 main()。请在模块设置 ▸ 运行中指定。")
                     val mainClass = target.mainClass
                     unresolvedBlocker(module)?.let { return fail(it) }
                     val project = ctx.projectOf(module) ?: return
@@ -517,11 +517,11 @@ internal class BuildService(private val ctx: EngineContext) : Disposable {
                 id.startsWith("assemble:") -> {
                     val parts = id.removePrefix("assemble:").split(":")
                     val module = ctx.modules().firstOrNull { it.name == parts[0] }
-                        ?: return fail("No module '${parts[0]}'.")
+                        ?: return fail("没有模块 '${parts[0]}'。")
                     val variant = parts.getOrNull(1) ?: ctx.activeVariant(module)
                     unresolvedBlocker(module)?.let { return fail(it) }
                     val android = androidBuild
-                        ?: return fail("Android SDK (platform + build-tools) not found — install one to assemble Android modules.")
+                        ?: return fail("未找到 Android SDK（platform + build-tools）——请安装后再组装 Android 模块。")
                     val project = ctx.projectOf(module) ?: return
                     val graph = android.createBuildGraph(
                         project, BuildRequest(
@@ -539,11 +539,11 @@ internal class BuildService(private val ctx: EngineContext) : Disposable {
                 id.startsWith("bundle:") -> {
                     val parts = id.removePrefix("bundle:").split(":")
                     val module = ctx.modules().firstOrNull { it.name == parts[0] }
-                        ?: return fail("No module '${parts[0]}'.")
+                        ?: return fail("没有模块 '${parts[0]}'。")
                     val variant = parts.getOrNull(1) ?: ctx.activeVariant(module)
                     unresolvedBlocker(module)?.let { return fail(it) }
                     val android = androidBuild
-                        ?: return fail("Android SDK (platform + build-tools) not found — install one to bundle Android modules.")
+                        ?: return fail("未找到 Android SDK（platform + build-tools）——请安装后再打包 Android 模块。")
                     val project = ctx.projectOf(module) ?: return
                     val graph = android.createBuildGraph(
                         project, BuildRequest(
@@ -562,14 +562,14 @@ internal class BuildService(private val ctx: EngineContext) : Disposable {
                 id.startsWith("androidRun:") -> {
                     val parts = id.removePrefix("androidRun:").split(":")
                     val module = ctx.modules().firstOrNull { it.name == parts[0] }
-                        ?: return fail("No module '${parts[0]}'.")
+                        ?: return fail("没有模块 '${parts[0]}'。")
                     val variant = parts.getOrNull(1) ?: ctx.activeVariant(module)
                     unresolvedBlocker(module)?.let { return fail(it) }
                     val installer =
-                        ctx.apkInstaller ?: return fail("APK install is only available on device.")
-                    val android = androidBuild ?: return fail("Android SDK not found.")
+                        ctx.apkInstaller ?: return fail("APK 安装仅在设备上可用。")
+                    val android = androidBuild ?: return fail("未找到 Android SDK。")
                     val pkg = module.facets.get(AndroidFacet.KEY)?.namespace
-                        ?: return fail("No Android package for '${parts[0]}'.")
+                        ?: return fail("没有 ${parts[0]} 的 Android 包。")
                     val project = ctx.projectOf(module) ?: return
                     val graph = android.createBuildGraph(
                         project, BuildRequest(
@@ -586,19 +586,19 @@ internal class BuildService(private val ctx: EngineContext) : Disposable {
                     ) { log -> installer.installAndLaunch(apk, pkg, log) }
                 }
 
-                else -> fail("Unknown task: $id")
+                else -> fail("未知任务：$id")
             }
         } catch (e: CyclicTaskDependencyException) {
-            fail("Build configuration error — cyclic task dependency: ${e.cycle.joinToString(" → ") { it.value }}")
+            fail("构建配置错误——任务依赖存在循环：${e.cycle.joinToString(" → ") { it.value }}")
         } catch (e: Throwable) {
-            fail("Couldn't start the build: ${e.message ?: e.javaClass.simpleName}")
+            fail("无法启动构建：${e.message ?: e.javaClass.simpleName}")
         }
     }
 
     /** Run the default task (first of [runTasks]) — the plain Run button + existing callers. */
     fun runBuild() {
         val first =
-            runTasks().firstOrNull() ?: return fail("Nothing to run or assemble in this project.")
+            runTasks().firstOrNull() ?: return fail("此项目中没有可运行或可组装的内容。")
         runTask(first.id)
     }
 
@@ -635,7 +635,7 @@ internal class BuildService(private val ctx: EngineContext) : Disposable {
         if (depCount < FIRST_BUILD_DEX_BANNER_THRESHOLD) return null
         val dexCache = (ctx.sharedCachesRoot ?: ctx.store.rootPath).resolve("caches").resolve("dex")
         if (dexCacheHasEntries(dexCache)) return null
-        return "First build — dexing $depCount libraries from scratch (there's no dex cache yet), so this " + "build is slower than usual. The next build reuses the cached dex and will be much faster."
+        return "首次构建——需要从头 dex $depCount 个库（还没有 dex 缓存），因此此次" + "构建会比平时慢。下次构建会复用缓存的 dex，速度会快很多。"
     }
 
     /** Whether the shared dex cache already holds any dexed output (so a build isn't the cold first one). */
@@ -729,7 +729,7 @@ internal class BuildService(private val ctx: EngineContext) : Disposable {
                 // so the build never ends as a silent failure with an empty log.
                 ctx.buildLog.log(
                     BuildLogEntry(
-                        "Build failed: ${e.message ?: e.toString()}", BuildLogLevel.ERROR
+                        "构建失败：${e.message ?: e.toString()}", BuildLogLevel.ERROR
                     )
                 )
                 null
@@ -756,7 +756,7 @@ internal class BuildService(private val ctx: EngineContext) : Disposable {
                 }.onFailure {
                     ctx.buildLog.log(
                         BuildLogEntry(
-                            "post-build step failed: ${it.message}", BuildLogLevel.ERROR
+                            "构建后步骤失败：${it.message}", BuildLogLevel.ERROR
                         )
                     )
                 }
@@ -782,7 +782,7 @@ internal class BuildService(private val ctx: EngineContext) : Disposable {
         finalizeRunConsole(succeeded = false) // the cancelled coroutine skips launch's onComplete
         _buildState.update {
             if (it.status == RunStatus.Running) it.copy(
-                status = RunStatus.Failed, log = it.log + logLine("Stopped.", UiLogLevel.Warn)
+                status = RunStatus.Failed, log = it.log + logLine("已停止。", UiLogLevel.Warn)
             ) else it
         }
     }
@@ -867,7 +867,7 @@ internal class BuildService(private val ctx: EngineContext) : Disposable {
         if (bad.isEmpty()) return null
         val lines = bad.joinToString("\n") { (mod, coord) -> "  • $coord  ($mod)" }
         val n = bad.size
-        return "Can't build: $n declared ${if (n == 1) "dependency is" else "dependencies are"} unresolved.\n" + "$lines\nResolve them first: tap Retry on the dependency banner (check your internet connection), or open the Dependencies screen."
+        return "无法构建：声明的 $n 个依赖尚未解析。\n" + "$lines\n请先解析它们：点击依赖横幅上的重试（检查网络连接），或打开依赖页面。"
     }
 
     /** The entry point to launch for console [module]: the user-configured Run override if set (carrying the

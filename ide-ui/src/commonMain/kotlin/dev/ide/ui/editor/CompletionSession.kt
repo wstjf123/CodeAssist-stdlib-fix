@@ -139,7 +139,7 @@ internal fun matchPositions(candidate: String, query: String): IntArray? {
  */
 internal fun matchTier(candidate: String, query: String): Int {
     if (query.isEmpty()) return 0
-    val name = candidate.takeWhile { isIdentifierChar(it) } // "Text(text: String)" -> "Text"
+    val name = candidate.takeWhile { isIdentifierChar(it) } // "Text(text: String)" -> "文本"
     return when {
         candidate == query || name == query -> 0                 // exact (case-sensitive): the user typed it whole
         candidate.equals(query, ignoreCase = true) || name.equals(query, ignoreCase = true) -> 1 // exact, case only

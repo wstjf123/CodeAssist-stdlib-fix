@@ -48,20 +48,20 @@ class JdkManager(private val platformDir: Path, private val fetcher: SdkNetFetch
      * editor gets JDK sources. Returns null on success or an error message. Desktop only.
      */
     fun downloadJdkSources(feature: Int, onProgress: (Long, Long) -> Unit = { _, _ -> }): String? {
-        val os = adoptiumOs() ?: return "Unsupported OS for JDK download."
+        val os = adoptiumOs() ?: return "不支持在此系统下载 JDK。"
         val arch = adoptiumArch()
         val ext = if (os == "windows") "zip" else "tar.gz"
         val url = "https://api.adoptium.net/v3/binary/latest/$feature/ga/$os/$arch/jdk/hotspot/normal/eclipse?project=jdk"
         val archive = Files.createTempFile("jdk-$feature", ".$ext")
         try {
-            if (!fetcher.download(url, archive, onProgress)) return "JDK download failed."
+            if (!fetcher.download(url, archive, onProgress)) return "JDK 下载失败。"
             Files.createDirectories(platformDir)
             val dest = platformDir.resolve("jdk-src.zip")
             // Pull just lib/src.zip straight out of the archive (no whole-JDK unpack, no external `tar`).
             val found = if (ext == "zip") extractSrcZipFromZip(archive, dest) else extractSrcZipFromTarGz(archive, dest)
             return if (found) null else "Downloaded JDK has no src.zip."
         } catch (e: Exception) {
-            return "JDK download failed: ${e.message}"
+            return "JDK 下载失败：${e.message}"
         } finally {
             runCatching { Files.deleteIfExists(archive) }
         }

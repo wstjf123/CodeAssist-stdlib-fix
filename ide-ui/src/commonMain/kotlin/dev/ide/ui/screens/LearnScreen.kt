@@ -55,8 +55,8 @@ fun LearnScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Learn", color = Ca.colors.textPrimary, style = Ca.type.large, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("Guides, samples, and the community", color = Ca.colors.textSecondary, style = Ca.type.subhead)
+                Text("学习", color = Ca.colors.textPrimary, style = Ca.type.large, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("指南、示例与社区", color = Ca.colors.textSecondary, style = Ca.type.subhead)
             }
             Spacer(Modifier.height(6.dp))
 

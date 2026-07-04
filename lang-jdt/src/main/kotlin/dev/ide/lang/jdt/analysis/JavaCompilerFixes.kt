@@ -158,7 +158,7 @@ class SurroundWithTryCatchForExceptionQuickFixProvider : QuickFixProvider {
         val edits = ArrayList<DocumentEdit>()
         edits.add(DocumentEdit(stmt.range.start, stmt.range.length, wrapped))
         if (imports.isNotEmpty()) edits.add(DocumentEdit(importInsertOffset(parsed), 0, imports.joinToString("") { "import $it;\n" }))
-        return listOf(eagerFix("Surround with try/catch", target.file, edits))
+        return listOf(eagerFix("用 try/catch 包围", target.file, edits))
     }
 }
 

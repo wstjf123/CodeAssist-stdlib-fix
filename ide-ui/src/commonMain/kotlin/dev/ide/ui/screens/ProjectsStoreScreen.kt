@@ -85,8 +85,8 @@ fun ProjectsStoreScreen(
     if (!available) {
         dev.ide.ui.components.ComingSoon(
             icon = CaIcons.grid,
-            title = "Store unavailable",
-            description = "The project store isn't available in this build.",
+            title = "商店不可用",
+            description = "此构建中项目商店不可用。",
             modifier = modifier.fillMaxSize().background(Ca.colors.bg),
         )
         return
@@ -142,7 +142,7 @@ private fun StoreHeader(onOpenHub: (() -> Unit)?) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Column(Modifier.weight(1f)) {
-            Text("Store", color = Ca.colors.textPrimary, style = Ca.type.large, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("商店", color = Ca.colors.textPrimary, style = Ca.type.large, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
                 "Templates and sample projects to start from",
                 color = Ca.colors.textSecondary, style = Ca.type.subhead,
@@ -167,7 +167,7 @@ private fun SearchField(value: String, onChange: (String) -> Unit, modifier: Mod
     ) {
         Icon(CaIcons.search, null, Modifier.size(18.dp), tint = Ca.colors.textTertiary)
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-            if (value.isEmpty()) Text("Search the store", color = Ca.colors.textTertiary, style = Ca.type.subhead)
+            if (value.isEmpty()) Text("搜索商店", color = Ca.colors.textTertiary, style = Ca.type.subhead)
             BasicTextField(
                 value = value,
                 onValueChange = onChange,
@@ -183,7 +183,7 @@ private fun SearchField(value: String, onChange: (String) -> Unit, modifier: Mod
                 Modifier.size(22.dp).clickable(interaction, indication = null) { onChange("") },
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(CaIcons.close, "Clear", Modifier.size(15.dp), tint = Ca.colors.textTertiary)
+                Icon(CaIcons.close, "清理", Modifier.size(15.dp), tint = Ca.colors.textTertiary)
             }
         }
     }
@@ -196,7 +196,7 @@ private fun CategoryRow(categories: List<String>, selected: String?, onSelect: (
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        FilterChip("All", selected == null) { onSelect(null) }
+        FilterChip("全部", selected == null) { onSelect(null) }
         categories.forEach { c -> FilterChip(c, selected == c) { onSelect(c) } }
     }
 }
@@ -356,7 +356,7 @@ private fun EmptySectionCard() {
             Icon(CaIcons.discord, null, Modifier.size(20.dp), tint = Ca.colors.accent)
         }
         Column(Modifier.weight(1f)) {
-            Text("Coming soon", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
+            Text("即将推出", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
             Text(
                 "Community projects will land here once submissions open.",
                 color = Ca.colors.textSecondary, style = Ca.type.footnote,
@@ -371,7 +371,7 @@ private fun EmptySectionCard() {
 private fun ResultsList(results: List<UiStoreItem>, onClick: (UiStoreItem) -> Unit) {
     if (results.isEmpty()) {
         Box(Modifier.fillMaxSize().padding(HPAD), contentAlignment = Alignment.TopCenter) {
-            Text("No matches", color = Ca.colors.textTertiary, style = Ca.type.subhead, modifier = Modifier.padding(top = 24.dp))
+            Text("没有匹配项", color = Ca.colors.textTertiary, style = Ca.type.subhead, modifier = Modifier.padding(top = 24.dp))
         }
         return
     }
@@ -407,7 +407,7 @@ private fun StoreRow(item: UiStoreItem, delayMillis: Int, onClick: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Chip(item.category, fill = Ca.colors.surface2, textColor = Ca.colors.textSecondary)
                 if (!item.available) Chip("Soon", fill = Ca.colors.warning.copy(alpha = 0.16f), textColor = Ca.colors.warning)
-                item.author?.let { Text("by $it", color = Ca.colors.textTertiary, style = Ca.type.caption2) }
+                item.author?.let { Text("作者：$it", color = Ca.colors.textTertiary, style = Ca.type.caption2) }
             }
         }
         Icon(CaIcons.chevronRight, null, Modifier.size(20.dp), tint = Ca.colors.textTertiary)
@@ -478,7 +478,7 @@ private fun StoreDetailSheet(
                         icon = CaIcons.download,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                else -> DisabledCta("Coming soon")
+                else -> DisabledCta("即将推出")
             }
         }
         Spacer(Modifier.height(4.dp))
@@ -521,5 +521,5 @@ private fun StoreGlyph(
 private fun kindLabel(item: UiStoreItem): String = when (item.kind) {
     UiStoreItemKind.Template -> "Template"
     UiStoreItemKind.Sample -> "Sample"
-    UiStoreItemKind.Community -> "Community"
+    UiStoreItemKind.Community -> "社区"
 }

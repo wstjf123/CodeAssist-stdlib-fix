@@ -33,7 +33,7 @@ fun PreviewRenderError(error: Throwable, modifier: Modifier = Modifier) {
     ) {
         Icon(
             CaIcons.error,
-            contentDescription = "render error",
+            contentDescription = "渲染错误",
             modifier = Modifier.size(20.dp),
             tint = Ca.colors.error,
         )

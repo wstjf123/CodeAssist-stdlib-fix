@@ -47,7 +47,7 @@ import kotlinx.coroutines.launch
 
 /** Which severities the Logs viewer shows. */
 private enum class LogFilter(val label: String, val keep: (String) -> Boolean) {
-    All("All", { true }),
+    All("全部", { true }),
     Warnings("Warnings", { it == "WARN" || it == "ERROR" }),
     Errors("Errors", { it == "ERROR" }),
 }
@@ -96,7 +96,7 @@ fun LogsScreen(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Icon(CaIcons.terminal, null, Modifier.size(18.dp), tint = Ca.colors.textSecondary)
-            Text("Logs", color = Ca.colors.textPrimary, style = Ca.type.headline, fontWeight = FontWeight.SemiBold)
+            Text("日志", color = Ca.colors.textPrimary, style = Ca.type.headline, fontWeight = FontWeight.SemiBold)
             Text("${shown.size}", color = Ca.colors.textTertiary, style = Ca.type.footnote, modifier = Modifier.padding(start = 4.dp))
             Box(Modifier.weight(1f))
             HeaderAction(if (paused) CaIcons.play else CaIcons.stop, if (paused) "Resume live tail" else "Pause live tail", paused) { paused = !paused }
@@ -122,7 +122,7 @@ fun LogsScreen(
         ) {
             Icon(CaIcons.search, null, Modifier.size(16.dp), tint = Ca.colors.accent)
             Box(Modifier.weight(1f)) {
-                if (query.isEmpty()) Text("Filter logs…", color = Ca.colors.textTertiary, style = Ca.type.subhead)
+                if (query.isEmpty()) Text("筛选日志…", color = Ca.colors.textTertiary, style = Ca.type.subhead)
                 BasicTextField(
                     value = query,
                     onValueChange = { query = it },

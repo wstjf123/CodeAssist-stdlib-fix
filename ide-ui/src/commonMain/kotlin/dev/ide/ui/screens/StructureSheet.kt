@@ -69,7 +69,7 @@ internal fun StructureSheet(state: IdeUiState, active: OpenFile) {
                 .background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.control))
                 .padding(horizontal = 12.dp, vertical = 9.dp),
         ) {
-            if (filter.isEmpty()) Text("Filter…", color = Ca.colors.textTertiary, style = Ca.type.body)
+            if (filter.isEmpty()) Text("筛选…", color = Ca.colors.textTertiary, style = Ca.type.body)
             BasicTextField(
                 value = filter,
                 onValueChange = { filter = it },
@@ -82,7 +82,7 @@ internal fun StructureSheet(state: IdeUiState, active: OpenFile) {
         Spacer(Modifier.size(6.dp))
         if (shown.isEmpty()) {
             Text(
-                if (symbols.isEmpty()) "No symbols in this file" else "No matches",
+                if (symbols.isEmpty()) "No symbols in this file" else "没有匹配项",
                 color = Ca.colors.textTertiary,
                 style = Ca.type.body,
                 modifier = Modifier.padding(16.dp),

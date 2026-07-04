@@ -126,6 +126,6 @@ private fun ErrorCard(err: UiError, onDismiss: () -> Unit) {
         }
 
         Spacer(Modifier.height(20.dp))
-        PrimaryButton(text = "Dismiss", onClick = onDismiss, modifier = Modifier.fillMaxWidth())
+        PrimaryButton(text = "关闭", onClick = onDismiss, modifier = Modifier.fillMaxWidth())
     }
 }

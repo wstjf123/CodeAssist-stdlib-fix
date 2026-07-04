@@ -124,7 +124,7 @@ fun EditorTopBar(
             )
             IndexStatusChip(indexStatus, compact = compact, onClick = onIndexClick)
             // Accent-tinted while there are unsaved changes; saves the active tab (Cmd/Ctrl-S also works).
-            IconButtonCa(CaIcons.save, "Save", onSave, active = hasUnsavedChanges)
+            IconButtonCa(CaIcons.save, "保存", onSave, active = hasUnsavedChanges)
             if (compact) {
                 // On a phone the bar can't hold every control, so Run stays inline and the rest (incl. the
                 // edit actions) collapse into a single ⋯ overflow menu — everything one tap away.
@@ -344,8 +344,8 @@ private fun UnresolvedDepsBanner(state: DepsResolveState, onRetry: () -> Unit) {
                         .clickable(onClick = onRetry).padding(horizontal = 10.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Icon(CaIcons.refresh, "Retry", Modifier.size(13.dp), tint = Ca.colors.error)
-                    Text("Retry", color = Ca.colors.error, style = Ca.type.caption, fontWeight = FontWeight.SemiBold)
+                    Icon(CaIcons.refresh, "重试", Modifier.size(13.dp), tint = Ca.colors.error)
+                    Text("重试", color = Ca.colors.error, style = Ca.type.caption, fontWeight = FontWeight.SemiBold)
                 }
                 IconButtonCa(
                     if (expanded) CaIcons.caretDown else CaIcons.caretRight,
@@ -395,7 +395,7 @@ private fun RunControl(
         // (below) so the menu's focusable popup can't auto-focus it and pop the keyboard on open.
         val openMenu = { keyboard?.hide(); query = ""; items = tasks(); open = true }
         if (compact) {
-            IconButtonCa(CaIcons.play, "Run", onClick = openMenu, tint = Ca.colors.accent)
+            IconButtonCa(CaIcons.play, "运行", onClick = openMenu, tint = Ca.colors.accent)
         } else {
             Row(
                 Modifier.height(34.dp)
@@ -406,8 +406,8 @@ private fun RunControl(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Icon(CaIcons.play, "Run", Modifier.size(16.dp), tint = Ca.colors.accent)
-                Text("Run", color = Ca.colors.accent, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
+                Icon(CaIcons.play, "运行", Modifier.size(16.dp), tint = Ca.colors.accent)
+                Text("运行", color = Ca.colors.accent, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
             }
         }
         CaDropdownMenu(
@@ -427,7 +427,7 @@ private fun RunControl(
                             .clickable { searchTapped = true }
                             .padding(horizontal = 10.dp, vertical = 8.dp),
                     ) {
-                        if (query.isEmpty()) Text("Search tasks…", color = Ca.colors.textTertiary, style = Ca.type.footnote)
+                        if (query.isEmpty()) Text("搜索任务…", color = Ca.colors.textTertiary, style = Ca.type.footnote)
                         BasicTextField(
                             value = query,
                             onValueChange = { query = it },
@@ -445,13 +445,13 @@ private fun RunControl(
                 }
                 if (items.isEmpty()) {
                     DropdownMenuItem(
-                        text = { Text("Nothing to run", color = Ca.colors.textTertiary, style = Ca.type.footnote) },
+                        text = { Text("没有可运行项", color = Ca.colors.textTertiary, style = Ca.type.footnote) },
                         onClick = {}, enabled = false,
                     )
                 }
                 if (filtered.isEmpty()) {
                     DropdownMenuItem(
-                        text = { Text("No matching tasks", color = Ca.colors.textTertiary, style = Ca.type.footnote) },
+                        text = { Text("没有匹配的任务", color = Ca.colors.textTertiary, style = Ca.type.footnote) },
                         onClick = {}, enabled = false,
                     )
                 }
@@ -509,7 +509,7 @@ private fun VariantChip(
         CaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             if (items.isEmpty()) {
                 DropdownMenuItem(
-                    text = { Text("No variants", color = Ca.colors.textTertiary, style = Ca.type.footnote) },
+                    text = { Text("没有变体", color = Ca.colors.textTertiary, style = Ca.type.footnote) },
                     onClick = {}, enabled = false,
                 )
             }
@@ -531,7 +531,7 @@ private fun VariantChip(
 @Composable
 fun IndexStatusChip(status: IndexUiStatus, compact: Boolean = false, onClick: (() -> Unit)? = null) {
     val shape = RoundedCornerShape(Ca.radius.pill)
-    // On a phone the idle "Indexed" chip is just clutter that crowds the Run button — show only while building.
+    // On a phone the idle "已索引" chip is just clutter that crowds the Run button — show only while building.
     if (compact && !status.building) return
     val base = Modifier.clip(shape)
         .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
@@ -552,7 +552,7 @@ fun IndexStatusChip(status: IndexUiStatus, compact: Boolean = false, onClick: ((
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Icon(CaIcons.check, null, Modifier.size(12.dp), tint = Ca.colors.success)
-            Text("Indexed", color = Ca.colors.textTertiary, style = Ca.type.caption)
+            Text("已索引", color = Ca.colors.textTertiary, style = Ca.type.caption)
         }
     }
 }

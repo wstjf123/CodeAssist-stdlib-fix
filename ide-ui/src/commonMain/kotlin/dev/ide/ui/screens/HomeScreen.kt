@@ -52,7 +52,7 @@ fun HomeScreen(
 }
 
 private val NAV_ITEMS = listOf(
-    BottomNavItem(HomeTab.Projects.name, "Projects", CaIcons.folder),
-    BottomNavItem(HomeTab.Store.name, "Store", CaIcons.grid),
-    BottomNavItem(HomeTab.Learn.name, "Learn", CaIcons.lightbulb),
+    BottomNavItem(HomeTab.Projects.name, "项目", CaIcons.folder),
+    BottomNavItem(HomeTab.Store.name, "商店", CaIcons.grid),
+    BottomNavItem(HomeTab.Learn.name, "学习", CaIcons.lightbulb),
 )

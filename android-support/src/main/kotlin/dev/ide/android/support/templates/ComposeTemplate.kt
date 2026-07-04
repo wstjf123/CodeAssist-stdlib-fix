@@ -23,8 +23,8 @@ import dev.ide.platform.log.Log
  */
 object JetpackComposeAppTemplate : ProjectTemplate {
     override val id = TemplateId("compose-app")
-    override val displayName = "Jetpack Compose App"
-    override val description = "An Android app with a Jetpack Compose UI and @Preview composables you can render in the editor."
+    override val displayName = "Jetpack Compose 应用"
+    override val description = "带 Jetpack Compose UI 和可在编辑器中渲染的 @Preview Composable 的 Android 应用。"
     override val category = TemplateCategory.ANDROID
     override val iconId = "module.android"
 

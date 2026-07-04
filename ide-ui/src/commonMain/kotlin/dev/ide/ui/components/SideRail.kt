@@ -43,14 +43,14 @@ fun SideRail(
             ProjectTile(projectInitial, size = 42.dp)
             Box(Modifier.padding(vertical = 2.dp).width(32.dp).height(1.dp).background(Ca.colors.separator))
 
-            RailItem(CaIcons.docText, "Files", selected == RailDestination.Files) { onSelect(RailDestination.Files) }
-            RailItem(CaIcons.search, "Search", selected == RailDestination.Search) { onSelect(RailDestination.Search) }
-            RailItem(CaIcons.gitBranch, "Source", selected == RailDestination.Source) { onSelect(RailDestination.Source) }
-            RailItem(CaIcons.ellipsis, "More", selected == RailDestination.More) { onSelect(RailDestination.More) }
+            RailItem(CaIcons.docText, "文件", selected == RailDestination.Files) { onSelect(RailDestination.Files) }
+            RailItem(CaIcons.search, "搜索", selected == RailDestination.Search) { onSelect(RailDestination.Search) }
+            RailItem(CaIcons.gitBranch, "源码", selected == RailDestination.Source) { onSelect(RailDestination.Source) }
+            RailItem(CaIcons.ellipsis, "更多", selected == RailDestination.More) { onSelect(RailDestination.More) }
 
             Box(Modifier.weight(1f))
             // One entry to the Settings & Tools hub (global settings · code style · SDK & keystore managers).
-            RailItem(CaIcons.gear, "Settings & Tools", false, onClick = onOpenHub)
+            RailItem(CaIcons.gear, "设置与工具", false, onClick = onOpenHub)
         }
     }
 }

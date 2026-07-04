@@ -15,7 +15,7 @@ import dev.ide.plugin.action.UI_ACTION_EP
  * at invoke time (it fires outside any service scope), so a single registration serves every opened project.
  *
  * Scope note: only commands that are pure engine operations (no UI navigation / app-state change) live here
- * in Phase A; the navigation-heavy menus (the "More" sheet, the stateful top-bar buttons) move to the action
+ * in Phase A; the navigation-heavy menus (the "更多" sheet, the stateful top-bar buttons) move to the action
  * model once the UI-side action registry lands (see `docs/ui-extensibility-and-plugin-api.md`, Phase B).
  */
 object BuiltInActions {
@@ -29,13 +29,13 @@ object BuiltInActions {
             UI_ACTION_EP,
             SimpleAction(
                 id = "ide.runBuild",
-                text = "Run Build",
+                text = "运行构建",
                 places = setOf(ActionPlaces.COMMAND_PALETTE),
                 iconId = "run",
                 order = 70,
             ) {
-                val s = env.activeEngine ?: return@SimpleAction ActionResult.message("No project is open")
-                s.build.runBuild(); ActionResult.message("Build started")
+                val s = env.activeEngine ?: return@SimpleAction ActionResult.message("未打开项目")
+                s.build.runBuild(); ActionResult.message("构建已开始")
             },
             PLUGIN,
         )
@@ -43,13 +43,13 @@ object BuiltInActions {
             UI_ACTION_EP,
             SimpleAction(
                 id = "ide.stopBuild",
-                text = "Stop Build",
+                text = "停止构建",
                 places = setOf(ActionPlaces.COMMAND_PALETTE),
                 iconId = "stop",
                 order = 71,
             ) {
-                val s = env.activeEngine ?: return@SimpleAction ActionResult.message("No project is open")
-                s.build.stopBuild(); ActionResult.message("Build stopped")
+                val s = env.activeEngine ?: return@SimpleAction ActionResult.message("未打开项目")
+                s.build.stopBuild(); ActionResult.message("构建已停止")
             },
             PLUGIN,
         )
@@ -57,13 +57,13 @@ object BuiltInActions {
             UI_ACTION_EP,
             SimpleAction(
                 id = "ide.reindex",
-                text = "Re-index Project",
+                text = "重新索引项目",
                 places = setOf(ActionPlaces.COMMAND_PALETTE),
                 iconId = "refresh",
                 order = 80,
             ) {
-                val s = env.activeEngine ?: return@SimpleAction ActionResult.message("No project is open")
-                s.reindex(); ActionResult.message("Re-indexing project…")
+                val s = env.activeEngine ?: return@SimpleAction ActionResult.message("未打开项目")
+                s.reindex(); ActionResult.message("正在重新索引项目…")
             },
             PLUGIN,
         )

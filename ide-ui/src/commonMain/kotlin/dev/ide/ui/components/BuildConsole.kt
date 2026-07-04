@@ -182,7 +182,7 @@ private fun Header(
     ) {
         Icon(CaIcons.terminal, null, Modifier.size(18.dp), tint = Ca.colors.textSecondary)
         Text(
-            "Build",
+            "构建",
             color = Ca.colors.textPrimary,
             style = Ca.type.subhead,
             fontWeight = FontWeight.SemiBold
@@ -221,7 +221,7 @@ private fun Header(
         )
         else IconButtonCa(
             CaIcons.play,
-            "Run",
+            "运行",
             onRun,
             boxSize = 28,
             iconSize = 16,
@@ -250,7 +250,7 @@ private fun StatusPill(status: RunStatus) {
     val (text, color) = when (status) {
         RunStatus.Idle -> "Idle" to Ca.colors.textSecondary
         RunStatus.Running -> "Running…" to Ca.colors.accent
-        RunStatus.Succeeded -> "Succeeded" to Ca.colors.run
+        RunStatus.Succeeded -> "成功" to Ca.colors.run
         RunStatus.Failed -> "Failed" to Ca.colors.error
     }
     Chip(text, fill = color.copy(alpha = 0.16f), textColor = color)
@@ -727,7 +727,7 @@ private fun LogTab(log: List<BuildLogLine>, running: Boolean) {
 }
 
 private enum class LogLevelFilter(val label: String, val keep: (UiLogLevel) -> Boolean) {
-    All("All", { true }),
+    All("全部", { true }),
     Warnings("Warnings", { it == UiLogLevel.Warn || it == UiLogLevel.Error }),
     Errors("Errors", { it == UiLogLevel.Error }),
 }
@@ -1149,7 +1149,7 @@ private fun SearchField(
         if (value.isNotEmpty()) {
             Icon(
                 CaIcons.close,
-                "Clear",
+                "清理",
                 Modifier.size(14.dp)
                     .clickable(interactionSource, indication = null) { onValueChange("") },
                 tint = Ca.colors.textTertiary

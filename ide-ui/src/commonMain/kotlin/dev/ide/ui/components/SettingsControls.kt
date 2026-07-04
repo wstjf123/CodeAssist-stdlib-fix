@@ -214,7 +214,7 @@ fun SettingsDivider() {
     Box(Modifier.fillMaxWidth().height(1.dp).background(Ca.colors.separator))
 }
 
-/** A collapsible "Advanced" group inside a card (closed by default). */
+/** A collapsible "高级" group inside a card (closed by default). */
 @Composable
 fun AdvancedGroup(content: @Composable () -> Unit) {
     var open by remember { mutableStateOf(false) }
@@ -224,7 +224,7 @@ fun AdvancedGroup(content: @Composable () -> Unit) {
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Icon(if (open) CaIcons.caretDown else CaIcons.caretRight, null, Modifier.size(14.dp), tint = Ca.colors.textTertiary)
-            Text("Advanced", color = Ca.colors.textTertiary, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold)
+            Text("高级", color = Ca.colors.textTertiary, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold)
         }
         AnimatedVisibility(open, enter = expandVertically(tween(Motion.FAST)) + fadeIn(), exit = shrinkVertically(tween(Motion.FAST)) + fadeOut()) {
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) { content() }

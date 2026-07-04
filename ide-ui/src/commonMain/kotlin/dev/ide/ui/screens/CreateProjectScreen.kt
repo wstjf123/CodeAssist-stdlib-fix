@@ -241,7 +241,7 @@ private fun ParamControl(param: UiTemplateParam, value: String, onChange: (Strin
                     .clickable { onChange((!on).toString()) }
                     .padding(horizontal = 14.dp, vertical = 6.dp),
             ) {
-                Text(if (on) "On" else "Off", color = if (on) Ca.colors.accent else Ca.colors.textSecondary, style = Ca.type.footnote, fontWeight = FontWeight.SemiBold)
+                Text(if (on) "开" else "关", color = if (on) Ca.colors.accent else Ca.colors.textSecondary, style = Ca.type.footnote, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -261,7 +261,7 @@ private fun Header(title: String, subtitle: String, onBack: () -> Unit) {
                 .clickable(interaction, indication = null, onClick = onBack),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(CaIcons.chevronLeft, "Back", Modifier.size(20.dp), tint = Ca.colors.textSecondary)
+            Icon(CaIcons.chevronLeft, "返回", Modifier.size(20.dp), tint = Ca.colors.textSecondary)
         }
         Column {
             Text(title, color = Ca.colors.textPrimary, style = Ca.type.title2, maxLines = 1, overflow = TextOverflow.Ellipsis)

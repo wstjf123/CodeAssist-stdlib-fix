@@ -64,7 +64,7 @@ fun FloatingLightbulb(onClick: () -> Unit, modifier: Modifier = Modifier) {
             .padding(horizontal = 7.dp, vertical = 5.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(CaIcons.lightbulb, contentDescription = "Show context actions", tint = Ca.colors.warning, modifier = Modifier.size(16.dp))
+        Icon(CaIcons.lightbulb, contentDescription = "显示上下文操作", tint = Ca.colors.warning, modifier = Modifier.size(16.dp))
     }
 }
 
@@ -81,7 +81,7 @@ fun PreviewGutterIcon(onClick: () -> Unit, modifier: Modifier = Modifier) {
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(CaIcons.image, contentDescription = "Preview this composable", tint = Ca.colors.accent, modifier = Modifier.size(15.dp))
+        Icon(CaIcons.image, contentDescription = "预览此 Composable", tint = Ca.colors.accent, modifier = Modifier.size(15.dp))
     }
 }
 
@@ -191,7 +191,7 @@ fun DiagnosticSheet(
                 Box(
                     Modifier.size(30.dp).clip(CircleShape).clickable(onClick = onDismiss),
                     contentAlignment = Alignment.Center,
-                ) { Icon(CaIcons.close, "Dismiss", Modifier.size(16.dp), tint = Ca.colors.textSecondary) }
+                ) { Icon(CaIcons.close, "关闭", Modifier.size(16.dp), tint = Ca.colors.textSecondary) }
             }
             Spacer(Modifier.height(10.dp))
             SelectionContainer {
@@ -206,7 +206,7 @@ fun DiagnosticSheet(
                 Spacer(Modifier.height(12.dp))
                 Box(Modifier.fillMaxWidth().height(1.dp).background(Ca.colors.separator))
                 Spacer(Modifier.height(6.dp))
-                Text("Quick fixes", color = Ca.colors.textTertiary, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+                Text("快速修复", color = Ca.colors.textTertiary, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
                 actions.forEachIndexed { i, a -> ActionRow(a, selected = false, onPick = { onPick(i) }, height = 48.dp) }
             }
             Spacer(Modifier.height(8.dp))

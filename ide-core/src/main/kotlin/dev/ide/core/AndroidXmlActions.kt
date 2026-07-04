@@ -43,7 +43,7 @@ class AndroidXmlActionProvider(
 
     private fun convertFix(from: String, to: String, nameStart: Int, nameLen: Int, parsed: ParsedFile): QuickFix =
         object : QuickFix {
-            override val title = "Convert '$from' to '$to'"
+            override val title = "将 '$from' 转换为 '$to'"
             override val kind = CodeActionKind.INTENTION
             override suspend fun computeEdits(ctx: FixContext): WorkspaceEdit {
                 val edits = ArrayList<DocumentEdit>()

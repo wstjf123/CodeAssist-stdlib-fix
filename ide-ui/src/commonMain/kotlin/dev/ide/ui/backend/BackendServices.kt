@@ -542,7 +542,7 @@ interface SettingsService {
     /** Write control [key] on page [pageId] and apply it. */
     fun setSetting(pageId: String, key: String, value: String) {}
 
-    /** Press a settings action (e.g. "Clear caches") on page [pageId]; returns a status message. */
+    /** Press a settings action (e.g. "清理缓存") on page [pageId]; returns a status message. */
     suspend fun invokeSettingAction(pageId: String, key: String): String? = null
 
     /** The per-language code style profile for the Code Style screen ([languageId] = "java" | "kotlin"). */

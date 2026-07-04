@@ -86,7 +86,7 @@ fun FindReplaceBar(
                 FieldBox(
                     value = query,
                     onChange = onQueryChange,
-                    placeholder = "Find",
+                    placeholder = "查找",
                     focusRequester = focus,
                     error = regexError,
                     onEnter = { shift -> if (shift) onPrev() else onNext() },
@@ -115,10 +115,10 @@ fun FindReplaceBar(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Box(Modifier.size(30.dp)) {} // align under the chevron
                 Box(Modifier.weight(1f)) {
-                    FieldBox(value = replace, onChange = onReplaceChange, placeholder = "Replace", error = false)
+                    FieldBox(value = replace, onChange = onReplaceChange, placeholder = "替换", error = false)
                 }
-                PillButton("Replace", enabled = matchCount > 0, onClick = onReplaceOne)
-                PillButton("All", enabled = matchCount > 0, onClick = onReplaceAll)
+                PillButton("替换", enabled = matchCount > 0, onClick = onReplaceOne)
+                PillButton("全部", enabled = matchCount > 0, onClick = onReplaceAll)
             }
         }
     }

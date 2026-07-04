@@ -88,7 +88,7 @@ import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
-/** The "Projects" picker: large title, a New-Project action, and a card per known project. */
+/** The "项目" picker: large title, a New-Project action, and a card per known project. */
 @Composable
 fun ProjectPickerScreen(
     projects: List<ProjectInfo>,
@@ -598,7 +598,7 @@ private fun LegacyRecoveryBanner(count: Int, onDismiss: () -> Unit) {
             Modifier.size(28.dp).pressScale(interaction).clickable(interaction, indication = null, onClick = onDismiss),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(CaIcons.close, "Dismiss", Modifier.size(16.dp), tint = Ca.colors.textTertiary)
+            Icon(CaIcons.close, "关闭", Modifier.size(16.dp), tint = Ca.colors.textTertiary)
         }
     }
 }

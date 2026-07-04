@@ -26,7 +26,7 @@ private val JAVA = LanguageId("java")
 /** SYNTAX: flag `System.out` / `System.err` used for logging (gated on METHOD_CALL nodes). */
 class SystemOutCallAnalyzer : FileAnalyzer {
     override val id = AnalyzerId("java.systemOut")
-    override val displayName = "System.out/err used for logging"
+    override val displayName = "使用 System.out/err 记录日志"
     override val languages = setOf(JAVA)
     override val defaultSeverity = Severity.WARNING
     override val tier = AnalyzerTier.SYNTAX
@@ -61,7 +61,7 @@ class SystemOutCallAnalyzer : FileAnalyzer {
  */
 class UnusedImportAnalyzer : FileAnalyzer {
     override val id = AnalyzerId("java.unusedImport")
-    override val displayName = "Unused import"
+    override val displayName = "未使用的导入"
     override val languages = setOf(JAVA)
     override val defaultSeverity = Severity.WARNING
     override val tier = AnalyzerTier.SYNTAX

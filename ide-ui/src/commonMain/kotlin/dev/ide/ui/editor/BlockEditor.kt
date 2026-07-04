@@ -273,7 +273,7 @@ private fun MethodHatPreview() {
 // Statement stack + dispatch.
 // ---------------------------------------------------------------------------
 
-/** An interlocking stack of statements + a trailing "add block" ghost (a drop zone). */
+/** An interlocking stack of statements + a trailing "添加代码块" ghost (a drop zone). */
 @Composable
 private fun Stack(body: Body, ctx: Ctx) {
     InterlockColumn(Modifier.wrapContentWidth()) {
@@ -570,9 +570,9 @@ private fun ValuePart(node: UiBlockNode, part: UiBlockPart, ctx: Ctx, depth: Int
         } else {
             val s = part.text.trim()
             when {
-                // B1: a declaration's `=` reads as the word "to" (`set x to 1`).
+                // B1: a declaration's `=` reads as the word "到" (`set x to 1`).
                 s == "=" && (node.label == "var" || node.kind == "local_var" || node.kind == "field_decl") ->
-                    Text("to", color = Ca.colors.block.text, style = Ca.type.code, fontWeight = FontWeight.SemiBold)
+                    Text("到", color = Ca.colors.block.text, style = Ca.type.code, fontWeight = FontWeight.SemiBold)
                 s.isNotEmpty() -> Text(s, color = Ca.colors.block.text.copy(alpha = 0.7f), style = Ca.type.code)
             }
         }
@@ -804,18 +804,18 @@ internal fun FocusSheet(node: UiBlockNode, ctx: Ctx, canBack: Boolean, onBack: (
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (canBack) Icon(CaIcons.chevronLeft, "back", Modifier.size(20.dp).clickable(remember { MutableInteractionSource() }, null, onClick = onBack), tint = Ca.colors.textSecondary)
                 Icon(CaIcons.braces, null, Modifier.size(16.dp), tint = Ca.colors.accent)
-                Text("Edit expression", color = Ca.colors.textPrimary, style = Ca.type.headline, modifier = Modifier.weight(1f))
+                Text("编辑表达式", color = Ca.colors.textPrimary, style = Ca.type.headline, modifier = Modifier.weight(1f))
                 Icon(CaIcons.close, "close", Modifier.size(18.dp).clickable(remember { MutableInteractionSource() }, null, onClick = onClose), tint = Ca.colors.textTertiary)
             }
             Box(
                 Modifier.fillMaxWidth().clip(shape).background(color, shape).padding(horizontal = 14.dp, vertical = 10.dp),
             ) { BlockInline(node, ctx, onPill = true, skipBody = false) }
-            Text("Tap a socket to edit it; tap a nested chip to go deeper.", color = Ca.colors.textTertiary, style = Ca.type.caption)
+            Text("点击插槽进行编辑；点击嵌套芯片继续深入。", color = Ca.colors.textTertiary, style = Ca.type.caption)
         }
     }
 }
 
-/** The trailing "add block" ghost in a stack — a dashed pill that's also a drop zone. */
+/** The trailing "添加代码块" ghost in a stack — a dashed pill that's also a drop zone. */
 @Composable
 private fun Ghost(gap: DropDescriptor.StatementGap, empty: Boolean, ctx: Ctx) {
     val hot = ctx.drag.hovered == gap
@@ -827,7 +827,7 @@ private fun Ghost(gap: DropDescriptor.StatementGap, empty: Boolean, ctx: Ctx) {
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Icon(CaIcons.plus, null, Modifier.size(12.dp), tint = Ca.colors.textTertiary)
-        if (empty) Text("add block", color = Ca.colors.textTertiary, fontStyle = FontStyle.Italic, fontSize = 11.sp)
+        if (empty) Text("添加代码块", color = Ca.colors.textTertiary, fontStyle = FontStyle.Italic, fontSize = 11.sp)
     }
 }
 
@@ -849,7 +849,7 @@ private fun BlockBar(drag: DragState, onAddBlock: () -> Unit) {
             ) {
                 val on = drag.hovered == DropDescriptor.Trash
                 Icon(CaIcons.close, "trash", Modifier.size(16.dp), tint = if (on) Ca.colors.textOnAccent else Ca.colors.textSecondary)
-                Text("Drop to delete", color = if (on) Ca.colors.textOnAccent else Ca.colors.textSecondary, style = Ca.type.footnote, fontWeight = FontWeight.SemiBold)
+                Text("拖放到此处删除", color = if (on) Ca.colors.textOnAccent else Ca.colors.textSecondary, style = Ca.type.footnote, fontWeight = FontWeight.SemiBold)
             }
         } else {
             Row(
@@ -858,12 +858,12 @@ private fun BlockBar(drag: DragState, onAddBlock: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Icon(CaIcons.plus, null, Modifier.size(16.dp), tint = Ca.colors.accent)
-                Text("Block", color = Ca.colors.accent, style = Ca.type.footnote, fontWeight = FontWeight.SemiBold)
+                Text("代码块", color = Ca.colors.accent, style = Ca.type.footnote, fontWeight = FontWeight.SemiBold)
             }
         }
         Box(Modifier.weight(1f))
         Box(Modifier.size(6.dp).clip(RoundedCornerShape(Ca.radius.pill)).background(Ca.colors.run))
-        Text("live projection · synced with Code", color = Ca.colors.textTertiary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+        Text("实时投影 · 与代码同步", color = Ca.colors.textTertiary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -904,8 +904,8 @@ private fun Palette(ctx: Ctx, onClose: () -> Unit) {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(CaIcons.layers, null, Modifier.size(18.dp), tint = Ca.colors.accent)
-                Text("Add a block", color = Ca.colors.textPrimary, style = Ca.type.headline, modifier = Modifier.weight(1f))
-                Text("statement slot", color = Ca.colors.textTertiary, style = Ca.type.caption)
+                Text("添加代码块", color = Ca.colors.textPrimary, style = Ca.type.headline, modifier = Modifier.weight(1f))
+                Text("语句插槽", color = Ca.colors.textTertiary, style = Ca.type.caption)
                 Icon(CaIcons.close, "close", Modifier.size(18.dp).clickable(remember { MutableInteractionSource() }, null, onClick = onClose), tint = Ca.colors.textTertiary)
             }
             PaletteSearch(query) { query = it }
@@ -915,9 +915,9 @@ private fun Palette(ctx: Ctx, onClose: () -> Unit) {
                 hits.forEach { (hit, fromMembers) -> PaletteBlock(hit.name, hit.detail, BlockCat.Call, templateFor(hit, fromMembers), ctx) }
             }
             when {
-                searching -> Text("Searching the index…", color = Ca.colors.textTertiary, style = Ca.type.caption)
-                query.isNotBlank() && hits.isEmpty() && statics.isEmpty() -> Text("No matches", color = Ca.colors.textTertiary, style = Ca.type.caption)
-                query.isNotBlank() && hits.isEmpty() -> Text("No index matches", color = Ca.colors.textTertiary, style = Ca.type.caption)
+                searching -> Text("正在搜索索引…", color = Ca.colors.textTertiary, style = Ca.type.caption)
+                query.isNotBlank() && hits.isEmpty() && statics.isEmpty() -> Text("没有匹配项", color = Ca.colors.textTertiary, style = Ca.type.caption)
+                query.isNotBlank() && hits.isEmpty() -> Text("索引中没有匹配项", color = Ca.colors.textTertiary, style = Ca.type.caption)
             }
         }
     }
@@ -932,7 +932,7 @@ private fun PaletteSearch(query: String, onQuery: (String) -> Unit) {
     ) {
         Icon(CaIcons.search, null, Modifier.size(14.dp), tint = Ca.colors.textTertiary)
         Box(Modifier.weight(1f)) {
-            if (query.isEmpty()) Text("Search blocks, classes, methods…", color = Ca.colors.textTertiary, style = Ca.type.codeSmall)
+            if (query.isEmpty()) Text("搜索代码块、类、方法…", color = Ca.colors.textTertiary, style = Ca.type.codeSmall)
             BasicTextField(
                 query, onQuery, singleLine = true,
                 textStyle = Ca.type.codeSmall.copy(color = Ca.colors.textPrimary),
@@ -983,7 +983,7 @@ private fun ActionBar(selection: Selection, ctx: Ctx, modifier: Modifier) {
             ActionItem(CaIcons.plus, "Duplicate") { val ic = selection.insertCtx; ctx.apply(UiBlockEdit.InsertTemplate(ic.ownerId, ic.slotIndex, ic.index + 1, selection.sourceText)) }
             Box(Modifier.width(1.dp).height(24.dp).background(Ca.colors.separator))
         }
-        ActionItem(CaIcons.close, "Delete", tint = Ca.colors.error) { ctx.apply(UiBlockEdit.DeleteBlock(selection.blockId)) }
+        ActionItem(CaIcons.close, "删除", tint = Ca.colors.error) { ctx.apply(UiBlockEdit.DeleteBlock(selection.blockId)) }
     }
 }
 

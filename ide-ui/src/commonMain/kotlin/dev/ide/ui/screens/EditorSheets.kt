@@ -103,13 +103,13 @@ internal fun DestinationSheets(
     BottomSheet(visible = state.sheetDest == RailDestination.Source, onDismiss = { state.sheetDest = null }, heightFraction = 0.55f) {
         ComingSoon(
             icon = CaIcons.gitBranch,
-            title = "Source Control",
-            description = "Git integration — staging, diffs, commit & push — is on the roadmap.",
+            title = "源代码管理",
+            description = "Git 集成——暂存、差异、提交和推送——已在路线图中。",
             modifier = Modifier.fillMaxWidth().weight(1f),
         )
     }
     BottomSheet(visible = state.sheetDest == RailDestination.More, onDismiss = { state.sheetDest = null }, heightFraction = 0.62f) {
-        // The "More" rows are UI-side actions resolved from the registry; the host bridges them to the app's
+        // The "更多" rows are UI-side actions resolved from the registry; the host bridges them to the app's
         // navigation/theme callbacks. Adding a row is a registration (see BuiltInUiActions), not an edit here.
         val moreHost = remember(state) {
             object : UiActionHost {
@@ -143,7 +143,7 @@ internal fun DestinationSheets(
     }
 }
 
-/** The "More" menu: secondary actions that don't warrant a top-level destination. Rows are UI-side actions
+/** The "更多" menu: secondary actions that don't warrant a top-level destination. Rows are UI-side actions
  *  resolved from [UiActionRegistry] (the built-ins, plus anything an in-UI plugin contributes). */
 @Composable
 internal fun MoreSheetContent(
@@ -153,10 +153,10 @@ internal fun MoreSheetContent(
 ) {
     BuiltInUiActions.ensureRegistered()
     val actions = UiActionRegistry.forPlace(UiActionPlaces.MORE_MENU, host)
-    // Scrollable so every row (incl. "Close project") is reachable when the sheet is short — e.g. the soft
+    // Scrollable so every row (incl. "关闭项目") is reachable when the sheet is short — e.g. the soft
     // keyboard is up and the sheet has been lifted above it (issue #994).
     Column(modifier.verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp)) {
-        Text("More", color = Ca.colors.textPrimary, style = Ca.type.headline, fontWeight = FontWeight.SemiBold,
+        Text("更多", color = Ca.colors.textPrimary, style = Ca.type.headline, fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(start = 6.dp, top = 4.dp, bottom = 10.dp))
         actions.forEach { a ->
             MoreRow(actionIcon(a.iconId), a.text, a.description ?: "") { a.perform(host) }

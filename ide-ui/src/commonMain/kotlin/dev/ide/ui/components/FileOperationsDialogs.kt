@@ -123,8 +123,8 @@ private fun DeletePanel(node: TreeNode, onDismiss: () -> Unit, onConfirm: () -> 
         Spacer12()
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Spacer(Modifier.weight(1f))
-            DialogButton("Cancel", primary = false, enabled = true, onClick = onDismiss)
-            DangerButton("Delete") { onConfirm(); onDismiss() }
+            DialogButton("取消", primary = false, enabled = true, onClick = onDismiss)
+            DangerButton("删除") { onConfirm(); onDismiss() }
         }
     }
 }
@@ -214,7 +214,7 @@ private fun DirectoryBrowserPanel(
         Spacer12()
         // The current folder's contents.
         if (entries.isEmpty()) {
-            Text("This folder is empty.", color = Ca.colors.textSecondary, style = Ca.type.footnote)
+            Text("此文件夹为空。", color = Ca.colors.textSecondary, style = Ca.type.footnote)
         } else {
             Column(
                 Modifier.fillMaxWidth().heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
@@ -273,7 +273,7 @@ private fun DialogCard(title: String, content: @Composable () -> Unit) {
 private fun ButtonRow(onCancel: () -> Unit, confirmLabel: String, enabled: Boolean, onConfirm: () -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Spacer(Modifier.weight(1f))
-        DialogButton("Cancel", primary = false, enabled = true, onClick = onCancel)
+        DialogButton("取消", primary = false, enabled = true, onClick = onCancel)
         DialogButton(confirmLabel, primary = true, enabled = enabled, onClick = onConfirm)
     }
 }
