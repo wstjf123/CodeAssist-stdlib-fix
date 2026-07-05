@@ -621,7 +621,7 @@ data class UiAgentToolCall(
 )
 
 interface AgentService {
-    suspend fun respond(request: UiAgentRequest): UiAgentResponse =
+    suspend fun respond(request: UiAgentRequest, onTextDelta: (String) -> Unit = {}): UiAgentResponse =
         UiAgentResponse("AI Agent transport is not available in this backend.")
 
     object Unsupported : AgentService

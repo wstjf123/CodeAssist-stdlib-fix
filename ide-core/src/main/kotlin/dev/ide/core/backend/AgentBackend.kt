@@ -12,7 +12,7 @@ import java.net.HttpURLConnection
 import java.net.URI
 
 internal class AgentBackend : AgentService {
-    override suspend fun respond(request: UiAgentRequest): UiAgentResponse = withContext(Dispatchers.IO) {
+    override suspend fun respond(request: UiAgentRequest, onTextDelta: (String) -> Unit): UiAgentResponse = withContext(Dispatchers.IO) {
         val base = request.config.baseUrl.trimEnd('/')
         val endpoint = if (base.endsWith("/responses")) base else "$base/responses"
         val body = buildRequestBody(request)
@@ -23,16 +23,22 @@ internal class AgentBackend : AgentService {
             doOutput = true
             setRequestProperty("Authorization", "Bearer ${request.config.apiKey}")
             setRequestProperty("Content-Type", "application/json")
-            setRequestProperty("Accept", "application/json")
+            setRequestProperty("Accept", "text/event-stream")
         }
         conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
         val code = conn.responseCode
-        val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-        val raw = stream?.use { input ->
-            BufferedReader(InputStreamReader(input, Charsets.UTF_8)).use { it.readText() }
-        }.orEmpty()
         if (code !in 200..299) {
+            val raw = conn.errorStream?.use { input ->
+                BufferedReader(InputStreamReader(input, Charsets.UTF_8)).use { it.readText() }
+            }.orEmpty()
             return@withContext UiAgentResponse("请求失败 HTTP $code\n${raw.take(4000)}", raw = raw)
+        }
+        val contentType = conn.contentType.orEmpty()
+        if ("text/event-stream" in contentType) {
+            return@withContext readSse(conn, onTextDelta)
+        }
+        val raw = conn.inputStream.use { input ->
+            BufferedReader(InputStreamReader(input, Charsets.UTF_8)).use { it.readText() }
         }
         UiAgentResponse(
             text = extractResponseText(raw),
@@ -46,6 +52,7 @@ internal class AgentBackend : AgentService {
         append('{')
         append("\"model\":\"").append(jsonEscape(request.config.model)).append("\",")
         append("\"input\":").append(request.input).append(',')
+        append("\"stream\":true,")
         append("\"reasoning\":{\"effort\":\"").append(jsonEscape(request.config.reasoningEffort)).append("\"}")
         request.previousResponseId?.takeIf { it.isNotBlank() }?.let {
             append(",\"previous_response_id\":\"").append(jsonEscape(it)).append("\"")
@@ -64,6 +71,96 @@ internal class AgentBackend : AgentService {
             append(']')
         }
         append('}')
+    }
+
+    private fun readSse(conn: HttpURLConnection, onTextDelta: (String) -> Unit): UiAgentResponse {
+        val raw = StringBuilder()
+        val text = StringBuilder()
+        var responseId: String? = null
+        val calls = ArrayList<UiAgentToolCall>()
+        val partialCalls = LinkedHashMap<String, PartialToolCall>()
+        conn.inputStream.use { input ->
+            BufferedReader(InputStreamReader(input, Charsets.UTF_8)).useLines { lines ->
+                lines.forEach { line ->
+                    raw.append(line).append('\n')
+                    val trimmed = line.trim()
+                    if (!trimmed.startsWith("data:")) return@forEach
+                    val data = trimmed.removePrefix("data:").trim()
+                    if (data.isEmpty() || data == "[DONE]") return@forEach
+                    handleSseData(data, text, calls, partialCalls, onTextDelta) { id ->
+                        if (responseId == null) responseId = id
+                    }
+                }
+            }
+        }
+        partialCalls.values.forEach { partial ->
+            val callId = partial.callId
+            val name = partial.name
+            if (!callId.isNullOrBlank() && !name.isNullOrBlank()) {
+                calls += UiAgentToolCall(callId, name, partial.arguments.toString())
+            }
+        }
+        return UiAgentResponse(text.toString(), responseId, calls.distinctBy { it.callId }, raw.toString())
+    }
+
+    private fun parseSse(raw: String, onTextDelta: (String) -> Unit): UiAgentResponse {
+        val text = StringBuilder()
+        var responseId: String? = null
+        val calls = ArrayList<UiAgentToolCall>()
+        val partialCalls = LinkedHashMap<String, PartialToolCall>()
+        raw.lineSequence()
+            .map { it.trim() }
+            .filter { it.startsWith("data:") }
+            .map { it.removePrefix("data:").trim() }
+            .filter { it.isNotEmpty() && it != "[DONE]" }
+            .forEach { data ->
+                handleSseData(data, text, calls, partialCalls, onTextDelta) { id ->
+                    if (responseId == null) responseId = id
+                }
+            }
+        partialCalls.values.forEach { partial ->
+            val callId = partial.callId
+            val name = partial.name
+            if (!callId.isNullOrBlank() && !name.isNullOrBlank()) {
+                calls += UiAgentToolCall(callId, name, partial.arguments.toString())
+            }
+        }
+        return UiAgentResponse(text.toString(), responseId, calls.distinctBy { it.callId }, raw)
+    }
+
+    private fun handleSseData(
+        data: String,
+        text: StringBuilder,
+        calls: MutableList<UiAgentToolCall>,
+        partialCalls: MutableMap<String, PartialToolCall>,
+        onTextDelta: (String) -> Unit,
+        onResponseId: (String) -> Unit,
+    ) {
+        (extractJsonStringAfter(data, "\"response_id\"") ?: extractJsonStringAfter(data, "\"id\""))?.let(onResponseId)
+        val delta = extractJsonStringAfter(data, "\"delta\"")
+        val type = extractJsonStringAfter(data, "\"type\"").orEmpty()
+        if (delta != null && ("output_text" in type || "text.delta" in type || "\"delta\"" in data)) {
+            text.append(delta)
+            onTextDelta(delta)
+        }
+        extractToolCalls(data).forEach { call -> calls += call }
+        if ("function_call" in data) {
+            val itemId = extractJsonStringAfter(data, "\"item_id\"")
+                ?: extractJsonStringAfter(data, "\"output_index\"")
+                ?: extractJsonStringAfter(data, "\"call_id\"")
+                ?: partialCalls.size.toString()
+            val partial = partialCalls.getOrPut(itemId) { PartialToolCall() }
+            extractJsonStringAfter(data, "\"call_id\"")?.let { partial.callId = it }
+            extractJsonStringAfter(data, "\"name\"")?.let { partial.name = it }
+            extractJsonStringAfter(data, "\"arguments\"")?.let { partial.arguments.append(it) }
+            extractJsonStringAfter(data, "\"arguments_delta\"")?.let { partial.arguments.append(it) }
+        }
+    }
+
+    private class PartialToolCall {
+        var callId: String? = null
+        var name: String? = null
+        val arguments = StringBuilder()
     }
 
     private fun extractResponseText(raw: String): String {

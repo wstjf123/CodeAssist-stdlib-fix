@@ -24,7 +24,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -40,14 +39,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ide.ui.AgentConfig
 import dev.ide.ui.IdeUiState
-import dev.ide.ui.backend.BuildLogLine
 import dev.ide.ui.backend.TreeNode
 import dev.ide.ui.backend.UiAgentConfig
 import dev.ide.ui.backend.UiAgentRequest
 import dev.ide.ui.backend.UiAgentTool
 import dev.ide.ui.backend.UiAgentToolCall
 import dev.ide.ui.backend.UiDiagnostic
-import dev.ide.ui.backend.UiLogEntry
 import dev.ide.ui.components.BottomSheet
 import dev.ide.ui.components.Chip
 import dev.ide.ui.components.DialogButton
@@ -58,7 +55,9 @@ import dev.ide.ui.icons.CaIcons
 import dev.ide.ui.theme.Ca
 import kotlinx.coroutines.launch
 
-private data class AgentMessage(val role: String, val text: String)
+private class AgentMessage(val role: String, text: String) {
+    var text by mutableStateOf(text)
+}
 
 @Composable
 internal fun AgentDock(state: IdeUiState, modifier: Modifier = Modifier) {
@@ -88,18 +87,7 @@ internal fun AgentSheets(state: IdeUiState, compact: Boolean) {
 
 @Composable
 private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
-    val buildState by state.backend.build.buildState.collectAsState()
     val active = state.active
-    val diagnostics = active?.session?.diagnostics.orEmpty()
-    val buildLog = buildState.log.takeLast(80)
-    val ideLogs = remember(state.backend, state.logsOpen, state.agentOpen) {
-        state.backend.diagnostics.recentLogs().takeLast(80)
-    }
-    var includeFile by remember { mutableStateOf(true) }
-    var includeDiagnostics by remember { mutableStateOf(true) }
-    var includeWorkspace by remember { mutableStateOf(false) }
-    var includeBuildLog by remember { mutableStateOf(false) }
-    var includeIdeLog by remember { mutableStateOf(false) }
     var prompt by remember { mutableStateOf("") }
     var sending by remember { mutableStateOf(false) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -122,20 +110,9 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
             IconButtonCa(CaIcons.close, "Close Agent", { state.agentOpen = false }, boxSize = 30, iconSize = 16)
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("上下文", color = Ca.colors.textTertiary, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                ContextToggle("当前文件", includeFile, active != null) { includeFile = it }
-                ContextToggle("诊断 ${diagnostics.size}", includeDiagnostics, diagnostics.isNotEmpty()) { includeDiagnostics = it }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                ContextToggle("工作区文件", includeWorkspace, true) { includeWorkspace = it }
-                ContextToggle("构建日志", includeBuildLog, buildLog.isNotEmpty()) { includeBuildLog = it }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                ContextToggle("IDE 日志", includeIdeLog, ideLogs.isNotEmpty()) { includeIdeLog = it }
-            }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             active?.let { Chip(it.name, fill = Ca.colors.surface2, textColor = Ca.colors.textSecondary) }
+            Chip("tools", fill = Ca.colors.surface2, textColor = Ca.colors.textSecondary)
         }
 
         Box(Modifier.fillMaxWidth().height(1.dp).background(Ca.colors.separator))
@@ -143,12 +120,13 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
         if (messages.isEmpty()) {
             Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 ToolRow("读取当前文件", active?.path ?: "没有打开文件", active != null)
-                ToolRow("读取警告报错", "${diagnostics.size} 条编辑器诊断", diagnostics.isNotEmpty())
-                ToolRow("查看构建日志", "${buildLog.size} 行最近日志", buildLog.isNotEmpty())
-                ToolRow("查看 IDE 日志", "${ideLogs.size} 条最近记录", ideLogs.isNotEmpty())
+                ToolRow("读取工作区文件", "按需列出并读取项目文件", true)
+                ToolRow("读取警告报错", "按需读取当前编辑器诊断", true)
+                ToolRow("查看日志", "按需查看构建日志和 IDE 日志", true)
+                ToolRow("修改当前文件", "通过工具修改当前编辑器 buffer", active != null)
                 Spacer(Modifier.weight(1f))
                 Text(
-                    "发送时会携带选中的上下文；回复可插入到当前编辑器光标处。",
+                    "直接描述任务；Agent 会按需调用工具读取文件、诊断、日志并修改当前编辑器。",
                     color = Ca.colors.textTertiary,
                     style = Ca.type.caption,
                 )
@@ -169,21 +147,15 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
                     state.agentConfigOpen = true
                     return@Composer
                 }
-                val context = buildAgentContext(
-                    state = state,
-                    includeFile = includeFile,
-                    includeDiagnostics = includeDiagnostics,
-                    includeWorkspace = includeWorkspace,
-                    includeBuildLog = includeBuildLog,
-                    includeIdeLog = includeIdeLog,
-                    buildLog = buildLog,
-                    ideLogs = ideLogs,
-                )
                 messages += AgentMessage("user", request)
                 prompt = ""
                 sending = true
                 scope.launch {
-                    val result = runCatching { runAgentLoop(state, request, context, messages) }
+                    val result = runCatching {
+                        runAgentLoop(state, request, messages) { delta ->
+                            scope.launch { appendAgentDelta(messages, delta) }
+                        }
+                    }
                     val text = result.fold(
                         onSuccess = { it },
                         onFailure = { e -> "请求失败：${e.message ?: "unknown error"}" },
@@ -370,56 +342,11 @@ private fun ConfigTextField(
     }
 }
 
-private fun buildAgentContext(
-    state: IdeUiState,
-    includeFile: Boolean,
-    includeDiagnostics: Boolean,
-    includeWorkspace: Boolean,
-    includeBuildLog: Boolean,
-    includeIdeLog: Boolean,
-    buildLog: List<BuildLogLine>,
-    ideLogs: List<UiLogEntry>,
-): String {
-    val out = StringBuilder()
-    fun appendLine(value: String = "") {
-        out.append(value).append('\n')
-    }
-    val active = state.active
-    if (includeFile && active != null) {
-        appendLine("## 当前文件")
-        appendLine(active.path)
-        appendLine("```")
-        appendLine(active.text.take(12000))
-        appendLine("```")
-    }
-    if (includeDiagnostics && active != null) {
-        appendDiagnostics(out, active.session.diagnostics)
-    }
-    if (includeWorkspace) {
-        appendLine("## 工作区文件")
-        collectFilePaths(state.tree).take(200).forEach { appendLine(it) }
-    }
-    if (includeBuildLog && buildLog.isNotEmpty()) {
-        appendLine("## 构建日志")
-        buildLog.forEach { entry ->
-            out.append(entry.timeLabel).append(' ').append(entry.level).append(": ").append(entry.message).append('\n')
-        }
-    }
-    if (includeIdeLog && ideLogs.isNotEmpty()) {
-        appendLine("## IDE 日志")
-        ideLogs.forEach { entry ->
-            out.append(entry.timeLabel).append(' ').append(entry.level).append('/').append(entry.tag).append(": ").append(entry.message).append('\n')
-            entry.stackTrace?.takeIf { it.isNotBlank() }?.let { out.append(it.take(1200)).append('\n') }
-        }
-    }
-    return out.toString().trim()
-}
-
 private suspend fun runAgentLoop(
     state: IdeUiState,
     request: String,
-    context: String,
     messages: MutableList<AgentMessage>,
+    onTextDelta: (String) -> Unit,
 ): String {
     val config = UiAgentConfig(
         baseUrl = state.agentConfig.baseUrl,
@@ -434,7 +361,6 @@ private suspend fun runAgentLoop(
             append("Use tools to inspect the workspace, diagnostics, logs, and to modify the currently edited buffer when needed. ")
             append("When modifying code, prefer replace_current_selection for focused edits and replace_current_file only when a whole-file rewrite is necessary.")
             append("\n\nUser request:\n").append(request)
-            if (context.isNotBlank()) append("\n\nInitial IDE context:\n").append(context)
         }
     )
     var previousResponseId: String? = null
@@ -446,9 +372,15 @@ private suspend fun runAgentLoop(
                 tools = tools,
                 previousResponseId = previousResponseId,
             )
-        )
+        ) { delta ->
+            if (delta.isEmpty()) return@respond
+            onTextDelta(delta)
+        }
         previousResponseId = response.responseId ?: previousResponseId
-        if (response.toolCalls.isEmpty()) return response.text.ifBlank { "完成。" }
+        if (response.toolCalls.isEmpty()) {
+            if (response.text.isNotBlank()) return ""
+            return response.text.ifBlank { "完成。" }
+        }
         val outputs = response.toolCalls.map { call ->
             val output = executeAgentTool(state, call)
             messages += AgentMessage("tool", "${call.name}\n$output")
@@ -457,6 +389,12 @@ private suspend fun runAgentLoop(
         input = buildToolOutputsInput(outputs)
     }
     return "工具调用次数过多，已停止。"
+}
+
+private fun appendAgentDelta(messages: MutableList<AgentMessage>, delta: String) {
+    val last = messages.lastOrNull()
+    val msg = if (last?.role == "agent") last else AgentMessage("agent", "").also { messages += it }
+    msg.text += delta
 }
 
 private fun agentTools(): List<UiAgentTool> = listOf(
