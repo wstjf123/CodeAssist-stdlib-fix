@@ -71,6 +71,7 @@ internal class AgentBackend : AgentService {
     private fun buildRequestBody(request: UiAgentRequest): String {
         val root = JsonObject().apply {
             addProperty("model", request.config.model)
+            if (request.instructions.isNotBlank()) addProperty("instructions", request.instructions)
             add("input", request.input.toJson())
             addProperty("stream", true)
             addProperty("tool_choice", "auto")
@@ -151,7 +152,7 @@ internal class AgentBackend : AgentService {
             }
             "response.output_item.done" -> {
                 val item = event.obj("item") ?: return
-                collectMessageText(item).takeIf { it.isNotEmpty() }?.let { value ->
+                collectMessageText(item).takeIf { it.isNotEmpty() && text.isEmpty() }?.let { value ->
                     text.append(value)
                 }
                 collectToolCall(item)?.let { calls += it }
@@ -167,13 +168,14 @@ internal class AgentBackend : AgentService {
             addProperty("type", type)
             when (type) {
                 "message" -> {
-                    addProperty("role", role ?: "user")
+                    val itemRole = role ?: "user"
+                    addProperty("role", itemRole)
                     add(
                         "content",
                         JsonArray().apply {
                             add(
                                 JsonObject().apply {
-                                    addProperty("type", "input_text")
+                                    addProperty("type", if (itemRole == "assistant") "output_text" else "input_text")
                                     addProperty("text", content.orEmpty())
                                 }
                             )

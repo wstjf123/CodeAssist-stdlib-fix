@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import dev.ide.ui.backend.IdeBackend
 import dev.ide.ui.backend.NodeKind
 import dev.ide.ui.backend.TreeNode
@@ -50,8 +51,66 @@ data class AgentConfig(
     val configured: Boolean get() = baseUrl.isNotBlank() && apiKey.isNotBlank() && model.isNotBlank()
 }
 
-class AgentMessage(val role: String, text: String) {
+class AgentConversationItem(
+    val type: String,
+    val role: String? = null,
+    text: String = "",
+    val callId: String? = null,
+    val name: String? = null,
+    val argumentsJson: String? = null,
+) {
     var text by mutableStateOf(text)
+}
+
+class AgentConversation(
+    val id: String,
+    title: String,
+    val createdSeq: Long,
+    updatedSeq: Long,
+    val items: SnapshotStateList<AgentConversationItem> = mutableStateListOf(),
+) {
+    var title by mutableStateOf(title)
+    var updatedSeq by mutableStateOf(updatedSeq)
+}
+
+private fun String.escapeAgentField(): String = buildString(length) {
+    this@escapeAgentField.forEach { ch ->
+        when (ch) {
+            '%' -> append("%25")
+            '\n' -> append("%0A")
+            '\r' -> append("%0D")
+            '\t' -> append("%09")
+            else -> append(ch)
+        }
+    }
+}
+
+private fun String.unescapeAgentField(): String {
+    if ('%' !in this) return this
+    val out = StringBuilder(length)
+    var i = 0
+    while (i < length) {
+        if (this[i] == '%' && i + 2 < length) {
+            val decoded = when (substring(i + 1, i + 3)) {
+                "25" -> '%'
+                "0A" -> '\n'
+                "0D" -> '\r'
+                "09" -> '\t'
+                else -> null
+            }
+            if (decoded != null) {
+                out.append(decoded)
+                i += 3
+            } else {
+                out.append(this[i])
+                i++
+            }
+        } else {
+            out.append(this[i])
+            i++
+        }
+    }
+    return out.toString()
 }
 
 /**
@@ -122,6 +181,7 @@ class IdeUiState(val backend: IdeBackend, val composePreviewHost: ComposePreview
     var consoleOpen by mutableStateOf(!isMobilePlatform)
     var agentOpen by mutableStateOf(false)
     var agentConfigOpen by mutableStateOf(false)
+    var agentHistoryOpen by mutableStateOf(false)
     var agentConfig by mutableStateOf(loadAgentConfig())
         private set
     var agentPrompt by mutableStateOf("")
@@ -129,7 +189,20 @@ class IdeUiState(val backend: IdeBackend, val composePreviewHost: ComposePreview
     var agentJob by mutableStateOf<Job?>(null)
     var agentReceivedChars by mutableStateOf(0)
     val agentScope: CoroutineScope = MainScope()
-    val agentMessages = mutableStateListOf<AgentMessage>()
+    val agentConversations = mutableStateListOf<AgentConversation>()
+    var activeAgentConversationId by mutableStateOf("")
+        private set
+    val activeAgentConversation: AgentConversation
+        get() {
+            agentConversations.firstOrNull { it.id == activeAgentConversationId }?.let { return it }
+            agentConversations.firstOrNull()?.let {
+                activeAgentConversationId = it.id
+                return it
+            }
+            return createAgentConversation()
+        }
+    val agentMessages: SnapshotStateList<AgentConversationItem>
+        get() = activeAgentConversation.items
     var paletteOpen by mutableStateOf(false)
     /** The in-file structure / outline bottom sheet (opened from the breadcrumb tap or Ctrl-F12). */
     var structureOpen by mutableStateOf(false)
@@ -167,6 +240,7 @@ class IdeUiState(val backend: IdeBackend, val composePreviewHost: ComposePreview
 
     init {
         applySettings(backend.settings.settings())
+        loadAgentConversations()
     }
 
     private fun loadAgentConfig(): AgentConfig = AgentConfig(
@@ -182,6 +256,118 @@ class IdeUiState(val backend: IdeBackend, val composePreviewHost: ComposePreview
         backend.settings.setPreference("agent.apiKey", config.apiKey)
         backend.settings.setPreference("agent.model", config.model.trim())
         backend.settings.setPreference("agent.reasoningEffort", config.reasoningEffort)
+    }
+
+    fun createAgentConversation(title: String = "新对话"): AgentConversation {
+        val seq = nextAgentConversationSeq()
+        val conversation = AgentConversation("agent-$seq", title, seq, seq)
+        agentConversations.add(0, conversation)
+        activeAgentConversationId = conversation.id
+        persistAgentConversations()
+        return conversation
+    }
+
+    fun selectAgentConversation(id: String) {
+        if (agentConversations.any { it.id == id }) {
+            activeAgentConversationId = id
+            agentHistoryOpen = false
+        }
+    }
+
+    fun deleteAgentConversation(id: String) {
+        val index = agentConversations.indexOfFirst { it.id == id }
+        if (index < 0) return
+        agentConversations.removeAt(index)
+        if (activeAgentConversationId == id) {
+            activeAgentConversationId = agentConversations.firstOrNull()?.id.orEmpty()
+            if (activeAgentConversationId.isEmpty()) createAgentConversation()
+        }
+        persistAgentConversations()
+    }
+
+    fun recordAgentChanged() {
+        val conversation = activeAgentConversation
+        conversation.updatedSeq = nextAgentConversationSeq()
+        if (conversation.title == "新对话") {
+            conversation.items.firstOrNull { it.type == "message" && it.role == "user" }?.text
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { conversation.title = it.lineSequence().first().take(32) }
+        }
+        agentConversations.sortByDescending { it.updatedSeq }
+        persistAgentConversations()
+    }
+
+    private fun loadAgentConversations() {
+        agentConversations.clear()
+        val encoded = backend.settings.preference("agent.conversations").orEmpty()
+        var current: AgentConversation? = null
+        encoded.lineSequence().forEach { line ->
+            if (line.isBlank()) return@forEach
+            val parts = line.split('\t')
+            when (parts.firstOrNull()) {
+                "C" -> {
+                    if (parts.size < 5) return@forEach
+                    val conversation = AgentConversation(
+                        id = parts[1].unescapeAgentField(),
+                        title = parts[2].unescapeAgentField().ifBlank { "新对话" },
+                        createdSeq = parts[3].toLongOrNull() ?: 0L,
+                        updatedSeq = parts[4].toLongOrNull() ?: 0L,
+                    )
+                    agentConversations += conversation
+                    current = conversation
+                }
+                "I" -> {
+                    val conversation = current ?: return@forEach
+                    if (parts.size < 8) return@forEach
+                    conversation.items += AgentConversationItem(
+                        type = parts[1].unescapeAgentField(),
+                        role = parts[2].unescapeAgentField().ifBlank { null },
+                        text = parts[3].unescapeAgentField(),
+                        callId = parts[4].unescapeAgentField().ifBlank { null },
+                        name = parts[5].unescapeAgentField().ifBlank { null },
+                        argumentsJson = parts[6].unescapeAgentField().ifBlank { null },
+                    )
+                }
+            }
+        }
+        agentConversations.sortByDescending { it.updatedSeq }
+        activeAgentConversationId = backend.settings.preference("agent.activeConversationId").orEmpty()
+            .takeIf { id -> agentConversations.any { it.id == id } }
+            ?: agentConversations.firstOrNull()?.id.orEmpty()
+        if (agentConversations.isEmpty()) createAgentConversation()
+    }
+
+    fun persistAgentConversations() {
+        val encoded = buildString {
+            agentConversations.take(40).forEach { conversation ->
+                append("C")
+                    .append('\t').append(conversation.id.escapeAgentField())
+                    .append('\t').append(conversation.title.escapeAgentField())
+                    .append('\t').append(conversation.createdSeq)
+                    .append('\t').append(conversation.updatedSeq)
+                    .append('\n')
+                conversation.items.takeLast(220).forEach { item ->
+                    append("I")
+                        .append('\t').append(item.type.escapeAgentField())
+                        .append('\t').append(item.role.orEmpty().escapeAgentField())
+                        .append('\t').append(item.text.escapeAgentField())
+                        .append('\t').append(item.callId.orEmpty().escapeAgentField())
+                        .append('\t').append(item.name.orEmpty().escapeAgentField())
+                        .append('\t').append(item.argumentsJson.orEmpty().escapeAgentField())
+                        .append('\t').append("")
+                        .append('\n')
+                }
+            }
+        }
+        backend.settings.setPreference("agent.conversations", encoded)
+        backend.settings.setPreference("agent.activeConversationId", activeAgentConversationId)
+    }
+
+    private fun nextAgentConversationSeq(): Long {
+        val next = (backend.settings.preference("agent.conversationSeq")?.toLongOrNull() ?: 0L) + 1L
+        backend.settings.setPreference("agent.conversationSeq", next.toString())
+        return next
     }
 
     fun toggleAgent() {

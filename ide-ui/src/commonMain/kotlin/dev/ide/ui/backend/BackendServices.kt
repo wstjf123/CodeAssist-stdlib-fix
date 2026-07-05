@@ -596,6 +596,7 @@ data class UiAgentConfig(
 
 data class UiAgentRequest(
     val config: UiAgentConfig,
+    val instructions: String = "",
     val input: List<UiAgentInputItem>,
     val tools: List<UiAgentTool> = emptyList(),
 )

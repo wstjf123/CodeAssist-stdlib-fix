@@ -40,7 +40,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ide.ui.AgentConfig
-import dev.ide.ui.AgentMessage
+import dev.ide.ui.AgentConversation
+import dev.ide.ui.AgentConversationItem
 import dev.ide.ui.IdeUiState
 import dev.ide.ui.backend.TreeNode
 import dev.ide.ui.backend.UiAgentConfig
@@ -84,6 +85,12 @@ internal fun AgentSheets(state: IdeUiState, compact: Boolean) {
             modifier = Modifier.fillMaxWidth().weight(1f).padding(start = 14.dp, end = 14.dp, bottom = 14.dp),
         )
     }
+    BottomSheet(visible = state.agentHistoryOpen, onDismiss = { state.agentHistoryOpen = false }, heightFraction = 0.6f) {
+        AgentHistorySheet(
+            state = state,
+            modifier = Modifier.fillMaxWidth().weight(1f).padding(start = 14.dp, end = 14.dp, bottom = 14.dp),
+        )
+    }
 }
 
 @Composable
@@ -112,6 +119,8 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            IconButtonCa(CaIcons.plus, "New conversation", { state.createAgentConversation() }, boxSize = 30, iconSize = 16)
+            IconButtonCa(CaIcons.docText, "Conversation history", { state.agentHistoryOpen = true }, boxSize = 30, iconSize = 16)
             IconButtonCa(CaIcons.gear, "Agent settings", { state.agentConfigOpen = true }, boxSize = 30, iconSize = 16)
             IconButtonCa(CaIcons.close, "Close Agent", { state.agentOpen = false }, boxSize = 30, iconSize = 16)
         }
@@ -149,29 +158,32 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
                     state.agentConfigOpen = true
                     return@Composer
                 }
-                messages += AgentMessage("user", request)
+                messages += AgentConversationItem("message", "user", request)
+                state.recordAgentChanged()
                 state.agentPrompt = ""
                 state.agentSending = true
                 state.agentReceivedChars = 0
                 state.agentJob = state.agentScope.launch {
                     try {
-                        val text = runAgentLoop(state, request, messages) { delta ->
+                        val text = runAgentLoop(state, messages) { delta ->
                             state.agentScope.launch {
                                 state.agentReceivedChars += delta.length
                                 appendAgentDelta(messages, delta)
                             }
                         }
-                        if (text.isNotBlank()) messages += AgentMessage("agent", text)
+                        if (text.isNotBlank()) messages += AgentConversationItem("message", "assistant", text)
                     } catch (e: CancellationException) {
-                        messages += AgentMessage("agent", "已停止。")
+                        messages += AgentConversationItem("message", "assistant", "已停止。")
                     } catch (e: Throwable) {
-                        messages += AgentMessage(
-                            "agent",
+                        messages += AgentConversationItem(
+                            "message",
+                            "assistant",
                             if (state.agentJob?.isCancelled == true) "已停止。" else "请求失败：${e.message ?: "unknown error"}",
                         )
                     } finally {
                         state.agentSending = false
                         state.agentJob = null
+                        state.recordAgentChanged()
                     }
                 }
             },
@@ -209,9 +221,9 @@ private fun ContextToggle(label: String, selected: Boolean, enabled: Boolean, on
 }
 
 @Composable
-private fun MessageBubble(message: AgentMessage) {
-    val agent = message.role == "agent"
-    val tool = message.role == "tool"
+private fun MessageBubble(message: AgentConversationItem) {
+    val agent = message.role == "assistant"
+    val tool = message.type == "function_call_output"
     if (tool) {
         ToolMessageBubble(message)
         return
@@ -239,9 +251,10 @@ private fun MessageBubble(message: AgentMessage) {
 }
 
 @Composable
-private fun ToolMessageBubble(message: AgentMessage) {
+private fun ToolMessageBubble(message: AgentConversationItem) {
     var expanded by remember(message) { mutableStateOf(false) }
-    val (name, output) = remember(message.text) { splitToolMessage(message.text) }
+    val name = message.name ?: "tool"
+    val output = message.text
     Column(
         Modifier.fillMaxWidth()
             .background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.sm))
@@ -268,10 +281,67 @@ private fun ToolMessageBubble(message: AgentMessage) {
     }
 }
 
-private fun splitToolMessage(text: String): Pair<String, String> {
-    val lineEnd = text.indexOf('\n')
-    if (lineEnd < 0) return text to ""
-    return text.substring(0, lineEnd) to text.substring(lineEnd + 1)
+@Composable
+private fun AgentHistorySheet(state: IdeUiState, modifier: Modifier = Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(CaIcons.docText, null, Modifier.size(18.dp), tint = Ca.colors.accent)
+            Text("对话历史", color = Ca.colors.textPrimary, style = Ca.type.headline, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            IconButtonCa(CaIcons.plus, "New conversation", {
+                state.createAgentConversation()
+                state.agentHistoryOpen = false
+            }, boxSize = 30, iconSize = 16)
+        }
+        if (state.agentConversations.isEmpty()) {
+            Text("暂无历史。", color = Ca.colors.textTertiary, style = Ca.type.caption)
+        } else {
+            LazyColumn(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(state.agentConversations, key = { it.id }) { conversation ->
+                    AgentConversationRow(
+                        conversation = conversation,
+                        active = conversation.id == state.activeAgentConversationId,
+                        onSelect = { state.selectAgentConversation(conversation.id) },
+                        onDelete = { state.deleteAgentConversation(conversation.id) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AgentConversationRow(
+    conversation: AgentConversation,
+    active: Boolean,
+    onSelect: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth()
+            .background(if (active) Ca.colors.accentSoft else Ca.colors.surface2, RoundedCornerShape(Ca.radius.sm))
+            .clickable { onSelect() }
+            .padding(start = 10.dp, top = 8.dp, end = 6.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                conversation.title,
+                color = if (active) Ca.colors.accent else Ca.colors.textPrimary,
+                style = Ca.type.footnote,
+                fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                "${conversation.items.count { it.type == "message" }} 条消息",
+                color = Ca.colors.textTertiary,
+                style = Ca.type.caption2,
+                maxLines = 1,
+            )
+        }
+        IconButtonCa(CaIcons.close, "Delete conversation", onDelete, boxSize = 28, iconSize = 14)
+    }
 }
 
 @Composable
@@ -417,8 +487,7 @@ private fun ConfigTextField(
 
 private suspend fun runAgentLoop(
     state: IdeUiState,
-    request: String,
-    messages: MutableList<AgentMessage>,
+    messages: MutableList<AgentConversationItem>,
     onTextDelta: (String) -> Unit,
 ): String {
     val config = UiAgentConfig(
@@ -428,24 +497,13 @@ private suspend fun runAgentLoop(
         reasoningEffort = state.agentConfig.reasoningEffort,
     )
     val tools = agentTools()
-    val input = mutableListOf(
-        UiAgentInputItem(
-            type = "message",
-            role = "user",
-            content = buildString {
-                append("You are an AI coding agent embedded in CodeAssist IDE. ")
-                append("Use tools to inspect the workspace, diagnostics, logs, and to modify the currently edited buffer when needed. ")
-                append("When modifying code, prefer replace_current_selection for focused edits and replace_current_file only when a whole-file rewrite is necessary.")
-                append("\n\nUser request:\n").append(request)
-            },
-        )
-    )
     repeat(8) {
         var receivedTextDelta = false
         val response = state.backend.agent.respond(
             UiAgentRequest(
                 config = config,
-                input = input.toList(),
+                instructions = agentInstructions(),
+                input = compactAgentInput(messages),
                 tools = tools,
             )
         ) { delta ->
@@ -459,12 +517,143 @@ private suspend fun runAgentLoop(
             return "完成。"
         }
         response.toolCalls.forEach { call ->
+            messages += AgentConversationItem(
+                type = "function_call",
+                callId = call.callId,
+                name = call.name,
+                argumentsJson = call.argumentsJson,
+            )
             val output = executeAgentTool(state, call)
-            messages += AgentMessage("tool", "${call.name}\n$output")
-            input.addToolOutput(call, output)
+            messages += AgentConversationItem(
+                type = "function_call_output",
+                text = output,
+                callId = call.callId,
+                name = call.name,
+            )
+            state.recordAgentChanged()
         }
     }
     return "工具调用次数过多，已停止。"
+}
+
+private fun agentInstructions(): String =
+    "You are an AI coding agent embedded in CodeAssist IDE. " +
+        "Use tools to inspect the workspace, diagnostics, logs, and to modify the currently edited buffer when needed. " +
+        "When modifying code, prefer replace_current_selection for focused edits and replace_current_file only when a whole-file rewrite is necessary."
+
+private fun compactAgentInput(messages: List<AgentConversationItem>): List<UiAgentInputItem> {
+    val (dropped, retainedItems) = splitTailFromLastUserMessages(messages, userMessageCount = 10)
+    val retained = retainedItems.toMutableList()
+    truncateAssistantText(retained, maxChars = 12000)
+    val input = ArrayList<UiAgentInputItem>()
+    buildCompactedSummary(dropped)?.let { summary ->
+        input += UiAgentInputItem(
+            type = "message",
+            role = "developer",
+            content = summary,
+        )
+    }
+    input += retained.mapNotNull { item ->
+        when (item.type) {
+            "message" -> UiAgentInputItem(
+                type = "message",
+                role = item.role ?: "user",
+                content = item.text,
+            )
+            "function_call" -> UiAgentInputItem(
+                type = "function_call",
+                callId = item.callId,
+                name = item.name,
+                argumentsJson = item.argumentsJson,
+            )
+            "function_call_output" -> UiAgentInputItem(
+                type = "function_call_output",
+                callId = item.callId,
+                output = item.text,
+            )
+            else -> null
+        }
+    }
+    return input
+}
+
+private fun splitTailFromLastUserMessages(
+    items: List<AgentConversationItem>,
+    userMessageCount: Int,
+): Pair<List<AgentConversationItem>, List<AgentConversationItem>> {
+    if (userMessageCount <= 0) return items to emptyList()
+    val latestUser = items.indexOfLast { it.type == "message" && it.role == "user" }
+    if (latestUser < 0) return items to emptyList()
+    val throughLatestUser = items.take(latestUser + 1)
+    var seen = 0
+    var start = latestUser
+    for (i in throughLatestUser.indices.reversed()) {
+        val item = throughLatestUser[i]
+        if (item.type == "message" && item.role == "user") {
+            seen++
+            start = i
+            if (seen >= userMessageCount) break
+        }
+    }
+    return items.take(start) to normalizeToolPairs(items.drop(start))
+}
+
+private fun buildCompactedSummary(items: List<AgentConversationItem>): String? {
+    if (items.isEmpty()) return null
+    val lines = ArrayList<String>()
+    items.forEach { item ->
+        when {
+            item.type == "message" && item.role == "user" -> {
+                lines += "User: ${item.text.oneLineForSummary()}"
+            }
+            item.type == "message" && item.role == "assistant" -> {
+                lines += "Assistant: ${item.text.oneLineForSummary()}"
+            }
+            item.type == "function_call" -> {
+                lines += "Tool call: ${item.name.orEmpty()} ${item.argumentsJson.orEmpty().oneLineForSummary(220)}"
+            }
+            item.type == "function_call_output" -> {
+                lines += "Tool output: ${item.name.orEmpty()} ${item.text.oneLineForSummary(220)}"
+            }
+        }
+    }
+    if (lines.isEmpty()) return null
+    return "Earlier conversation was compacted. Preserve these facts and decisions:\n" +
+        lines.takeLast(80).joinToString("\n")
+}
+
+private fun String.oneLineForSummary(limit: Int = 360): String {
+    val value = trim().replace(Regex("\\s+"), " ")
+    return if (value.length <= limit) value else value.take(limit) + "..."
+}
+
+private fun normalizeToolPairs(items: List<AgentConversationItem>): List<AgentConversationItem> {
+    val callIds = items.asSequence()
+        .filter { it.type == "function_call" }
+        .mapNotNull { it.callId }
+        .toSet()
+    return items.filter { item ->
+        item.type != "function_call_output" || item.callId in callIds
+    }
+}
+
+private fun truncateAssistantText(items: MutableList<AgentConversationItem>, maxChars: Int) {
+    var remaining = maxChars
+    val iterator = items.listIterator()
+    while (iterator.hasNext()) {
+        val item = iterator.next()
+        if (item.type != "message" || item.role != "assistant") continue
+        if (remaining <= 0) {
+            iterator.remove()
+            continue
+        }
+        if (item.text.length > remaining) {
+            iterator.set(AgentConversationItem("message", "assistant", item.text.take(remaining) + "\n... [truncated]"))
+            remaining = 0
+        } else {
+            remaining -= item.text.length
+        }
+    }
 }
 
 private fun isUsefulAgentText(text: String): Boolean {
@@ -474,9 +663,13 @@ private fun isUsefulAgentText(text: String): Boolean {
     return true
 }
 
-private fun appendAgentDelta(messages: MutableList<AgentMessage>, delta: String) {
+private fun appendAgentDelta(messages: MutableList<AgentConversationItem>, delta: String) {
     val last = messages.lastOrNull()
-    val msg = if (last?.role == "agent") last else AgentMessage("agent", "").also { messages += it }
+    val msg = if (last?.type == "message" && last.role == "assistant") {
+        last
+    } else {
+        AgentConversationItem("message", "assistant", "").also { messages += it }
+    }
     msg.text += delta
 }
 
@@ -569,24 +762,6 @@ private fun executeAgentTool(state: IdeUiState, call: UiAgentToolCall): String {
             else -> "unknown tool: ${call.name}"
         }
     }.getOrElse { "tool failed: ${it.message ?: "unknown error"}" }
-}
-
-private fun MutableList<UiAgentInputItem>.addToolOutput(call: UiAgentToolCall, output: String) {
-    add(
-        UiAgentInputItem(
-            type = "function_call",
-            callId = call.callId,
-            name = call.name,
-            argumentsJson = call.argumentsJson,
-        )
-    )
-    add(
-        UiAgentInputItem(
-            type = "function_call_output",
-            callId = call.callId,
-            output = output,
-        )
-    )
 }
 
 private fun collectFilePaths(root: TreeNode): List<String> {

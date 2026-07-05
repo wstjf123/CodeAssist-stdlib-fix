@@ -156,7 +156,7 @@ internal fun EditorCenter(
                 // destination sheet (either layout), or — on a phone — the file-tree / build-console bottom sheets
                 // (on desktop those are docked side panes that leave the editor interactive). A covered editor
                 // dismisses its floating popups so they don't hang over the overlay.
-                val editorObscured = state.paletteOpen || state.sheetDest != null || state.agentConfigOpen ||
+                val editorObscured = state.paletteOpen || state.sheetDest != null || state.agentConfigOpen || state.agentHistoryOpen ||
                         (compact && (state.navOpen || state.consoleOpen || state.agentOpen))
                 val codeSurface: @Composable (Modifier, Boolean) -> Unit = { mod, autoFocus ->
                     CodeEditor(
