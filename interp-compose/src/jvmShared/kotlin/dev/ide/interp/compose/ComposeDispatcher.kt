@@ -11,6 +11,9 @@ import dev.ide.lang.kotlin.interp.DispatchKind
 import dev.ide.lang.kotlin.interp.RNode
 import dev.ide.lang.kotlin.interp.ResolvedCallable
 import java.lang.reflect.Proxy
+import java.lang.reflect.ParameterizedType
+import java.lang.reflect.Type
+import java.lang.reflect.WildcardType
 
 /**
  * The Compose bridge (see `docs/compose-interpreter.md`, step 4): the interpreter [Dispatcher] that threads
@@ -40,11 +43,21 @@ class ComposeDispatcher(
 
     private val fallback: Dispatcher = fallback ?: ReflectiveDispatcher(
         loader = loader ?: ReflectiveDispatcher::class.java.classLoader,
-        lambdaProxies = LambdaProxyStrategy { lambda, fi, composable ->
+        lambdaProxies = object : LambdaProxyStrategy {
             // A composable function-type param: thread the Composer. Plain event callbacks (`onClick`,
             // `onValueChange`) still get a Compose-owned proxy so callback failures are surfaced in the preview
             // chip instead of disappearing inside Compose's input/event dispatch.
-            if (composable) composableLambdaProxy(lambda, fi) else eventLambdaProxy(lambda, fi)
+            override fun proxyOrNull(lambda: InterpretedLambda, functionalInterface: Class<*>, composableParam: Boolean): Any? =
+                proxyOrNull(lambda, functionalInterface, null, composableParam)
+
+            override fun proxyOrNull(
+                lambda: InterpretedLambda,
+                functionalInterface: Class<*>,
+                genericType: Type?,
+                composableParam: Boolean,
+            ): Any? =
+                if (composableParam) composableLambdaProxy(lambda, functionalInterface, genericType)
+                else eventLambdaProxy(lambda, functionalInterface, genericType)
         },
     )
 
@@ -151,9 +164,9 @@ class ComposeDispatcher(
 
     private fun lambdaProxy(lambda: InterpretedLambda, functionalInterface: Class<*>): Any =
         if (functionalInterface.methods.any { it.name == "invoke" && it.parameterTypes.any(COMPOSER::isAssignableFrom) }) {
-            composableLambdaProxy(lambda, functionalInterface)
+            composableLambdaProxy(lambda, functionalInterface, null)
         } else {
-            eventLambdaProxy(lambda, functionalInterface)
+            eventLambdaProxy(lambda, functionalInterface, null)
         }
 
     private class Handled(val value: Any?)
@@ -173,7 +186,7 @@ class ComposeDispatcher(
      * lambda body's composables compose into the right group; non-composer leading args (a scope receiver)
      * are passed to the lambda, the trailing `Composer`/`$changed` are stripped.
      */
-    private fun composableLambdaProxy(lambda: InterpretedLambda, functionalInterface: Class<*>): Any =
+    private fun composableLambdaProxy(lambda: InterpretedLambda, functionalInterface: Class<*>, genericType: Type?): Any =
         Proxy.newProxyInstance(
             functionalInterface.classLoader ?: javaClass.classLoader, arrayOf(functionalInterface),
         ) { _, method, callArgs ->
@@ -185,7 +198,7 @@ class ComposeDispatcher(
                     val prev = composer
                     if (composerArg != null) composer = composerArg
                     try {
-                        lambda.invoke(real)
+                        boxLambdaResult(lambda.invoke(real), method, genericType)
                     } catch (ce: kotlin.coroutines.cancellation.CancellationException) {
                         throw ce // recomposition cancellation is control flow — never swallow it
                     } catch (e: Exception) {
@@ -211,7 +224,7 @@ class ComposeDispatcher(
             }
         }
 
-    private fun eventLambdaProxy(lambda: InterpretedLambda, functionalInterface: Class<*>): Any =
+    private fun eventLambdaProxy(lambda: InterpretedLambda, functionalInterface: Class<*>, genericType: Type?): Any =
         Proxy.newProxyInstance(
             functionalInterface.classLoader ?: javaClass.classLoader, arrayOf(functionalInterface),
         ) { _, method, callArgs ->
@@ -224,7 +237,7 @@ class ComposeDispatcher(
                         val prev = composer
                         composer = composerArg
                         return@newProxyInstance try {
-                            lambda.invoke(real)
+                            boxLambdaResult(lambda.invoke(real), method, genericType)
                         } catch (ce: kotlin.coroutines.cancellation.CancellationException) {
                             throw ce
                         } catch (e: Exception) {
@@ -235,7 +248,7 @@ class ComposeDispatcher(
                         }
                     }
                     try {
-                        lambda.invoke(a)
+                        boxLambdaResult(lambda.invoke(a), method, genericType)
                     } catch (ce: kotlin.coroutines.cancellation.CancellationException) {
                         throw ce
                     } catch (e: Exception) {
@@ -253,5 +266,48 @@ class ComposeDispatcher(
 
     private companion object {
         val COMPOSER: Class<*> = Class.forName("androidx.compose.runtime.Composer")
+
+        fun boxLambdaResult(value: Any?, method: java.lang.reflect.Method, genericType: Type?): Any? {
+            if (method.name != "invoke" || value == null) return value
+            val returnType = lambdaReturnClass(method, genericType) ?: return value
+            if (returnType == Unit::class.java || returnType == Void.TYPE || returnType == Void::class.java) return value
+            return boxValueClassIfNeeded(value, returnType)
+        }
+
+        private fun lambdaReturnClass(method: java.lang.reflect.Method, genericType: Type?): Class<*>? =
+            (genericType as? ParameterizedType)
+                ?.actualTypeArguments
+                ?.lastOrNull()
+                ?.let(::erasedClass)
+                ?: method.genericReturnType.let(::erasedClass)
+
+        private fun erasedClass(type: Type?): Class<*>? = when (type) {
+            is Class<*> -> type
+            is ParameterizedType -> erasedClass(type.rawType)
+            is WildcardType -> type.upperBounds.firstOrNull()?.let(::erasedClass)
+            else -> null
+        }
+
+        private fun boxValueClassIfNeeded(value: Any?, targetType: Class<*>): Any? {
+            if (value == null || targetType.isPrimitive || targetType.isInstance(value)) return value
+            val box = targetType.methods.firstOrNull {
+                it.name == "box-impl" && java.lang.reflect.Modifier.isStatic(it.modifiers) &&
+                    it.parameterCount == 1 && boxed(it.parameterTypes[0]).isInstance(value)
+            } ?: return value
+            box.isAccessible = true
+            return box.invoke(null, value)
+        }
+
+        private fun boxed(c: Class<*>): Class<*> = when (c) {
+            Int::class.javaPrimitiveType -> Integer::class.java
+            Long::class.javaPrimitiveType -> java.lang.Long::class.java
+            Double::class.javaPrimitiveType -> java.lang.Double::class.java
+            Float::class.javaPrimitiveType -> java.lang.Float::class.java
+            Boolean::class.javaPrimitiveType -> java.lang.Boolean::class.java
+            Char::class.javaPrimitiveType -> Character::class.java
+            Byte::class.javaPrimitiveType -> java.lang.Byte::class.java
+            Short::class.javaPrimitiveType -> java.lang.Short::class.java
+            else -> c
+        }
     }
 }

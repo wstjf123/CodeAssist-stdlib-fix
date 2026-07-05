@@ -6,6 +6,7 @@ import dev.ide.lang.kotlin.interp.RNode
 import dev.ide.lang.kotlin.interp.ResolvedCallable
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
+import java.lang.reflect.Type
 
 /** Load [fqn] across the loaders that might hold the project/runtime libraries — [preferred] first (the
  *  project library [ClassLoader] when previewing on device, whose parent is the IDE app loader so it also
@@ -141,6 +142,13 @@ interface InterpretedLambda {
  */
 fun interface LambdaProxyStrategy {
     fun proxyOrNull(lambda: InterpretedLambda, functionalInterface: Class<*>, composableParam: Boolean): Any?
+
+    fun proxyOrNull(
+        lambda: InterpretedLambda,
+        functionalInterface: Class<*>,
+        genericType: Type?,
+        composableParam: Boolean,
+    ): Any? = proxyOrNull(lambda, functionalInterface, composableParam)
 }
 
 /**
@@ -273,7 +281,7 @@ class ReflectiveDispatcher(
         if (args.none { it === OmittedArg } && args.size >= declaredValueParamCount) {
             findMethod(target.javaClass, name, args, static = false)?.let { m ->
                 runCatching { m.isAccessible = true }
-                return m.invoke(target, *bindArgs(m.parameterTypes, args, composable))
+                return m.invoke(target, *bindArgs(m.parameterTypes, m.genericParameterTypes, args, composable))
             }
             // No exact-arity match: a vararg method (`fun f(vararg x)`) packs the trailing args into an array.
             findVarargMethod(target.javaClass, name, args, static = false)?.let { return invokeVararg(it, target, args, composable) }
@@ -295,7 +303,7 @@ class ReflectiveDispatcher(
         if (args.none { it === OmittedArg } && args.size >= declaredRealParamCount) {
             findMethod(scope.javaClass, name, args, static = false)?.let { m ->
                 runCatching { m.isAccessible = true }
-                return m.invoke(scope, *bindArgs(m.parameterTypes, args, composable))
+                return m.invoke(scope, *bindArgs(m.parameterTypes, m.genericParameterTypes, args, composable))
             }
             findVarargMethod(scope.javaClass, name, args, static = false)?.let { return invokeVararg(it, scope, args, composable) }
         }
@@ -309,7 +317,7 @@ class ReflectiveDispatcher(
         if (args.none { it === OmittedArg } && args.size >= declaredRealParamCount) {
             findMethod(cls, name, args, static = true)?.let { m ->
                 runCatching { m.isAccessible = true }
-                return m.invoke(null, *bindArgs(m.parameterTypes, args, composable))
+                return m.invoke(null, *bindArgs(m.parameterTypes, m.genericParameterTypes, args, composable))
             }
             findVarargMethod(cls, name, args, static = true)?.let { return invokeVararg(it, null, args, composable) }
         }
@@ -347,7 +355,7 @@ class ReflectiveDispatcher(
             val slot = if (trailingLambda && i == k - 1) n - 1 else i
             if (slot !in 0 until n) continue
             slots[slot] = if (a is InterpretedLambda)
-                (lambdaProxies?.proxyOrNull(a, params[slot], composable.getOrElse(i) { false }) ?: regularLambdaProxy(a, params[slot]))
+                (lambdaProxies?.proxyOrNull(a, params[slot], null, composable.getOrElse(i) { false }) ?: regularLambdaProxy(a, params[slot]))
             else a
             provided[slot] = true
         }
@@ -448,7 +456,7 @@ class ReflectiveDispatcher(
         if (!hasOmitted) {
             cls.declaredConstructors.filter { it.parameterCount == args.size }
                 .firstOrNull { paramsAccept(it.parameterTypes, args) }
-                ?.let { runCatching { it.isAccessible = true }; return it.newInstance(*bindArgs(it.parameterTypes, args, composable)) }
+                ?.let { runCatching { it.isAccessible = true }; return it.newInstance(*bindArgs(it.parameterTypes, it.genericParameterTypes, args, composable)) }
         }
         // A call that omits a defaulted parameter (`SpanStyle(fontWeight = …)`, or a trimmed trailing default
         // that left no hole) has no exact-arity match — Kotlin emits an `<init>$default` synthetic constructor
@@ -457,7 +465,7 @@ class ReflectiveDispatcher(
         // Last resort: an arity match whose types the strict [paramsAccept] rejected (preserves prior behavior).
         if (!hasOmitted) {
             cls.declaredConstructors.firstOrNull { it.parameterCount == args.size }
-                ?.let { runCatching { it.isAccessible = true }; return it.newInstance(*bindArgs(it.parameterTypes, args, composable)) }
+                ?.let { runCatching { it.isAccessible = true }; return it.newInstance(*bindArgs(it.parameterTypes, it.genericParameterTypes, args, composable)) }
         }
         throw InterpreterException("no constructor(${args.count { it !== OmittedArg }}) on $ownerFqn")
     }
@@ -482,7 +490,7 @@ class ReflectiveDispatcher(
             if (i < realArgs.size && realArgs[i] !== OmittedArg) {
                 val a = realArgs[i]
                 slots[i] = if (a is InterpretedLambda)
-                    (lambdaProxies?.proxyOrNull(a, params[i], composable.getOrElse(i) { false }) ?: regularLambdaProxy(a, params[i]))
+                    (lambdaProxies?.proxyOrNull(a, params[i], null, composable.getOrElse(i) { false }) ?: regularLambdaProxy(a, params[i]))
                 else boxValueClassIfNeeded(a, params[i])
             } else {
                 slots[i] = zeroValue(params[i])
@@ -570,10 +578,10 @@ class ReflectiveDispatcher(
     /** Convert an interpreted lambda arg into a JVM functional-interface proxy of the target parameter type
      *  (composable params route through [lambdaProxies] so the Compose bridge can thread a Composer); pass
      *  everything else through. */
-    private fun bindArgs(params: Array<Class<*>>, args: List<Any?>, composable: List<Boolean>): Array<Any?> =
+    private fun bindArgs(params: Array<Class<*>>, genericParams: Array<Type>, args: List<Any?>, composable: List<Boolean>): Array<Any?> =
         Array(args.size) { i ->
             (args[i] as? InterpretedLambda)?.let { lam ->
-                lambdaProxies?.proxyOrNull(lam, params[i], composable.getOrElse(i) { false })
+                lambdaProxies?.proxyOrNull(lam, params[i], genericParams.getOrNull(i), composable.getOrElse(i) { false })
                     ?: regularLambdaProxy(lam, params[i])
             } ?: boxValueClassIfNeeded(args[i], params[i])
         }
@@ -650,11 +658,11 @@ class ReflectiveDispatcher(
         for (j in 0 until args.size - fixed) {
             val a = args[fixed + j]
             val v = (a as? InterpretedLambda)?.let { lam ->
-                lambdaProxies?.proxyOrNull(lam, componentType, composable.getOrElse(fixed + j) { false }) ?: regularLambdaProxy(lam, componentType)
+                lambdaProxies?.proxyOrNull(lam, componentType, null, composable.getOrElse(fixed + j) { false }) ?: regularLambdaProxy(lam, componentType)
             } ?: boxValueClassIfNeeded(a, componentType)
             java.lang.reflect.Array.set(varargArray, j, v)
         }
-        val leading = bindArgs(m.parameterTypes.copyOfRange(0, fixed), args.subList(0, fixed), composable)
+        val leading = bindArgs(m.parameterTypes.copyOfRange(0, fixed), m.genericParameterTypes.copyOfRange(0, fixed), args.subList(0, fixed), composable)
         val callArgs = arrayOfNulls<Any?>(pc)
         for (i in 0 until fixed) callArgs[i] = leading[i]
         callArgs[fixed] = varargArray
