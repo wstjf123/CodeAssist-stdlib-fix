@@ -31,13 +31,20 @@ object UiThreadWatchdog {
     @Volatile
     private var logFile: File? = null
 
-    fun start(context: Context) {
+    @Volatile
+    private var mainThread: Thread? = null
+
+    fun start(context: Context, uiThread: Thread = Thread.currentThread()) {
+        mainThread = uiThread
         if (!started.compareAndSet(false, true)) return
         val appContext = context.applicationContext
         logFile = File(AndroidIde.appHomeDir(appContext), "logs/ui-watchdog.log").also { file ->
             file.parentFile?.mkdirs()
             rotateIfNeeded(file)
-            append(file, "watchdog started pid=${android.os.Process.myPid()} thread=${Thread.currentThread().name}")
+            append(
+                file,
+                "watchdog started pid=${android.os.Process.myPid()} current=${Thread.currentThread().name}/${Thread.currentThread().id} ui=${uiThread.name}/${uiThread.id} state=${uiThread.state}"
+            )
         }
 
         Handler(Looper.getMainLooper()).post(object : Runnable {
@@ -73,7 +80,7 @@ object UiThreadWatchdog {
 
     private fun dumpStall(stalledFor: Long) {
         val file = logFile ?: return
-        val mainThread = Looper.getMainLooper().thread
+        val mainThread = mainThread ?: Looper.getMainLooper().thread
         val stacks = Thread.getAllStackTraces()
         val text = buildString {
             appendLine("main thread stalled for ${stalledFor}ms")

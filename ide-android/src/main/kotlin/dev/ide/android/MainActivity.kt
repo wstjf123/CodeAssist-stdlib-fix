@@ -67,7 +67,7 @@ class MainActivity : ComponentActivity() {
         )
 
         super.onCreate(savedInstanceState)
-        UiThreadWatchdog.start(this)
+        UiThreadWatchdog.start(this, Thread.currentThread())
         UiTrace.sink = UiThreadWatchdog::mark
         UiThreadWatchdog.mark("MainActivity.onCreate")
         inbound.value = extractStream(intent)
