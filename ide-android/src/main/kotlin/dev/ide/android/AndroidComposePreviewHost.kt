@@ -56,17 +56,17 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
     private val log = Log.logger("AndroidComposePreviewHost")
 
     @Composable
-    override fun Preview(path: String, preview: UiComposePreview, text: String, dark: Boolean, onProblems: (List<PreviewIssue>) -> Unit, onBusy: (Boolean) -> Unit, modifier: Modifier) {
+    override fun Preview(path: String, preview: UiComposePreview, text: String, dark: Boolean, refreshKey: Int, onProblems: (List<PreviewIssue>) -> Unit, onBusy: (Boolean) -> Unit, modifier: Modifier) {
         val report by rememberUpdatedState(onProblems)
         val reportBusy by rememberUpdatedState(onBusy)
         val appContext = LocalContext.current.applicationContext
         var useProjectLoader by remember(path) { mutableStateOf(false) }
-        val apk by produceState<ComposePreviewApk?>(null, path, preview.functionName, text) {
+        val apk by produceState<ComposePreviewApk?>(null, path, preview.functionName, text, refreshKey) {
             value = runCatching { backend.composePreviewApk(path, text, preview.functionName) }.getOrNull()
         }
-        var apkError by remember(path, preview.variantId, text, apk?.fingerprint) { mutableStateOf<Throwable?>(null) }
+        var apkError by remember(path, preview.variantId, text, refreshKey, apk?.fingerprint) { mutableStateOf<Throwable?>(null) }
         val compiledCandidate = apk != null && !preview.hasParameter && preview.arity == 0
-        val state by produceState<PreviewState>(PreviewState.Loading, path, preview.functionName, preview.arity, text, compiledCandidate) {
+        val state by produceState<PreviewState>(PreviewState.Loading, path, preview.functionName, preview.arity, text, refreshKey, compiledCandidate) {
             value = PreviewState.Loading
             if (compiledCandidate) {
                 value = PreviewState.CompiledReady
@@ -113,8 +113,8 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
         }
         val renderer = remember(loader) { ComposePreviewRenderer(loader) }
         val apkRenderer = remember(apkLoader) { apkLoader?.let { ApkComposePreviewRenderer(it) } }
-        var renderError by remember(path, preview.variantId, text, useProjectLoader, loader) { mutableStateOf<Throwable?>(null) }
-        var partialError by remember(path, preview.variantId, text, useProjectLoader, loader) { mutableStateOf<Throwable?>(null) }
+        var renderError by remember(path, preview.variantId, text, refreshKey, useProjectLoader, loader) { mutableStateOf<Throwable?>(null) }
+        var partialError by remember(path, preview.variantId, text, refreshKey, useProjectLoader, loader) { mutableStateOf<Throwable?>(null) }
         val compiledPreviewActive = apkRenderer != null && compiledCandidate && apkError == null
         val compiledPreviewUnavailable = compiledCandidate && apkError != null
         // The interpreter re-runs on every recomposition pass, so a content lambda that fails deterministically
@@ -122,7 +122,7 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
         // composition) every pass would invalidate → re-run → invalidate … an unbounded recomposition loop.
         // Track the last error identity (type + message) and update state only when it actually changes — incl.
         // clearing to null. Keyed alongside `partialError` so both reset together on a new buffer.
-        val partialKey = remember(path, preview.variantId, text, useProjectLoader, loader) { arrayOfNulls<String>(1) }
+        val partialKey = remember(path, preview.variantId, text, refreshKey, useProjectLoader, loader) { arrayOfNulls<String>(1) }
 
         // Tell the pane when the engine is busy lowering/interpreting the buffer (the Loading phase) vs. settled,
         // so its badge can show a loading state while a fresh edit is being caught up to.

@@ -18,9 +18,11 @@ interface ComposePreviewHost {
      * host applies the composition-level ones: `uiMode`, `locale`, `fontScale`, `@PreviewParameter`). [dark]
      * is the surface's Night toggle; the host renders night when either [dark] or the variant's `uiMode` asks
      * for it. Interpret/render problems are reported through [onProblems] (empty when clean) so the pane can
-     * show them in the shared problem chip rather than over the device frame, and [onBusy] reports whether the
-     * host is currently lowering/interpreting vs. settled so the pane can show a loading badge.
+     * show them in the shared problem chip rather than over the device frame. [refreshKey] asks the host to
+     * re-resolve/re-render the same preview without the pane having to dispose the platform preview view, and
+     * [onBusy] reports whether the host is currently lowering/interpreting vs. settled so the pane can show a
+     * loading badge.
      */
     @Composable
-    fun Preview(path: String, preview: UiComposePreview, text: String, dark: Boolean, onProblems: (List<PreviewIssue>) -> Unit, onBusy: (Boolean) -> Unit, modifier: Modifier)
+    fun Preview(path: String, preview: UiComposePreview, text: String, dark: Boolean, refreshKey: Int, onProblems: (List<PreviewIssue>) -> Unit, onBusy: (Boolean) -> Unit, modifier: Modifier)
 }

@@ -50,7 +50,7 @@ class DesktopComposePreviewHost(private val backend: IdeServicesBackend) : Compo
     // here: Compose for Desktop has no LocalConfiguration to override, so the frame renders under the host's
     // system theme. The Light/Night split is meaningful on device, where the override drives isSystemInDarkTheme().
     @Composable
-    override fun Preview(path: String, preview: UiComposePreview, text: String, dark: Boolean, onProblems: (List<PreviewIssue>) -> Unit, onBusy: (Boolean) -> Unit, modifier: Modifier) {
+    override fun Preview(path: String, preview: UiComposePreview, text: String, dark: Boolean, refreshKey: Int, onProblems: (List<PreviewIssue>) -> Unit, onBusy: (Boolean) -> Unit, modifier: Modifier) {
         val report by rememberUpdatedState(onProblems)
         val reportBusy by rememberUpdatedState(onBusy)
         var useProjectLoader by remember(path) { mutableStateOf(false) }
@@ -65,7 +65,7 @@ class DesktopComposePreviewHost(private val backend: IdeServicesBackend) : Compo
             }
         }
         val renderer = remember(loader) { ComposePreviewRenderer(loader) }
-        val state by produceState<PreviewState>(PreviewState.Loading, path, preview.functionName, preview.arity, text) {
+        val state by produceState<PreviewState>(PreviewState.Loading, path, preview.functionName, preview.arity, text, refreshKey) {
             value = PreviewState.Loading
             val lowered = runCatching { backend.lowerComposePreview(path, preview.functionName, preview.arity, text) }.getOrNull()
             value = if (lowered != null) PreviewState.Ready(lowered) else {
@@ -77,14 +77,14 @@ class DesktopComposePreviewHost(private val backend: IdeServicesBackend) : Compo
                 PreviewState.NotInterpretable(why)
             }
         }
-        var renderError by remember(path, preview.variantId, text, useProjectLoader, loader) { mutableStateOf<Throwable?>(null) }
-        var partialError by remember(path, preview.variantId, text, useProjectLoader, loader) { mutableStateOf<Throwable?>(null) }
+        var renderError by remember(path, preview.variantId, text, refreshKey, useProjectLoader, loader) { mutableStateOf<Throwable?>(null) }
+        var partialError by remember(path, preview.variantId, text, refreshKey, useProjectLoader, loader) { mutableStateOf<Throwable?>(null) }
         // The interpreter re-runs on every recomposition pass, so a content lambda that fails deterministically
         // hands the renderer a FRESH Throwable each pass. Writing that to `partialError` (read during
         // composition) every pass would invalidate → re-run → invalidate … an unbounded recomposition loop.
         // Track the last error identity (type + message) and update state only when it actually changes — incl.
         // clearing to null. Keyed alongside `partialError` so both reset together on a new buffer.
-        val partialKey = remember(path, preview.variantId, text, useProjectLoader, loader) { arrayOfNulls<String>(1) }
+        val partialKey = remember(path, preview.variantId, text, refreshKey, useProjectLoader, loader) { arrayOfNulls<String>(1) }
 
         // Tell the pane when the engine is busy lowering/interpreting the buffer (the Loading phase) vs. settled,
         // so its badge can show a loading state while a fresh edit is being caught up to.
