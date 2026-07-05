@@ -19,6 +19,7 @@ asm = "9.7"           # org.ow2.asm — bytecode rewrite of System.exit for the 
 trove4j = "1.0.20200330"  # gnu.trove.* — IntelliJ-core dependency the Kotlin compiler needs but doesn't bundle
 desugarJdkLibs = "2.1.5"  # com.android.tools:desugar_jdk_libs — core-library desugaring (temporarily enabled)
 bouncycastle = "1.78.1"   # org.bouncycastle — in-process keystore creation (keypair + self-signed X.509) on ART (no keytool)
+gson = "2.11.0"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
@@ -84,6 +85,7 @@ ow2-asm-commons = { module = "org.ow2.asm:asm-commons", version.ref = "asm" } # 
 # bundled into the launchers (:ide-android, :ide-desktop). bcpkix pulls bcprov transitively.
 bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncycastle" }
 bouncycastle-prov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

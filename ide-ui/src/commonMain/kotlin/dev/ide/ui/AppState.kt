@@ -123,7 +123,6 @@ class IdeUiState(val backend: IdeBackend, val composePreviewHost: ComposePreview
         private set
     var agentPrompt by mutableStateOf("")
     var agentSending by mutableStateOf(false)
-    var agentPreviousResponseId: String? = null
     val agentMessages = mutableStateListOf<AgentMessage>()
     var paletteOpen by mutableStateOf(false)
     /** The in-file structure / outline bottom sheet (opened from the breadcrumb tap or Ctrl-F12). */

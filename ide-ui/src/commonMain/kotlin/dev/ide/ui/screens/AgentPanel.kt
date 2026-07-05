@@ -41,6 +41,7 @@ import dev.ide.ui.AgentMessage
 import dev.ide.ui.IdeUiState
 import dev.ide.ui.backend.TreeNode
 import dev.ide.ui.backend.UiAgentConfig
+import dev.ide.ui.backend.UiAgentInputItem
 import dev.ide.ui.backend.UiAgentRequest
 import dev.ide.ui.backend.UiAgentTool
 import dev.ide.ui.backend.UiAgentToolCall
@@ -353,48 +354,41 @@ private suspend fun runAgentLoop(
         reasoningEffort = state.agentConfig.reasoningEffort,
     )
     val tools = agentTools()
-    var input = jsonString(
-        buildString {
-            append("You are an AI coding agent embedded in CodeAssist IDE. ")
-            append("Use tools to inspect the workspace, diagnostics, logs, and to modify the currently edited buffer when needed. ")
-            append("When modifying code, prefer replace_current_selection for focused edits and replace_current_file only when a whole-file rewrite is necessary.")
-            append("\n\nUser request:\n").append(request)
-        }
+    val input = mutableListOf(
+        UiAgentInputItem(
+            type = "message",
+            role = "user",
+            content = buildString {
+                append("You are an AI coding agent embedded in CodeAssist IDE. ")
+                append("Use tools to inspect the workspace, diagnostics, logs, and to modify the currently edited buffer when needed. ")
+                append("When modifying code, prefer replace_current_selection for focused edits and replace_current_file only when a whole-file rewrite is necessary.")
+                append("\n\nUser request:\n").append(request)
+            },
+        )
     )
-    var previousResponseId: String? = state.agentPreviousResponseId
     repeat(8) {
         var receivedTextDelta = false
         val response = state.backend.agent.respond(
             UiAgentRequest(
                 config = config,
-                input = input,
+                input = input.toList(),
                 tools = tools,
-                previousResponseId = previousResponseId,
             )
         ) { delta ->
             if (!isUsefulAgentText(delta)) return@respond
             receivedTextDelta = true
             onTextDelta(delta)
         }
-        previousResponseId = response.responseId ?: previousResponseId
-        state.agentPreviousResponseId = previousResponseId
         if (response.toolCalls.isEmpty()) {
             if (receivedTextDelta && isUsefulAgentText(response.text)) return ""
             if (isUsefulAgentText(response.text)) return response.text
-            if (previousResponseId != null) {
-                input = jsonString(
-                    "The previous tool calls are complete. Reply to the user in natural language with the result. Do not output JSON unless the user explicitly asked for JSON."
-                )
-                return@repeat
-            }
             return "完成。"
         }
-        val outputs = response.toolCalls.map { call ->
+        response.toolCalls.forEach { call ->
             val output = executeAgentTool(state, call)
             messages += AgentMessage("tool", "${call.name}\n$output")
-            call.callId to output
+            input.addToolOutput(call, output)
         }
-        input = buildToolOutputsInput(outputs)
     }
     return "工具调用次数过多，已停止。"
 }
@@ -461,7 +455,7 @@ private fun executeAgentTool(state: IdeUiState, call: UiAgentToolCall): String {
         when (call.name) {
             "list_workspace_files" -> collectFilePaths(state.tree).take(500).joinToString("\n")
             "read_workspace_file" -> {
-                val path = jsonArg(call.argumentsJson, "path") ?: return "missing path"
+                val path = call.stringArguments["path"] ?: return "missing path"
                 val known = collectFilePaths(state.tree).toSet()
                 if (path !in known && !path.startsWith(state.backend.project.rootPath)) return "path is outside workspace"
                 if (active?.path == path) active.text else state.backend.files.readFile(path).take(20000)
@@ -486,14 +480,14 @@ private fun executeAgentTool(state: IdeUiState, call: UiAgentToolCall): String {
                 else logs.joinToString("\n") { "${it.timeLabel} ${it.level}/${it.tag}: ${it.message}" }
             }
             "replace_current_selection" -> {
-                val text = jsonArg(call.argumentsJson, "text") ?: return "missing text"
+                val text = call.stringArguments["text"] ?: return "missing text"
                 val session = active?.session ?: return "no current file"
                 val start = session.selection.min
                 session.replaceRange(start, session.selection.max, text, TextRange(start + text.length))
                 "updated ${active.path} at selection"
             }
             "replace_current_file" -> {
-                val text = jsonArg(call.argumentsJson, "text") ?: return "missing text"
+                val text = call.stringArguments["text"] ?: return "missing text"
                 val session = active?.session ?: return "no current file"
                 session.replaceRange(0, session.doc.length, text, TextRange(text.length.coerceAtMost(session.doc.length + text.length)))
                 "replaced ${active.path}"
@@ -503,69 +497,22 @@ private fun executeAgentTool(state: IdeUiState, call: UiAgentToolCall): String {
     }.getOrElse { "tool failed: ${it.message ?: "unknown error"}" }
 }
 
-private fun buildToolOutputsInput(outputs: List<Pair<String, String>>): String = buildString {
-    append('[')
-    outputs.forEachIndexed { index, (callId, output) ->
-        if (index > 0) append(',')
-        append("{\"type\":\"function_call_output\",\"call_id\":\"")
-        append(jsonEscape(callId))
-        append("\",\"output\":")
-        append(jsonString(output))
-        append('}')
-    }
-    append(']')
-}
-
-private fun jsonArg(json: String, key: String): String? {
-    val keyAt = json.indexOf("\"$key\"")
-    if (keyAt < 0) return null
-    val colon = json.indexOf(':', keyAt)
-    if (colon < 0) return null
-    val quote = json.indexOf('"', colon + 1)
-    if (quote < 0) return null
-    val out = StringBuilder()
-    var i = quote + 1
-    while (i < json.length) {
-        val c = json[i++]
-        when (c) {
-            '"' -> return out.toString()
-            '\\' -> {
-                if (i >= json.length) return null
-                when (val esc = json[i++]) {
-                    '"', '\\', '/' -> out.append(esc)
-                    'b' -> out.append('\b')
-                    'f' -> out.append('\u000C')
-                    'n' -> out.append('\n')
-                    'r' -> out.append('\r')
-                    't' -> out.append('\t')
-                    'u' -> {
-                        if (i + 4 > json.length) return null
-                        out.append(json.substring(i, i + 4).toIntOrNull(16)?.toChar() ?: return null)
-                        i += 4
-                    }
-                }
-            }
-            else -> out.append(c)
-        }
-    }
-    return null
-}
-
-private fun jsonString(value: String): String = "\"" + jsonEscape(value) + "\""
-
-private fun jsonEscape(value: String): String = buildString {
-    value.forEach { c ->
-        when (c) {
-            '\\' -> append("\\\\")
-            '"' -> append("\\\"")
-            '\b' -> append("\\b")
-            '\u000C' -> append("\\f")
-            '\n' -> append("\\n")
-            '\r' -> append("\\r")
-            '\t' -> append("\\t")
-            else -> if (c < ' ') append("\\u").append(c.code.toString(16).padStart(4, '0')) else append(c)
-        }
-    }
+private fun MutableList<UiAgentInputItem>.addToolOutput(call: UiAgentToolCall, output: String) {
+    add(
+        UiAgentInputItem(
+            type = "function_call",
+            callId = call.callId,
+            name = call.name,
+            argumentsJson = call.argumentsJson,
+        )
+    )
+    add(
+        UiAgentInputItem(
+            type = "function_call_output",
+            callId = call.callId,
+            output = output,
+        )
+    )
 }
 
 private fun collectFilePaths(root: TreeNode): List<String> {

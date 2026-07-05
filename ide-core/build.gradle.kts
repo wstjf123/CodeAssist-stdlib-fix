@@ -39,6 +39,7 @@ dependencies {
     implementation(project(":vfs-api"))
 
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.gson)
 
     testImplementation(libs.kotlinx.coroutines.test)
     // Opt-in regression suites (`regressionTest`): shared benchmark/baseline harness.
