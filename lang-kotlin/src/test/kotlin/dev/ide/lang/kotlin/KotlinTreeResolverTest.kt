@@ -302,6 +302,18 @@ class KotlinTreeResolverTest {
     }
 
     @Test
+    fun defaultedFloatOverloadWinsOverExactArityLongMismatch() {
+        // Mirrors Compose `Animatable(0f)`: a one-arg value-class overload takes a Long-underlying value, while
+        // the intended Float overload has a second defaulted parameter. Arity filtering must not discard the
+        // defaulted Float overload before type matching sees that `0f` is not a Long.
+        val fn = lower("package demo\nfun f() { Animatable(0f) }")
+        val call = assertIs<RNode.Call>(fn.stmts()[0], "Animatable(0f) should resolve")
+        val callee = assertIs<ResolvedCallable.Source>(call.callee)
+        assertEquals(listOf("initialValue", "visibilityThreshold"), callee.paramNames)
+        assertTrue(fn.isComplete, "defaulted Float overload should win; diags=${fn.diagnostics}")
+    }
+
+    @Test
     fun delegatedPropertyReadsThroughItsValue() {
         // `val s by lazy { … }` — a `.value`-convention delegate (`kotlin.Lazy`). The slot holds the delegate
         // (the `lazy { }` call); a use of `s` lowers to `delegate.value` so the interpreter reads the real getter.
@@ -783,6 +795,9 @@ class KotlinTreeResolverTest {
                     fun Label(text: Styled) {}
                     fun Note(text: String, a: Int = 0) {}
                     fun Note(text: String, b: Int = 0, c: Int = 0) {}
+                    class Anim
+                    fun Animatable(initialValue: Long): Anim = Anim()
+                    fun Animatable(initialValue: Float, visibilityThreshold: Float = 0f): Anim = Anim()
                     fun panel(width: Int = 0, color: String = "", count: Int = 0) {}
                     fun panel(width: Int = 0, label: Int = 0) {}
                     fun card(color: String = "", count: Int = 0) {}

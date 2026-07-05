@@ -1421,7 +1421,10 @@ class KotlinTreeResolver(
                 .ifEmpty { candidates.filter { it.paramTypes.size >= argCount } }
                 .ifEmpty { candidates }
         } else {
-            candidates.filter { it.paramTypes.size == argCount || it.paramNames.size == argCount || acceptsVararg(it) }
+            candidates.filter {
+                it.paramTypes.size == argCount || it.paramNames.size == argCount || acceptsVararg(it) ||
+                    (bindIndices(it, valueArgs)?.let { supplied -> missingParamsAreDefaulted(it, supplied.toSet()) } == true)
+            }
                 .ifEmpty { candidates.filter { it.paramTypes.isEmpty() && argCount == 0 } }
                 .ifEmpty { candidates }
         }

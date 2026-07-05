@@ -59,6 +59,26 @@ class ReflectiveDispatcherTest {
     }
 
     @Test
+    fun resolvedDefaultedStaticOverloadSkipsShorterRuntimeArityMismatch() {
+        // Mirrors Compose `Animatable(0f)`: the resolved callee has two value params (second defaulted), but the
+        // runtime call supplies one arg. A same-named one-arg Long overload exists; dispatch must go through the
+        // Float overload's `$default` synthetic instead of invoking the Long method with a Float.
+        val callee = ResolvedCallable.Library(
+            displayName = "defaultFloatProbe",
+            ownerFqn = "dev.ide.interp.ReflectiveDispatcherTestKt",
+            methodName = "defaultFloatProbe",
+            paramTypes = listOf(KotlinType("kotlin.Float"), KotlinType("kotlin.Float")),
+            isStatic = true,
+            isConstructor = false,
+            isInline = false,
+            descriptorPrecise = true,
+            paramNames = listOf("initialValue", "visibilityThreshold"),
+        )
+        val c = call(DispatchKind.TOP_LEVEL, callee)
+        assertEquals("float:0.0/2.0", dispatcher.dispatch(c, receiver = null, args = listOf(0f)))
+    }
+
+    @Test
     fun memberCallOnANonPublicJdkClassResolvesToThePublicInterfaceMethod() {
         // `listOf("a","b")[1]` → `get(1)`. Kotlin's `listOf` returns a `java.util.Arrays$ArrayList` — a
         // NON-public, non-exported JDK class. Invoking its own `get` fails under the module system
@@ -326,3 +346,9 @@ class ReflectiveDispatcherTest {
     interface ScopeIface { fun Mod.weighted(w: Int, fill: Boolean = true): String }
     class ScopeImpl : ScopeIface { override fun Mod.weighted(w: Int, fill: Boolean): String = "w=$w fill=$fill" }
 }
+
+@Suppress("UNUSED_PARAMETER")
+fun defaultFloatProbe(initialValue: Long): String = "long:$initialValue"
+
+fun defaultFloatProbe(initialValue: Float, visibilityThreshold: Float = 2f): String =
+    "float:$initialValue/$visibilityThreshold"

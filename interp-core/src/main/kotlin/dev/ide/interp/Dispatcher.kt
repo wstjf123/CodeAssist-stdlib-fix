@@ -206,24 +206,25 @@ class ReflectiveDispatcher(
             // it normally never reaches here; if it does, the only sound thing is a plain instance invocation.
             DispatchKind.MEMBER, DispatchKind.OPERATOR, DispatchKind.INVOKE, DispatchKind.SUPER -> {
                 val target = receiver ?: throw InterpreterException("instance call `${callee.displayName}` has no receiver")
-                invokeInstance(target, callee.displayName, args, composableParamFlags(callee, args))
+                invokeInstance(target, callee.displayName, args, composableParamFlags(callee, args), declaredValueParamCount(callee))
             }
             // A member extension (`RowScope.weight`): `receiver` is the scope instance, the extension receiver is
             // the head of `args`. It's an instance method on the scope whose first param is the extension receiver
             // — and BOTH precede its value params, which matters for the defaulted-arg synthetic.
             DispatchKind.MEMBER_EXTENSION -> {
                 val target = receiver ?: throw InterpreterException("member extension `${callee.displayName}` has no scope receiver")
-                invokeMemberExtension(target, callee.displayName, args, composableParamFlags(callee, args))
+                invokeMemberExtension(target, callee.displayName, args, composableParamFlags(callee, args), declaredValueParamCount(callee) + 1)
             }
             DispatchKind.EXTENSION -> {
                 val owner = libraryOwner(callee) ?: throw InterpreterException("extension `${callee.displayName}` has no owner")
                 // Extensions compile to static facade methods with the receiver as the first parameter.
                 val all = listOfNotNull(receiver) + args
-                invokeStatic(owner, callee.displayName, all, composableParamFlags(callee, all, leadingReceiver = receiver != null), receiverCount = if (receiver != null) 1 else 0)
+                val receiverCount = if (receiver != null) 1 else 0
+                invokeStatic(owner, callee.displayName, all, composableParamFlags(callee, all, leadingReceiver = receiver != null), receiverCount, declaredValueParamCount(callee) + receiverCount)
             }
             DispatchKind.TOP_LEVEL -> {
                 val owner = libraryOwner(callee) ?: throw InterpreterException("top-level `${callee.displayName}` has no owner")
-                invokeStatic(owner, callee.displayName, args, composableParamFlags(callee, args), receiverCount = 0)
+                invokeStatic(owner, callee.displayName, args, composableParamFlags(callee, args), receiverCount = 0, declaredRealParamCount = declaredValueParamCount(callee))
             }
             DispatchKind.CONSTRUCTOR -> {
                 val owner = libraryOwner(callee) ?: throw InterpreterException("constructor `${callee.displayName}` has no type")
@@ -237,6 +238,9 @@ class ReflectiveDispatcher(
 
     private fun libraryOwner(callee: ResolvedCallable): String? =
         (callee as? ResolvedCallable.Library)?.ownerFqn?.let { jvmName(it) }
+
+    private fun declaredValueParamCount(callee: ResolvedCallable): Int =
+        (callee as? ResolvedCallable.Library)?.let { maxOf(it.paramNames.size, it.paramTypes.size) } ?: 0
 
     // Reflective method resolution (a `cls.methods` scan + overload pick, and for the `$default` path a
     // transitive-interface walk with `Class.forName($DefaultImpls)`) is deterministic given the class, the
@@ -264,9 +268,9 @@ class ReflectiveDispatcher(
         }
     }
 
-    private fun invokeInstance(target: Any, name: String, args: List<Any?>, composable: List<Boolean>): Any? {
+    private fun invokeInstance(target: Any, name: String, args: List<Any?>, composable: List<Boolean>, declaredValueParamCount: Int): Any? {
         // An omitted (defaulted) parameter has no exact-arity match — go straight to the `$default` synthetic.
-        if (args.none { it === OmittedArg }) {
+        if (args.none { it === OmittedArg } && args.size >= declaredValueParamCount) {
             findMethod(target.javaClass, name, args, static = false)?.let { m ->
                 runCatching { m.isAccessible = true }
                 return m.invoke(target, *bindArgs(m.parameterTypes, args, composable))
@@ -287,8 +291,8 @@ class ReflectiveDispatcher(
      *  synthetic is needed — and it has TWO non-value leading params (the scope `$this` AND the extension
      *  receiver), so `receiverCount = 2`; the synthetic may live on the scope's interface (see
      *  [invokeViaDefaultSynthetic]'s interface search), not the runtime impl class. */
-    private fun invokeMemberExtension(scope: Any, name: String, args: List<Any?>, composable: List<Boolean>): Any? {
-        if (args.none { it === OmittedArg }) {
+    private fun invokeMemberExtension(scope: Any, name: String, args: List<Any?>, composable: List<Boolean>, declaredRealParamCount: Int): Any? {
+        if (args.none { it === OmittedArg } && args.size >= declaredRealParamCount) {
             findMethod(scope.javaClass, name, args, static = false)?.let { m ->
                 runCatching { m.isAccessible = true }
                 return m.invoke(scope, *bindArgs(m.parameterTypes, args, composable))
@@ -300,9 +304,9 @@ class ReflectiveDispatcher(
         throw InterpreterException("no member extension `$name`(${args.size}) on ${scope.javaClass.name}")
     }
 
-    private fun invokeStatic(ownerFqn: String, name: String, args: List<Any?>, composable: List<Boolean>, receiverCount: Int): Any? {
+    private fun invokeStatic(ownerFqn: String, name: String, args: List<Any?>, composable: List<Boolean>, receiverCount: Int, declaredRealParamCount: Int): Any? {
         val cls = loadClass(ownerFqn)
-        if (args.none { it === OmittedArg }) {
+        if (args.none { it === OmittedArg } && args.size >= declaredRealParamCount) {
             findMethod(cls, name, args, static = true)?.let { m ->
                 runCatching { m.isAccessible = true }
                 return m.invoke(null, *bindArgs(m.parameterTypes, args, composable))
