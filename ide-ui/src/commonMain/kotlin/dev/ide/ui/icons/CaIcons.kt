@@ -123,6 +123,7 @@ object CaIcons {
     val undo = build("undo", s("M4 12h8.5a5.5 5.5 0 0 1 5.5 5.5"), s("M8 8l-4 4 4 4"))
     val redo = build("redo", s("M20 12h-8.5a5.5 5.5 0 0 0-5.5 5.5"), s("M16 8l4 4-4 4"))
     val arrowRight = build("arrow-right", s("M5 12h13M13 6l6 6-6 6"))
+    val arrowUp = build("arrow-up", s("M12 19V6M6 12l6-6 6 6"))
     /** Arrow into a tray — import files from outside the app. */
     val download = build("download", s("M12 4v10M8 10.5l4 4 4-4"), s("M5 18.5h14"))
     /** Arrow up out of a tray — share/export a file to another app. */

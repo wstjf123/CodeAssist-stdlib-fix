@@ -15,6 +15,7 @@ import dev.ide.ui.editor.core.EditorSession
 import dev.ide.ui.editor.languageFor
 import dev.ide.ui.platform.isMobilePlatform
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 
 /**
@@ -125,6 +126,7 @@ class IdeUiState(val backend: IdeBackend, val composePreviewHost: ComposePreview
         private set
     var agentPrompt by mutableStateOf("")
     var agentSending by mutableStateOf(false)
+    var agentJob by mutableStateOf<Job?>(null)
     val agentScope: CoroutineScope = MainScope()
     val agentMessages = mutableStateListOf<AgentMessage>()
     var paletteOpen by mutableStateOf(false)

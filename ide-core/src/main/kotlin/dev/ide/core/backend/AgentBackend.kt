@@ -10,7 +10,10 @@ import dev.ide.ui.backend.UiAgentInputItem
 import dev.ide.ui.backend.UiAgentRequest
 import dev.ide.ui.backend.UiAgentResponse
 import dev.ide.ui.backend.UiAgentToolCall
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -31,31 +34,38 @@ internal class AgentBackend : AgentService {
             setRequestProperty("Content-Type", "application/json")
             setRequestProperty("Accept", "text/event-stream")
         }
-        conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-        val code = conn.responseCode
-        if (code !in 200..299) {
-            val raw = conn.errorStream?.use { input ->
+        val cancellation = currentCoroutineContext()[Job]?.invokeOnCompletion { cause ->
+            if (cause is CancellationException) conn.disconnect()
+        }
+        try {
+            conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            val code = conn.responseCode
+            if (code !in 200..299) {
+                val raw = conn.errorStream?.use { input ->
+                    BufferedReader(InputStreamReader(input, Charsets.UTF_8)).use { it.readText() }
+                }.orEmpty()
+                return@withContext UiAgentResponse("请求失败 HTTP $code\n${raw.take(4000)}", raw = raw)
+            }
+            val contentType = conn.contentType.orEmpty()
+            if ("text/event-stream" in contentType) {
+                return@withContext readSse(conn, onTextDelta)
+            }
+            val raw = conn.inputStream.use { input ->
                 BufferedReader(InputStreamReader(input, Charsets.UTF_8)).use { it.readText() }
-            }.orEmpty()
-            return@withContext UiAgentResponse("请求失败 HTTP $code\n${raw.take(4000)}", raw = raw)
+            }
+            if (raw.lineSequence().any { it.trimStart().startsWith("data:") }) {
+                return@withContext parseSse(raw, onTextDelta)
+            }
+            val root = parseObject(raw)
+            UiAgentResponse(
+                text = extractResponseText(root),
+                responseId = root?.string("id")?.takeIf { it.startsWith("resp_") },
+                toolCalls = extractToolCalls(root),
+                raw = raw,
+            )
+        } finally {
+            cancellation?.dispose()
         }
-        val contentType = conn.contentType.orEmpty()
-        if ("text/event-stream" in contentType) {
-            return@withContext readSse(conn, onTextDelta)
-        }
-        val raw = conn.inputStream.use { input ->
-            BufferedReader(InputStreamReader(input, Charsets.UTF_8)).use { it.readText() }
-        }
-        if (raw.lineSequence().any { it.trimStart().startsWith("data:") }) {
-            return@withContext parseSse(raw, onTextDelta)
-        }
-        val root = parseObject(raw)
-        UiAgentResponse(
-            text = extractResponseText(root),
-            responseId = root?.string("id")?.takeIf { it.startsWith("resp_") },
-            toolCalls = extractToolCalls(root),
-            raw = raw,
-        )
     }
 
     private fun buildRequestBody(request: UiAgentRequest): String {

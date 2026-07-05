@@ -152,20 +152,27 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
                 messages += AgentMessage("user", request)
                 state.agentPrompt = ""
                 state.agentSending = true
-                state.agentScope.launch {
+                state.agentJob = state.agentScope.launch {
                     try {
                         val text = runAgentLoop(state, request, messages) { delta ->
                             state.agentScope.launch { appendAgentDelta(messages, delta) }
                         }
                         if (text.isNotBlank()) messages += AgentMessage("agent", text)
                     } catch (e: CancellationException) {
-                        throw e
+                        messages += AgentMessage("agent", "已停止。")
                     } catch (e: Throwable) {
-                        messages += AgentMessage("agent", "请求失败：${e.message ?: "unknown error"}")
+                        messages += AgentMessage(
+                            "agent",
+                            if (state.agentJob?.isCancelled == true) "已停止。" else "请求失败：${e.message ?: "unknown error"}",
+                        )
                     } finally {
                         state.agentSending = false
+                        state.agentJob = null
                     }
                 }
+            },
+            onStop = {
+                state.agentJob?.cancel()
             },
             sending = state.agentSending,
         )
@@ -267,27 +274,58 @@ private fun Composer(
     value: String,
     onValueChange: (String) -> Unit,
     onSend: () -> Unit,
+    onStop: () -> Unit,
     sending: Boolean,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Box(
-            Modifier.fillMaxWidth().heightIn(min = 42.dp, max = 120.dp)
-                .background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.control))
-                .border(1.dp, Ca.colors.hairline, RoundedCornerShape(Ca.radius.control))
-                .padding(horizontal = 12.dp, vertical = 9.dp),
-        ) {
-            if (value.isEmpty()) Text("询问或要求修改当前文件…", color = Ca.colors.textTertiary, style = Ca.type.footnote)
-            BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
-                textStyle = Ca.type.footnote.copy(color = Ca.colors.textPrimary),
-                cursorBrush = SolidColor(Ca.colors.accent),
-                modifier = Modifier.fillMaxWidth(),
+    Box(
+        Modifier.fillMaxWidth().heightIn(min = 54.dp, max = 132.dp)
+            .background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.control))
+            .border(1.dp, Ca.colors.hairline, RoundedCornerShape(Ca.radius.control)),
+    ) {
+        if (value.isEmpty()) {
+            Text(
+                "询问或要求修改当前文件…",
+                color = Ca.colors.textTertiary,
+                style = Ca.type.footnote,
+                modifier = Modifier.padding(start = 12.dp, top = 9.dp, end = 52.dp, bottom = 38.dp),
             )
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Spacer(Modifier.weight(1f))
-            DialogButton(if (sending) "发送中" else "发送", primary = true, enabled = value.isNotBlank() && !sending, onClick = onSend)
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            textStyle = Ca.type.footnote.copy(color = Ca.colors.textPrimary),
+            cursorBrush = SolidColor(Ca.colors.accent),
+            modifier = Modifier.fillMaxWidth().padding(start = 12.dp, top = 9.dp, end = 52.dp, bottom = 38.dp),
+        )
+        val canSend = value.isNotBlank()
+        Box(
+            Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 10.dp, bottom = 10.dp)
+                .size(32.dp)
+                .background(
+                    when {
+                        sending -> Ca.colors.error.copy(alpha = 0.16f)
+                        canSend -> Ca.colors.accent
+                        else -> Ca.colors.surface3
+                    },
+                    RoundedCornerShape(Ca.radius.pill),
+                )
+                .clickable(enabled = sending || canSend) {
+                    if (sending) onStop() else onSend()
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                if (sending) CaIcons.stop else CaIcons.arrowUp,
+                if (sending) "Stop" else "Send",
+                Modifier.size(15.dp),
+                tint = when {
+                    sending -> Ca.colors.error
+                    canSend -> Ca.colors.textOnAccent
+                    else -> Ca.colors.textTertiary
+                },
+            )
         }
     }
 }
