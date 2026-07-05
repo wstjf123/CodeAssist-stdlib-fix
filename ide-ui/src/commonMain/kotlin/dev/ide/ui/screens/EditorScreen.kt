@@ -99,7 +99,7 @@ fun EditorScreen(
     // sheet) before the app-level handler pops the screen (#997). Desktop has no system back, so this is inert
     // there; the mobile-only panes are gated on [isMobilePlatform] since on wide layouts they're docked panes.
     PlatformBackHandler(
-        enabled = newEntry != null || newXmlTarget != null || newSource != null || fileOp != null || state.addSourceRootModule != null || state.indexDetailOpen || state.paletteOpen || state.sheetDest != null || state.searchOpen || (isMobilePlatform && (state.navOpen || state.consoleOpen)),
+        enabled = newEntry != null || newXmlTarget != null || newSource != null || fileOp != null || state.addSourceRootModule != null || state.indexDetailOpen || state.paletteOpen || state.agentConfigOpen || state.sheetDest != null || state.searchOpen || (isMobilePlatform && (state.navOpen || state.consoleOpen || state.agentOpen)),
     ) {
         when {
             fileOp != null -> fileOp = null
@@ -109,8 +109,10 @@ fun EditorScreen(
             newXmlTarget != null -> newXmlTarget = null
             state.indexDetailOpen -> state.indexDetailOpen = false
             state.paletteOpen -> state.paletteOpen = false
+            state.agentConfigOpen -> state.agentConfigOpen = false
             state.sheetDest != null -> state.sheetDest = null
             state.searchOpen -> state.searchOpen = false
+            isMobilePlatform && state.agentOpen -> state.agentOpen = false
             isMobilePlatform && state.consoleOpen -> state.consoleOpen = false
             isMobilePlatform && state.navOpen -> state.navOpen = false
         }

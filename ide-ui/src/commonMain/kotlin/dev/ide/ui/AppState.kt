@@ -38,6 +38,15 @@ enum class RailDestination { Files, Search, Source, More }
  *  the one layout that works on a phone where the panes can't otherwise share the screen). */
 enum class EditorViewMode { Text, Blocks, Preview, Split }
 
+data class AgentConfig(
+    val baseUrl: String = "",
+    val apiKey: String = "",
+    val model: String = "",
+    val reasoningEffort: String = "high",
+) {
+    val configured: Boolean get() = baseUrl.isNotBlank() && apiKey.isNotBlank() && model.isNotBlank()
+}
+
 /**
  * One open editor tab. Its buffer-of-record is the [EditorSession] (the rope-backed model both the text
  * and block editors edit in place) — there is **no** mirrored `TextFieldValue`, so a keystroke never
@@ -104,6 +113,10 @@ class IdeUiState(val backend: IdeBackend, val composePreviewHost: ComposePreview
     var navOpen by mutableStateOf(!isMobilePlatform)
     var searchOpen by mutableStateOf(false)
     var consoleOpen by mutableStateOf(!isMobilePlatform)
+    var agentOpen by mutableStateOf(false)
+    var agentConfigOpen by mutableStateOf(false)
+    var agentConfig by mutableStateOf(loadAgentConfig())
+        private set
     var paletteOpen by mutableStateOf(false)
     /** The in-file structure / outline bottom sheet (opened from the breadcrumb tap or Ctrl-F12). */
     var structureOpen by mutableStateOf(false)
@@ -141,6 +154,30 @@ class IdeUiState(val backend: IdeBackend, val composePreviewHost: ComposePreview
 
     init {
         applySettings(backend.settings.settings())
+    }
+
+    private fun loadAgentConfig(): AgentConfig = AgentConfig(
+        baseUrl = backend.settings.preference("agent.baseUrl").orEmpty(),
+        apiKey = backend.settings.preference("agent.apiKey").orEmpty(),
+        model = backend.settings.preference("agent.model").orEmpty(),
+        reasoningEffort = backend.settings.preference("agent.reasoningEffort") ?: "high",
+    )
+
+    fun saveAgentConfig(config: AgentConfig) {
+        agentConfig = config
+        backend.settings.setPreference("agent.baseUrl", config.baseUrl.trim())
+        backend.settings.setPreference("agent.apiKey", config.apiKey)
+        backend.settings.setPreference("agent.model", config.model.trim())
+        backend.settings.setPreference("agent.reasoningEffort", config.reasoningEffort)
+    }
+
+    fun toggleAgent() {
+        if (!agentConfig.configured) {
+            agentConfigOpen = true
+            return
+        }
+        agentOpen = !agentOpen
+        if (agentOpen) consoleOpen = false
     }
 
     /** Push persisted IDE settings into the live editor-pref fields (called on creation + on each settings change). */

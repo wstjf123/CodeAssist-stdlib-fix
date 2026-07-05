@@ -584,6 +584,36 @@ interface ActionService {
 }
 
 // ---------------------------------------------------------------------------
+// AI Agent
+// ---------------------------------------------------------------------------
+
+data class UiAgentConfig(
+    val baseUrl: String,
+    val apiKey: String,
+    val model: String,
+    val reasoningEffort: String,
+)
+
+data class UiAgentRequest(
+    val config: UiAgentConfig,
+    val prompt: String,
+    val context: String,
+    val stream: Boolean = true,
+)
+
+data class UiAgentResponse(
+    val text: String,
+    val raw: String = "",
+)
+
+interface AgentService {
+    suspend fun respond(request: UiAgentRequest): UiAgentResponse =
+        UiAgentResponse("AI Agent transport is not available in this backend.")
+
+    object Unsupported : AgentService
+}
+
+// ---------------------------------------------------------------------------
 // Diagnostics: critical errors, logs, analytics
 // ---------------------------------------------------------------------------
 

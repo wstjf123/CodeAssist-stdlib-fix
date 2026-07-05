@@ -1,6 +1,7 @@
 package dev.ide.ui
 
 import dev.ide.ui.backend.ActionService
+import dev.ide.ui.backend.AgentService
 import dev.ide.ui.backend.BlockService
 import dev.ide.ui.backend.BuildService
 import dev.ide.ui.backend.BuildState
@@ -34,7 +35,7 @@ import kotlinx.coroutines.flow.StateFlow
 internal open class StubBackend : IdeBackend,
     FileService, EditorService, BlockService, PreviewService, SearchService, BuildService,
     DependencyService, ModuleService, SigningService, ProjectService, SdkService, SettingsService, ActionService,
-    DiagnosticsService {
+    AgentService, DiagnosticsService {
 
     override val files: FileService get() = this
     override val editor: EditorService get() = this
@@ -49,6 +50,7 @@ internal open class StubBackend : IdeBackend,
     override val sdk: SdkService get() = this
     override val settings: SettingsService get() = this
     override val actions: ActionService get() = this
+    override val agent: AgentService get() = this
     override val diagnostics: DiagnosticsService get() = this
 
     override val project: ProjectInfo = ProjectInfo("stub", "/stub", 0)

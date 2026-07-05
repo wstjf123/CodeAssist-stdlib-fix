@@ -110,8 +110,13 @@ internal fun EditorCenter(
                 onRedo = { active?.session?.redo() },
                 onFind = { if (active != null) findEpoch++ },
                 onReformat = { if (active != null) formatEpoch++ },
-                onToggleConsole = { state.consoleOpen = !state.consoleOpen },
+                onToggleConsole = {
+                    state.consoleOpen = !state.consoleOpen
+                    if (state.consoleOpen) state.agentOpen = false
+                },
                 consoleOpen = state.consoleOpen,
+                onToggleAgent = { state.toggleAgent() },
+                agentOpen = state.agentOpen,
                 inlayHintsOn = state.inlayHintsEnabled,
                 onToggleInlayHints = { state.inlayHintsEnabled = !state.inlayHintsEnabled },
                 showPreview = hasPreview,
@@ -149,8 +154,8 @@ internal fun EditorCenter(
                 // destination sheet (either layout), or — on a phone — the file-tree / build-console bottom sheets
                 // (on desktop those are docked side panes that leave the editor interactive). A covered editor
                 // dismisses its floating popups so they don't hang over the overlay.
-                val editorObscured = state.paletteOpen || state.sheetDest != null ||
-                        (compact && (state.navOpen || state.consoleOpen))
+                val editorObscured = state.paletteOpen || state.sheetDest != null || state.agentConfigOpen ||
+                        (compact && (state.navOpen || state.consoleOpen || state.agentOpen))
                 val codeSurface: @Composable (Modifier) -> Unit = { mod ->
                     CodeEditor(
                         path = active.path,

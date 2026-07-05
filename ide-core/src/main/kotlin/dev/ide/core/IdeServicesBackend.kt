@@ -2,6 +2,7 @@ package dev.ide.core
 
 import dev.ide.ui.backend.IdeBackend
 import dev.ide.ui.backend.ActionService
+import dev.ide.ui.backend.AgentService
 import dev.ide.ui.backend.BlockService
 import dev.ide.ui.backend.BuildService
 import dev.ide.ui.backend.DependencyService
@@ -20,6 +21,7 @@ import dev.ide.ui.backend.ProjectInfo
 import dev.ide.ui.backend.UiError
 import dev.ide.analytics.AnalyticsService
 import dev.ide.core.backend.ActionBackend
+import dev.ide.core.backend.AgentBackend
 import dev.ide.core.backend.BlockBackend
 import dev.ide.core.backend.BuildBackend
 import dev.ide.core.backend.DependencyBackend
@@ -244,6 +246,7 @@ class IdeServicesBackend(
     override val sdk: SdkService = SdkBackend(this)
     override val settings: SettingsService = SettingsBackend(this)
     override val actions: ActionService = ActionBackend(this)
+    override val agent: AgentService = AgentBackend()
     override val diagnostics: DiagnosticsService = DiagnosticsBackend(this)
 
     init {

@@ -135,6 +135,12 @@ internal fun ExpandedLayout(
                 VerticalDivider()
             }
             EditorCenter(state, indexStatus, compact = false, Modifier.weight(1f).fillMaxHeight())
+            if (state.agentOpen) {
+                VerticalDivider()
+                GlassSurface(Modifier.width(380.dp).fillMaxHeight(), GlassMaterial.Regular) {
+                    AgentDock(state)
+                }
+            }
             if (state.consoleOpen) {
                 VerticalDivider()
                 GlassSurface(Modifier.width(380.dp).fillMaxHeight(), GlassMaterial.Regular) {
@@ -153,6 +159,7 @@ internal fun ExpandedLayout(
             }
         }
         DestinationSheets(state, compact = false, onOpenModuleConfig, onToggleTheme, onOpenHub, onCloseProject, fileActions)
+        AgentSheets(state, compact = false)
         PaletteOverlay(state, onToggleTheme, onOpenHub, onOpenDependencies)
     }
 }
@@ -278,6 +285,7 @@ internal fun CompactLayout(
             )
         }
         DestinationSheets(state, compact = true, onOpenModuleConfig, onToggleTheme, onOpenHub, onCloseProject, fileActions)
+        AgentSheets(state, compact = true)
         PaletteOverlay(state, onToggleTheme, onOpenHub, onOpenDependencies)
     }
 }

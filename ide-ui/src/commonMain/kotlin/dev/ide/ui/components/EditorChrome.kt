@@ -13,7 +13,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -25,7 +24,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -97,6 +95,8 @@ fun EditorTopBar(
     onReformat: () -> Unit = {},
     onToggleConsole: () -> Unit = {},
     consoleOpen: Boolean = false,
+    onToggleAgent: () -> Unit = {},
+    agentOpen: Boolean = false,
     inlayHintsOn: Boolean = true,
     onToggleInlayHints: () -> Unit = {},
     showPreview: Boolean = false,
@@ -144,6 +144,8 @@ fun EditorTopBar(
                     onToggleInlayHints = onToggleInlayHints,
                     consoleOpen = consoleOpen,
                     onToggleConsole = onToggleConsole,
+                    agentOpen = agentOpen,
+                    onToggleAgent = onToggleAgent,
                     showPreview = showPreview,
                     onPreview = onPreview,
                 )
@@ -158,6 +160,7 @@ fun EditorTopBar(
                 IconButtonCa(CaIcons.command, "Command palette", onOpenPalette)
                 IconButtonCa(CaIcons.eye, "Toggle inlay hints", onToggleInlayHints, active = inlayHintsOn)
                 IconButtonCa(CaIcons.terminal, "Build console", onToggleConsole, active = consoleOpen)
+                IconButtonCa(CaIcons.sparkle, "AI Agent", onToggleAgent, active = agentOpen)
                 // Shown when the open file has @Preview composables — renders/checks them via the interpreter.
                 if (showPreview) IconButtonCa(CaIcons.image, "Compose preview", onPreview, active = previewBusy)
                 PluginToolbarActions(pluginActions, dim, onPluginAction)
@@ -201,6 +204,8 @@ private fun EditorOverflowMenu(
     onToggleInlayHints: () -> Unit,
     consoleOpen: Boolean,
     onToggleConsole: () -> Unit,
+    agentOpen: Boolean,
+    onToggleAgent: () -> Unit,
     showPreview: Boolean,
     onPreview: () -> Unit,
 ) {
@@ -219,6 +224,7 @@ private fun EditorOverflowMenu(
                 CaIcons.eye, if (inlayHintsOn) "Hide inlay hints" else "Show inlay hints", active = inlayHintsOn,
             ) { open = false; onToggleInlayHints() }
             OverflowItem(CaIcons.terminal, "Build console", active = consoleOpen) { open = false; onToggleConsole() }
+            OverflowItem(CaIcons.sparkle, "AI Agent", active = agentOpen) { open = false; onToggleAgent() }
             if (showPreview) OverflowItem(CaIcons.image, "Compose preview") { open = false; onPreview() }
         }
     }

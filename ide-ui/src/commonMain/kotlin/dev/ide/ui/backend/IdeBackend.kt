@@ -61,6 +61,9 @@ interface IdeBackend {
     /** The IntelliJ-style UI action surface (toolbar / menus / command palette). */
     val actions: ActionService
 
+    /** AI Agent transport. Optional backends may inherit the unsupported default. */
+    val agent: AgentService get() = AgentService.Unsupported
+
     /** The critical-error dialog, the logs viewer, and opt-in analytics. */
     val diagnostics: DiagnosticsService
 }
