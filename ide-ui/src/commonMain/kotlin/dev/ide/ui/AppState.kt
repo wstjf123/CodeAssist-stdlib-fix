@@ -47,6 +47,10 @@ data class AgentConfig(
     val configured: Boolean get() = baseUrl.isNotBlank() && apiKey.isNotBlank() && model.isNotBlank()
 }
 
+class AgentMessage(val role: String, text: String) {
+    var text by mutableStateOf(text)
+}
+
 /**
  * One open editor tab. Its buffer-of-record is the [EditorSession] (the rope-backed model both the text
  * and block editors edit in place) — there is **no** mirrored `TextFieldValue`, so a keystroke never
@@ -117,6 +121,10 @@ class IdeUiState(val backend: IdeBackend, val composePreviewHost: ComposePreview
     var agentConfigOpen by mutableStateOf(false)
     var agentConfig by mutableStateOf(loadAgentConfig())
         private set
+    var agentPrompt by mutableStateOf("")
+    var agentSending by mutableStateOf(false)
+    var agentPreviousResponseId: String? = null
+    val agentMessages = mutableStateListOf<AgentMessage>()
     var paletteOpen by mutableStateOf(false)
     /** The in-file structure / outline bottom sheet (opened from the breadcrumb tap or Ctrl-F12). */
     var structureOpen by mutableStateOf(false)

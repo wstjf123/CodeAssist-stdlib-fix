@@ -25,7 +25,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -38,6 +37,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ide.ui.AgentConfig
+import dev.ide.ui.AgentMessage
 import dev.ide.ui.IdeUiState
 import dev.ide.ui.backend.TreeNode
 import dev.ide.ui.backend.UiAgentConfig
@@ -54,10 +54,6 @@ import dev.ide.ui.components.IconButtonCa
 import dev.ide.ui.icons.CaIcons
 import dev.ide.ui.theme.Ca
 import kotlinx.coroutines.launch
-
-private class AgentMessage(val role: String, text: String) {
-    var text by mutableStateOf(text)
-}
 
 @Composable
 internal fun AgentDock(state: IdeUiState, modifier: Modifier = Modifier) {
@@ -88,10 +84,8 @@ internal fun AgentSheets(state: IdeUiState, compact: Boolean) {
 @Composable
 private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
     val active = state.active
-    var prompt by remember { mutableStateOf("") }
-    var sending by remember { mutableStateOf(false) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    val messages = remember { mutableStateListOf<AgentMessage>() }
+    val messages = state.agentMessages
 
     Column(modifier.fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -138,30 +132,34 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
         }
 
         Composer(
-            value = prompt,
-            onValueChange = { prompt = it },
+            value = state.agentPrompt,
+            onValueChange = { state.agentPrompt = it },
             onSend = {
-                val request = prompt.trim()
+                if (state.agentSending) return@Composer
+                val request = state.agentPrompt.trim()
                 if (request.isEmpty()) return@Composer
                 if (!state.agentConfig.configured) {
                     state.agentConfigOpen = true
                     return@Composer
                 }
                 messages += AgentMessage("user", request)
-                prompt = ""
-                sending = true
+                state.agentPrompt = ""
+                state.agentSending = true
                 scope.launch {
-                    val result = runCatching {
-                        runAgentLoop(state, request, messages) { delta ->
-                            scope.launch { appendAgentDelta(messages, delta) }
+                    try {
+                        val result = runCatching {
+                            runAgentLoop(state, request, messages) { delta ->
+                                scope.launch { appendAgentDelta(messages, delta) }
+                            }
                         }
+                        val text = result.fold(
+                            onSuccess = { it },
+                            onFailure = { e -> "请求失败：${e.message ?: "unknown error"}" },
+                        )
+                        if (text.isNotBlank()) messages += AgentMessage("agent", text)
+                    } finally {
+                        state.agentSending = false
                     }
-                    val text = result.fold(
-                        onSuccess = { it },
-                        onFailure = { e -> "请求失败：${e.message ?: "unknown error"}" },
-                    )
-                    if (text.isNotBlank()) messages += AgentMessage("agent", text)
-                    sending = false
                 }
             },
             onInsert = {
@@ -172,7 +170,7 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
                 }
             },
             canInsert = active != null && messages.any { it.role == "agent" },
-            sending = sending,
+            sending = state.agentSending,
         )
     }
 }
@@ -363,8 +361,9 @@ private suspend fun runAgentLoop(
             append("\n\nUser request:\n").append(request)
         }
     )
-    var previousResponseId: String? = null
+    var previousResponseId: String? = state.agentPreviousResponseId
     repeat(8) {
+        var receivedTextDelta = false
         val response = state.backend.agent.respond(
             UiAgentRequest(
                 config = config,
@@ -374,11 +373,13 @@ private suspend fun runAgentLoop(
             )
         ) { delta ->
             if (delta.isEmpty()) return@respond
+            receivedTextDelta = true
             onTextDelta(delta)
         }
         previousResponseId = response.responseId ?: previousResponseId
+        state.agentPreviousResponseId = previousResponseId
         if (response.toolCalls.isEmpty()) {
-            if (response.text.isNotBlank()) return ""
+            if (receivedTextDelta && response.text.isNotBlank()) return ""
             return response.text.ifBlank { "完成。" }
         }
         val outputs = response.toolCalls.map { call ->
