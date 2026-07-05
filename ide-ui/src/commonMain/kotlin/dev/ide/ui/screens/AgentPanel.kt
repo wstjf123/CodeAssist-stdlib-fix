@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -123,18 +124,9 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(Ca.colors.separator))
 
         if (messages.isEmpty()) {
-            Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                ToolRow("读取当前文件", active?.path ?: "没有打开文件", active != null)
-                ToolRow("读取工作区文件", "按需列出并读取项目文件", true)
-                ToolRow("读取警告报错", "按需读取当前编辑器诊断", true)
-                ToolRow("查看日志", "按需查看构建日志和 IDE 日志", true)
-                ToolRow("修改当前文件", "通过工具修改当前编辑器 buffer", active != null)
+            Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("描述要处理的问题。Agent 会按需读取文件、诊断和日志，并在需要时修改当前编辑器。", color = Ca.colors.textTertiary, style = Ca.type.caption)
                 Spacer(Modifier.weight(1f))
-                Text(
-                    "直接描述任务；Agent 会按需调用工具读取文件、诊断、日志并修改当前编辑器。",
-                    color = Ca.colors.textTertiary,
-                    style = Ca.type.caption,
-                )
             }
         } else {
             LazyColumn(
@@ -175,14 +167,6 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
                     }
                 }
             },
-            onInsert = {
-                val text = messages.lastOrNull { it.role == "agent" }?.text ?: return@Composer
-                active?.session?.let { session ->
-                    val start = session.selection.min
-                    session.replaceRange(start, session.selection.max, text, TextRange(start + text.length))
-                }
-            },
-            canInsert = active != null && messages.any { it.role == "agent" },
             sending = state.agentSending,
         )
     }
@@ -213,21 +197,6 @@ private fun ContextToggle(label: String, selected: Boolean, enabled: Boolean, on
 }
 
 @Composable
-private fun ToolRow(title: String, detail: String, enabled: Boolean) {
-    Row(
-        Modifier.fillMaxWidth().background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.sm)).padding(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Icon(if (enabled) CaIcons.check else CaIcons.info, null, Modifier.size(15.dp), tint = if (enabled) Ca.colors.success else Ca.colors.textTertiary)
-        Column(Modifier.weight(1f)) {
-            Text(title, color = Ca.colors.textPrimary, style = Ca.type.footnote, fontWeight = FontWeight.SemiBold)
-            Text(detail, color = Ca.colors.textTertiary, style = Ca.type.caption2, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-    }
-}
-
-@Composable
 private fun MessageBubble(message: AgentMessage) {
     val agent = message.role == "agent"
     val tool = message.role == "tool"
@@ -235,22 +204,25 @@ private fun MessageBubble(message: AgentMessage) {
         ToolMessageBubble(message)
         return
     }
-    Column(
-        Modifier.fillMaxWidth()
-            .background(if (agent) Ca.colors.surface2 else Ca.colors.accentSoft, RoundedCornerShape(Ca.radius.sm))
-            .padding(10.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = if (agent) Arrangement.Start else Arrangement.End,
     ) {
-        Text(
-            when {
-                agent -> "Agent"
-                else -> "You"
-            },
-            color = if (agent) Ca.colors.textTertiary else Ca.colors.accent,
-            style = Ca.type.caption2,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(message.text, color = Ca.colors.textPrimary, style = Ca.type.codeSmall)
+        Column(
+            Modifier
+                .widthIn(max = if (agent) 520.dp else 360.dp)
+                .background(if (agent) Ca.colors.surface2.copy(alpha = 0.62f) else Ca.colors.accentSoft, RoundedCornerShape(Ca.radius.sm))
+                .padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                if (agent) "Agent" else "You",
+                color = if (agent) Ca.colors.textTertiary else Ca.colors.accent,
+                style = Ca.type.caption2,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(message.text, color = Ca.colors.textPrimary, style = Ca.type.codeSmall)
+        }
     }
 }
 
@@ -295,8 +267,6 @@ private fun Composer(
     value: String,
     onValueChange: (String) -> Unit,
     onSend: () -> Unit,
-    onInsert: () -> Unit,
-    canInsert: Boolean,
     sending: Boolean,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -316,7 +286,6 @@ private fun Composer(
             )
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            DialogButton("插入回复", primary = false, enabled = canInsert, onClick = onInsert)
             Spacer(Modifier.weight(1f))
             DialogButton(if (sending) "发送中" else "发送", primary = true, enabled = value.isNotBlank() && !sending, onClick = onSend)
         }
