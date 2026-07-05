@@ -243,6 +243,7 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
                                 "Preview not interpretable", color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 12.sp, modifier = Modifier.padding(16.dp),
                             )
+                            PreviewState.CompiledReady -> Unit
                             is PreviewState.Ready -> Unit
                         }
                     }
