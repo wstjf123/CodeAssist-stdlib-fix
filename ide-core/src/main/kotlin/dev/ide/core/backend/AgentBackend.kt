@@ -43,10 +43,11 @@ internal class AgentBackend : AgentService {
         if (raw.lineSequence().any { it.trimStart().startsWith("data:") }) {
             return@withContext parseSse(raw, onTextDelta)
         }
+        val parsed = MiniJson.parse(raw)
         UiAgentResponse(
-            text = extractResponseText(raw),
+            text = extractResponseText(raw, parsed),
             responseId = extractResponseId(raw),
-            toolCalls = extractToolCalls(raw),
+            toolCalls = extractToolCalls(raw, parsed),
             raw = raw,
         )
     }
@@ -56,6 +57,9 @@ internal class AgentBackend : AgentService {
         append("\"model\":\"").append(jsonEscape(request.config.model)).append("\",")
         append("\"input\":").append(request.input).append(',')
         append("\"stream\":true,")
+        append("\"tool_choice\":\"auto\",")
+        append("\"parallel_tool_calls\":true,")
+        append("\"store\":false,")
         append("\"reasoning\":{\"effort\":\"").append(jsonEscape(request.config.reasoningEffort)).append("\"}")
         request.previousResponseId?.takeIf { it.isNotBlank() }?.let {
             append(",\"previous_response_id\":\"").append(jsonEscape(it)).append("\"")
@@ -81,7 +85,6 @@ internal class AgentBackend : AgentService {
         val text = StringBuilder()
         var responseId: String? = null
         val calls = ArrayList<UiAgentToolCall>()
-        val partialCalls = LinkedHashMap<String, PartialToolCall>()
         conn.inputStream.use { input ->
             BufferedReader(InputStreamReader(input, Charsets.UTF_8)).useLines { lines ->
                 lines.forEach { line ->
@@ -90,17 +93,8 @@ internal class AgentBackend : AgentService {
                     if (!trimmed.startsWith("data:")) return@forEach
                     val data = trimmed.removePrefix("data:").trim()
                     if (data.isEmpty() || data == "[DONE]") return@forEach
-                    handleSseData(data, text, calls, partialCalls, onTextDelta) { id ->
-                        if (responseId == null) responseId = id
-                    }
+                    handleSseData(data, text, calls, onTextDelta) { id -> responseId = id }
                 }
-            }
-        }
-        partialCalls.values.forEach { partial ->
-            val callId = partial.callId
-            val name = partial.name
-            if (!callId.isNullOrBlank() && !name.isNullOrBlank()) {
-                calls += UiAgentToolCall(callId, name, partial.arguments.toString())
             }
         }
         return UiAgentResponse(text.toString(), responseId, calls.distinctBy { it.callId }, raw.toString())
@@ -110,24 +104,14 @@ internal class AgentBackend : AgentService {
         val text = StringBuilder()
         var responseId: String? = null
         val calls = ArrayList<UiAgentToolCall>()
-        val partialCalls = LinkedHashMap<String, PartialToolCall>()
         raw.lineSequence()
             .map { it.trim() }
             .filter { it.startsWith("data:") }
             .map { it.removePrefix("data:").trim() }
             .filter { it.isNotEmpty() && it != "[DONE]" }
             .forEach { data ->
-                handleSseData(data, text, calls, partialCalls, onTextDelta) { id ->
-                    if (responseId == null) responseId = id
-                }
+                handleSseData(data, text, calls, onTextDelta) { id -> responseId = id }
             }
-        partialCalls.values.forEach { partial ->
-            val callId = partial.callId
-            val name = partial.name
-            if (!callId.isNullOrBlank() && !name.isNullOrBlank()) {
-                calls += UiAgentToolCall(callId, name, partial.arguments.toString())
-            }
-        }
         return UiAgentResponse(text.toString(), responseId, calls.distinctBy { it.callId }, raw)
     }
 
@@ -135,103 +119,59 @@ internal class AgentBackend : AgentService {
         data: String,
         text: StringBuilder,
         calls: MutableList<UiAgentToolCall>,
-        partialCalls: MutableMap<String, PartialToolCall>,
         onTextDelta: (String) -> Unit,
         onResponseId: (String) -> Unit,
     ) {
         val event = MiniJson.parse(data) as? Map<*, *> ?: return
         val type = event.string("type").orEmpty()
 
-        event.string("response_id")?.let(onResponseId)
-        val response = event.map("response")
-        response?.string("id")?.let(onResponseId)
-        if (type == "response.created" || type == "response.completed") {
-            event.string("id")?.takeIf { it.startsWith("resp_") }?.let(onResponseId)
-        }
-
-        if (type.endsWith("output_text.delta") || type.endsWith("text.delta")) {
-            val delta = event.string("delta").orEmpty()
-            if (delta.isNotEmpty()) {
-                text.append(delta)
-                onTextDelta(delta)
-            }
-            return
-        }
-
-        if (type == "response.function_call_arguments.delta") {
-            val partial = partialForEvent(event, partialCalls)
-            event.string("delta")?.let { partial.arguments.append(it) }
-            return
-        }
-
-        if (type == "response.function_call_arguments.done") {
-            val partial = partialForEvent(event, partialCalls)
-            event.string("arguments")?.let {
-                partial.arguments.clear()
-                partial.arguments.append(it)
-            }
-            return
-        }
-
-        event.map("item")?.let { item ->
-            if (item.string("type") == "function_call") {
-                val key = event.string("item_id") ?: item.string("id") ?: item.string("call_id") ?: partialCalls.size.toString()
-                val partial = partialCalls.getOrPut(key) { PartialToolCall() }
-                item.string("call_id")?.let { partial.callId = it }
-                item.string("name")?.let { partial.name = it }
-                item.string("arguments")?.takeIf { it.isNotEmpty() }?.let {
-                    partial.arguments.clear()
-                    partial.arguments.append(it)
+        when (type) {
+            "response.output_text.delta" -> {
+                val delta = event.string("delta").orEmpty()
+                if (delta.isNotEmpty()) {
+                    text.append(delta)
+                    onTextDelta(delta)
                 }
             }
-        }
-
-        if (type.endsWith(".done") || type == "response.completed") {
-            collectToolCalls(event).forEach { call -> calls += call }
-            if (calls.isEmpty()) extractToolCalls(data).forEach { call -> calls += call }
-        }
-    }
-
-    private fun partialForEvent(event: Map<*, *>, partialCalls: MutableMap<String, PartialToolCall>): PartialToolCall {
-        val key = event.string("item_id")
-            ?: event.string("output_index")
-            ?: event.string("call_id")
-            ?: partialCalls.size.toString()
-        val partial = partialCalls.getOrPut(key) { PartialToolCall() }
-        event.string("call_id")?.let { partial.callId = it }
-        event.string("name")?.let { partial.name = it }
-        return partial
-    }
-
-    private fun collectToolCalls(value: Any?): List<UiAgentToolCall> {
-        val out = ArrayList<UiAgentToolCall>()
-        fun walk(v: Any?) {
-            when (v) {
-                is Map<*, *> -> {
-                    if (v.string("type") == "function_call") {
-                        val callId = v.string("call_id") ?: v.string("id")
-                        val name = v.string("name")
-                        val args = v.string("arguments").orEmpty()
-                        if (!callId.isNullOrBlank() && !name.isNullOrBlank()) {
-                            out += UiAgentToolCall(callId, name, args)
-                        }
-                    }
-                    v.values.forEach(::walk)
+            "response.output_item.done" -> {
+                val item = event.map("item") ?: return
+                collectMessageText(item).takeIf { it.isNotEmpty() }?.let { value ->
+                    text.append(value)
                 }
-                is List<*> -> v.forEach(::walk)
+                collectToolCall(item)?.let { calls += it }
+            }
+            "response.completed" -> {
+                event.map("response")?.string("id")?.let(onResponseId)
             }
         }
-        walk(value)
-        return out.distinctBy { it.callId }
     }
 
-    private class PartialToolCall {
-        var callId: String? = null
-        var name: String? = null
-        val arguments = StringBuilder()
+    private fun collectToolCall(item: Map<*, *>): UiAgentToolCall? {
+        if (item.string("type") != "function_call") return null
+        val callId = item.string("call_id") ?: item.string("id")
+        val name = item.string("name")
+        val args = item.string("arguments").orEmpty()
+        if (callId.isNullOrBlank() || name.isNullOrBlank()) return null
+        return UiAgentToolCall(callId, name, args)
     }
 
-    private fun extractResponseText(raw: String): String {
+    private fun collectMessageText(item: Map<*, *>): String {
+        if (item.string("type") != "message") return ""
+        val content = item.list("content") ?: return ""
+        return buildString {
+            content.forEach { part ->
+                val obj = part as? Map<*, *> ?: return@forEach
+                if (obj.string("type") == "output_text") append(obj.string("text").orEmpty())
+            }
+        }
+    }
+
+    private fun extractResponseText(raw: String, parsed: Any? = MiniJson.parse(raw)): String {
+        val root = parsed as? Map<*, *>
+        val outputText = root?.list("output").orEmpty()
+            .mapNotNull { it as? Map<*, *> }
+            .joinToString("") { collectMessageText(it) }
+        if (outputText.isNotEmpty()) return outputText
         extractJsonStringAfter(raw, "\"output_text\"")?.let { return it }
         val values = Regex("\"type\"\\s*:\\s*\"output_text\"[\\s\\S]*?\"text\"\\s*:\\s*\"")
             .findAll(raw)
@@ -247,7 +187,13 @@ internal class AgentBackend : AgentService {
         return Regex("\"id\"\\s*:\\s*\"(resp_[^\"]+)\"").find(raw)?.groupValues?.getOrNull(1)
     }
 
-    private fun extractToolCalls(raw: String): List<UiAgentToolCall> {
+    private fun extractToolCalls(raw: String, parsed: Any? = MiniJson.parse(raw)): List<UiAgentToolCall> {
+        val root = parsed as? Map<*, *>
+        val outputCalls = root?.list("output").orEmpty()
+            .mapNotNull { it as? Map<*, *> }
+            .mapNotNull { collectToolCall(it) }
+        if (outputCalls.isNotEmpty()) return outputCalls
+
         val calls = ArrayList<UiAgentToolCall>()
         var index = 0
         while (true) {
@@ -357,6 +303,7 @@ internal class AgentBackend : AgentService {
 
     private fun Map<*, *>.string(key: String): String? = this[key] as? String
     private fun Map<*, *>.map(key: String): Map<*, *>? = this[key] as? Map<*, *>
+    private fun Map<*, *>.list(key: String): List<*>? = this[key] as? List<*>
 
     private object MiniJson {
         fun parse(text: String): Any? = runCatching {

@@ -372,15 +372,22 @@ private suspend fun runAgentLoop(
                 previousResponseId = previousResponseId,
             )
         ) { delta ->
-            if (delta.isEmpty()) return@respond
+            if (!isUsefulAgentText(delta)) return@respond
             receivedTextDelta = true
             onTextDelta(delta)
         }
         previousResponseId = response.responseId ?: previousResponseId
         state.agentPreviousResponseId = previousResponseId
         if (response.toolCalls.isEmpty()) {
-            if (receivedTextDelta && response.text.isNotBlank()) return ""
-            return response.text.ifBlank { "完成。" }
+            if (receivedTextDelta && isUsefulAgentText(response.text)) return ""
+            if (isUsefulAgentText(response.text)) return response.text
+            if (previousResponseId != null) {
+                input = jsonString(
+                    "The previous tool calls are complete. Reply to the user in natural language with the result. Do not output JSON unless the user explicitly asked for JSON."
+                )
+                return@repeat
+            }
+            return "完成。"
         }
         val outputs = response.toolCalls.map { call ->
             val output = executeAgentTool(state, call)
@@ -390,6 +397,13 @@ private suspend fun runAgentLoop(
         input = buildToolOutputsInput(outputs)
     }
     return "工具调用次数过多，已停止。"
+}
+
+private fun isUsefulAgentText(text: String): Boolean {
+    val value = text.trim()
+    if (value.isEmpty() || value == "null") return false
+    if (Regex("""(?:\{\}|\[\])+\s*""").matches(value)) return false
+    return true
 }
 
 private fun appendAgentDelta(messages: MutableList<AgentMessage>, delta: String) {
