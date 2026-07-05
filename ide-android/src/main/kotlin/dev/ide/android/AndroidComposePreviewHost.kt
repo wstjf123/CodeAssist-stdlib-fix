@@ -172,7 +172,7 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
                 if (compiledPreviewUnavailable) {
                     Box(modifier, contentAlignment = Alignment.Center) { PreviewRenderError(apkError!!) }
                 } else if (compiledPreviewActive) {
-                    IsolatedComposePreview(modifier) {
+                    IsolatedComposePreview(modifier, refreshKey) {
                         CompositionLocalProvider(LocalConfiguration provides cfg) {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 val compiledError = apkRenderer?.Render(compiledApk!!.facadeFqn, compiledApk!!.functionName)
@@ -208,7 +208,7 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
                         partialError = e
                     }
                 }
-                IsolatedComposePreview(modifier) {
+                IsolatedComposePreview(modifier, refreshKey) {
                     CompositionLocalProvider(LocalConfiguration provides cfg) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             val compiledError = if (compiledPreviewActive) {
@@ -228,7 +228,7 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
             }
             else -> {
                 if (compiledPreviewActive) {
-                    IsolatedComposePreview(modifier) {
+                    IsolatedComposePreview(modifier, refreshKey) {
                         CompositionLocalProvider(LocalConfiguration provides cfg) {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 val compiledError = apkRenderer?.Render(compiledApk!!.facadeFqn, compiledApk!!.functionName)
@@ -268,12 +268,14 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
 @Composable
 private fun IsolatedComposePreview(
     modifier: Modifier,
+    refreshKey: Int,
     content: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
     val currentDensity by rememberUpdatedState(density)
     val currentConfiguration by rememberUpdatedState(configuration)
+    val currentRefreshKey by rememberUpdatedState(refreshKey)
     val currentContent by rememberUpdatedState(content)
     AndroidView(
         modifier = modifier,
@@ -287,7 +289,9 @@ private fun IsolatedComposePreview(
                         LocalDensity provides currentDensity,
                         LocalConfiguration provides currentConfiguration,
                     ) {
-                        currentContent()
+                        key(currentRefreshKey) {
+                            currentContent()
+                        }
                     }
                 }
             }
