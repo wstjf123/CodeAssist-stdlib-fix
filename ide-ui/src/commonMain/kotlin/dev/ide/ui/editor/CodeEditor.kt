@@ -195,6 +195,9 @@ fun CodeEditor(
      * while obscured — even when the overlay doesn't steal the editor's input focus.
      */
     obscured: Boolean = false,
+    /** Request focus when the editor first enters composition. Split view disables this to avoid opening the IME
+     *  while the preview pane is being mounted; tapping the editor still focuses it normally. */
+    autoFocus: Boolean = true,
 ) {
     // Source code is intrinsically left-to-right: the gutter sits at the left edge and lines flow right.
     // On an RTL system locale (e.g. Arabic) Compose flips `LocalLayoutDirection`, which would make
@@ -205,7 +208,7 @@ fun CodeEditor(
         CodeEditorContent(
             path, session, backend, modifier, onSave, onNavigate, onRenamed,
             findEpoch, formatEpoch, fontScale, onFontScaleChange, onPreview, completionAutoPopup, completionDelayMs,
-            twoAxisScroll, pinchZoom, softKeyboardSuggestions, wordWrap, wrapIndent, fontLigatures, obscured,
+            twoAxisScroll, pinchZoom, softKeyboardSuggestions, wordWrap, wrapIndent, fontLigatures, obscured, autoFocus,
         )
     }
 }
@@ -233,6 +236,7 @@ private fun CodeEditorContent(
     wrapIndent: Boolean = true,
     fontLigatures: Boolean = true,
     obscured: Boolean = false,
+    autoFocus: Boolean = true,
 ) {
     val colors = Ca.colors
     val syntax = colors.syntax
@@ -1063,7 +1067,9 @@ private fun CodeEditorContent(
         editorStructure = runCatching { backend.editor.fileStructure(path, editorSession.doc.text) }.getOrDefault(emptyList())
     }
 
-    LaunchedEffect(path) { runCatching { focus.requestFocus() } }
+    LaunchedEffect(path, autoFocus) {
+        if (autoFocus) runCatching { focus.requestFocus() }
+    }
 
     // ---- per-line diagnostic segments (recomputed per edit — O(diagnostics), they are few) ----
     // Keyed on the document *instance* (an edit swaps it; a caret move doesn't), so the key compare is an

@@ -156,7 +156,7 @@ internal fun EditorCenter(
                 // dismisses its floating popups so they don't hang over the overlay.
                 val editorObscured = state.paletteOpen || state.sheetDest != null || state.agentConfigOpen ||
                         (compact && (state.navOpen || state.consoleOpen || state.agentOpen))
-                val codeSurface: @Composable (Modifier) -> Unit = { mod ->
+                val codeSurface: @Composable (Modifier, Boolean) -> Unit = { mod, autoFocus ->
                     CodeEditor(
                         path = active.path,
                         session = active.session,
@@ -178,6 +178,7 @@ internal fun EditorCenter(
                         wordWrap = state.wordWrapEnabled,
                         wrapIndent = state.wrapIndentEnabled,
                         fontLigatures = state.fontLigaturesEnabled,
+                        autoFocus = autoFocus,
                         // Tapping a @Preview gutter icon switches this tab to the Preview surface, rendering that
                         // specific composable. The editor tools (incl. the Code/Blocks/Preview switch) are pinned
                         // to the breadcrumb row, so they're already visible — making the view change easy to undo.
@@ -225,12 +226,12 @@ internal fun EditorCenter(
                     // Edit + watch at once: stacked on a phone (the only way both fit), side-by-side when wide.
                     EditorViewMode.Split -> SplitEditorPreview(
                         stacked = compact,
-                        editor = codeSurface,
+                        editor = { mod -> codeSurface(mod, false) },
                         preview = previewSurface,
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                     )
 
-                    else -> codeSurface(Modifier.weight(1f).fillMaxWidth())
+                    else -> codeSurface(Modifier.weight(1f).fillMaxWidth(), true)
                 }
             } else {
                 Box(
