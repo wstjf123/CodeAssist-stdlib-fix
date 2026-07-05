@@ -611,6 +611,29 @@ data class UiAgentInputItem(
     val output: String? = null,
 )
 
+data class UiAgentConversationStore(
+    val activeConversationId: String = "",
+    val nextSeq: Long = 0L,
+    val conversations: List<UiAgentConversationRecord> = emptyList(),
+)
+
+data class UiAgentConversationRecord(
+    val id: String = "",
+    val title: String = "",
+    val createdSeq: Long = 0L,
+    val updatedSeq: Long = 0L,
+    val items: List<UiAgentConversationItemRecord> = emptyList(),
+)
+
+data class UiAgentConversationItemRecord(
+    val type: String = "",
+    val role: String? = null,
+    val text: String = "",
+    val callId: String? = null,
+    val name: String? = null,
+    val argumentsJson: String? = null,
+)
+
 data class UiAgentResponse(
     val text: String,
     val responseId: String? = null,
@@ -634,6 +657,10 @@ data class UiAgentToolCall(
 interface AgentService {
     suspend fun respond(request: UiAgentRequest, onTextDelta: (String) -> Unit = {}): UiAgentResponse =
         UiAgentResponse("AI Agent transport is not available in this backend.")
+
+    fun loadConversationStore(): UiAgentConversationStore = UiAgentConversationStore()
+
+    fun saveConversationStore(store: UiAgentConversationStore) {}
 
     object Unsupported : AgentService
 }

@@ -5,7 +5,12 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import com.google.gson.reflect.TypeToken
+import dev.ide.core.BackendContext
 import dev.ide.ui.backend.AgentService
+import dev.ide.ui.backend.UiAgentConversationItemRecord
+import dev.ide.ui.backend.UiAgentConversationRecord
+import dev.ide.ui.backend.UiAgentConversationStore
 import dev.ide.ui.backend.UiAgentInputItem
 import dev.ide.ui.backend.UiAgentRequest
 import dev.ide.ui.backend.UiAgentResponse
@@ -20,7 +25,28 @@ import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URI
 
-internal class AgentBackend : AgentService {
+internal class AgentBackend(private val ctx: BackendContext? = null) : AgentService {
+    override fun loadConversationStore(): UiAgentConversationStore {
+        val raw = ctx?.manager?.preference(CONVERSATIONS_PREF).orEmpty()
+        if (raw.isBlank()) {
+            return UiAgentConversationStore(
+                activeConversationId = ctx?.manager?.preference(ACTIVE_CONVERSATION_PREF).orEmpty(),
+                nextSeq = ctx?.manager?.preference(CONVERSATION_SEQ_PREF)?.toLongOrNull() ?: 0L,
+            )
+        }
+        parseConversationStore(raw)?.let { return it }
+        return parseLegacyConversationStore(raw).copy(
+            activeConversationId = ctx?.manager?.preference(ACTIVE_CONVERSATION_PREF).orEmpty(),
+            nextSeq = ctx?.manager?.preference(CONVERSATION_SEQ_PREF)?.toLongOrNull() ?: 0L,
+        )
+    }
+
+    override fun saveConversationStore(store: UiAgentConversationStore) {
+        ctx?.manager?.setPreference(CONVERSATIONS_PREF, gson.toJson(store))
+        ctx?.manager?.setPreference(ACTIVE_CONVERSATION_PREF, store.activeConversationId)
+        ctx?.manager?.setPreference(CONVERSATION_SEQ_PREF, store.nextSeq.toString())
+    }
+
     override suspend fun respond(request: UiAgentRequest, onTextDelta: (String) -> Unit): UiAgentResponse = withContext(Dispatchers.IO) {
         val base = request.config.baseUrl.trimEnd('/')
         val endpoint = if (base.endsWith("/responses")) base else "$base/responses"
@@ -243,6 +269,47 @@ internal class AgentBackend : AgentService {
     private fun parseJson(text: String): JsonElement? =
         runCatching { JsonParser.parseString(text) }.getOrNull()
 
+    private fun parseConversationStore(raw: String): UiAgentConversationStore? =
+        runCatching {
+            gson.fromJson<UiAgentConversationStore>(raw, conversationStoreType)
+        }.getOrNull()
+
+    private fun parseLegacyConversationStore(raw: String): UiAgentConversationStore {
+        val conversations = ArrayList<UiAgentConversationRecord>()
+        var current: LegacyConversationBuilder? = null
+        raw.lineSequence().forEach { line ->
+            if (line.isBlank()) return@forEach
+            val parts = line.split('\t')
+            when (parts.firstOrNull()) {
+                "C" -> {
+                    if (parts.size < 5) return@forEach
+                    val record = LegacyConversationBuilder(
+                        id = parts[1].decodeLegacyAgentField(),
+                        title = parts[2].decodeLegacyAgentField().ifBlank { "新对话" },
+                        createdSeq = parts[3].toLongOrNull() ?: 0L,
+                        updatedSeq = parts[4].toLongOrNull() ?: 0L,
+                    )
+                    conversations += record.toRecord()
+                    current = record
+                }
+                "I" -> {
+                    val builder = current ?: return@forEach
+                    if (parts.size < 8) return@forEach
+                    builder.items += UiAgentConversationItemRecord(
+                        type = parts[1].decodeLegacyAgentField(),
+                        role = parts[2].decodeLegacyAgentField().ifBlank { null },
+                        text = parts[3].decodeLegacyAgentField(),
+                        callId = parts[4].decodeLegacyAgentField().ifBlank { null },
+                        name = parts[5].decodeLegacyAgentField().ifBlank { null },
+                        argumentsJson = parts[6].decodeLegacyAgentField().ifBlank { null },
+                    )
+                    conversations[conversations.lastIndex] = builder.toRecord()
+                }
+            }
+        }
+        return UiAgentConversationStore(conversations = conversations.sortedByDescending { it.updatedSeq })
+    }
+
     private fun JsonObject.string(key: String): String? =
         get(key)?.asStringOrNull()
 
@@ -258,7 +325,50 @@ internal class AgentBackend : AgentService {
     private fun JsonElement.asStringOrNull(): String? =
         takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }?.asString
 
-    private companion object {
-        val gson = Gson()
+    private class LegacyConversationBuilder(
+        val id: String,
+        val title: String,
+        val createdSeq: Long,
+        val updatedSeq: Long,
+        val items: MutableList<UiAgentConversationItemRecord> = ArrayList(),
+    ) {
+        fun toRecord(): UiAgentConversationRecord =
+            UiAgentConversationRecord(id, title, createdSeq, updatedSeq, items.toList())
     }
+
+    private companion object {
+        private const val CONVERSATIONS_PREF = "agent.conversations"
+        private const val ACTIVE_CONVERSATION_PREF = "agent.activeConversationId"
+        private const val CONVERSATION_SEQ_PREF = "agent.conversationSeq"
+        val gson = Gson()
+        val conversationStoreType = object : TypeToken<UiAgentConversationStore>() {}.type
+    }
+}
+
+private fun String.decodeLegacyAgentField(): String {
+    if ('%' !in this) return this
+    val out = StringBuilder(length)
+    var i = 0
+    while (i < length) {
+        if (this[i] == '%' && i + 2 < length) {
+            val decoded = when (substring(i + 1, i + 3)) {
+                "25" -> '%'
+                "0A" -> '\n'
+                "0D" -> '\r'
+                "09" -> '\t'
+                else -> null
+            }
+            if (decoded != null) {
+                out.append(decoded)
+                i += 3
+            } else {
+                out.append(this[i])
+                i++
+            }
+        } else {
+            out.append(this[i])
+            i++
+        }
+    }
+    return out.toString()
 }
