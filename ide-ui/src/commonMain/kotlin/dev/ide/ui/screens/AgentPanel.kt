@@ -67,7 +67,7 @@ internal fun AgentDock(state: IdeUiState, modifier: Modifier = Modifier) {
 internal fun AgentSheets(state: IdeUiState, compact: Boolean) {
     if (compact) {
         BottomSheet(visible = state.agentOpen, onDismiss = { state.agentOpen = false }, heightFraction = 0.9f) {
-            AgentPanel(state = state, modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 14.dp, bottom = 14.dp))
+            AgentPanel(state = state, modifier = Modifier.fillMaxWidth().weight(1f).padding(start = 14.dp, end = 14.dp, bottom = 14.dp))
         }
     }
     BottomSheet(visible = state.agentConfigOpen, onDismiss = { state.agentConfigOpen = false }, heightFraction = 0.72f) {
@@ -79,7 +79,7 @@ internal fun AgentSheets(state: IdeUiState, compact: Boolean) {
                 state.agentOpen = true
                 state.consoleOpen = false
             },
-            modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 14.dp, bottom = 14.dp),
+            modifier = Modifier.fillMaxWidth().weight(1f).padding(start = 14.dp, end = 14.dp, bottom = 14.dp),
         )
     }
 }
