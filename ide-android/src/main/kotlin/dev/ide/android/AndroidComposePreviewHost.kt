@@ -65,8 +65,13 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
             value = runCatching { backend.composePreviewApk(path, text, preview.functionName) }.getOrNull()
         }
         var apkError by remember(path, preview.variantId, text, apk?.fingerprint) { mutableStateOf<Throwable?>(null) }
-        val state by produceState<PreviewState>(PreviewState.Loading, path, preview.functionName, preview.arity, text) {
+        val compiledCandidate = apk != null && !preview.hasParameter && preview.arity == 0
+        val state by produceState<PreviewState>(PreviewState.Loading, path, preview.functionName, preview.arity, text, compiledCandidate) {
             value = PreviewState.Loading
+            if (compiledCandidate) {
+                value = PreviewState.CompiledReady
+                return@produceState
+            }
             val lowered = runCatching { backend.lowerComposePreview(path, preview.functionName, preview.arity, text) }.getOrNull()
             value = if (lowered != null) PreviewState.Ready(lowered) else {
                 // Surface WHY it isn't interpretable (the unsupported constructs + offending source) instead of
@@ -110,8 +115,8 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
         val apkRenderer = remember(apkLoader) { apkLoader?.let { ApkComposePreviewRenderer(it) } }
         var renderError by remember(path, preview.variantId, text, useProjectLoader, loader) { mutableStateOf<Throwable?>(null) }
         var partialError by remember(path, preview.variantId, text, useProjectLoader, loader) { mutableStateOf<Throwable?>(null) }
-        val compiledPreviewActive = apkRenderer != null && apk != null && !preview.hasParameter && preview.arity == 0 && apkError == null
-        val compiledPreviewUnavailable = apk != null && !preview.hasParameter && preview.arity == 0 && apkError != null
+        val compiledPreviewActive = apkRenderer != null && compiledCandidate && apkError == null
+        val compiledPreviewUnavailable = compiledCandidate && apkError != null
         // The interpreter re-runs on every recomposition pass, so a content lambda that fails deterministically
         // hands the renderer a FRESH Throwable each pass. Writing that to `partialError` (read during
         // composition) every pass would invalidate → re-run → invalidate … an unbounded recomposition loop.
@@ -158,6 +163,26 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
             }
         }
         when (val s = state) {
+            PreviewState.CompiledReady -> {
+                if (compiledPreviewUnavailable) {
+                    Box(modifier, contentAlignment = Alignment.Center) { PreviewRenderError(apkError!!) }
+                } else if (compiledPreviewActive) {
+                    IsolatedComposePreview(modifier) {
+                        CompositionLocalProvider(LocalConfiguration provides cfg) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                val compiledError = apkRenderer?.Render(apk!!.facadeFqn, apk!!.functionName)
+                                if (compiledError != null) {
+                                    LaunchedEffect(compiledError.message, compiledError::class) { apkError = compiledError }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Box(modifier, contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(Modifier.size(28.dp))
+                    }
+                }
+            }
             is PreviewState.Ready -> {
                 // Key the capture on the error's identity, not the instance: the interpreter throws a
                 // fresh Throwable each pass, so keying on it would relaunch + rewrite state every
@@ -228,6 +253,7 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
 
     private sealed interface PreviewState {
         object Loading : PreviewState
+        object CompiledReady : PreviewState
         data class Ready(val lowered: LoweredComposePreview) : PreviewState
         data class NotInterpretable(val reasons: List<String>) : PreviewState
     }
