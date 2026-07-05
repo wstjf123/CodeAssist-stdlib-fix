@@ -182,8 +182,10 @@ internal class AgentBackend : AgentService {
             }
         }
 
-    private fun List<UiAgentInputItem>.toJson(): JsonArray =
-        JsonArray().apply { forEach { add(it.toJson()) } }
+    private fun List<UiAgentInputItem>.toJson(): JsonArray {
+        val items = this
+        return JsonArray().apply { items.forEach { add(it.toJson()) } }
+    }
 
     private fun extractResponseText(root: JsonObject?): String {
         val output = root?.array("output") ?: return ""
