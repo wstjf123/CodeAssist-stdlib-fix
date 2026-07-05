@@ -6,6 +6,7 @@ import dev.ide.lang.kotlin.symbols.DefaultImports
 import dev.ide.lang.kotlin.symbols.KotlinSymbol
 import dev.ide.lang.kotlin.symbols.KotlinSymbolService
 import dev.ide.lang.kotlin.symbols.KotlinType
+import dev.ide.lang.kotlin.symbols.TypeRendering
 import dev.ide.lang.resolve.Modifier
 import dev.ide.lang.resolve.SymbolKind
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
@@ -1463,6 +1464,7 @@ class KotlinTreeResolver(
         val maxConcrete = sized.maxOfOrNull { concreteness(it) } ?: return null
         val mostConcrete = sized.filter { concreteness(it) == maxConcrete }
         mostConcrete.singleOrNull()?.let { return it }
+        preferTrailingLambdaOverload(mostConcrete, valueArgs)?.let { return it }
         // Still tied, but the candidates may be INDISTINGUISHABLE FOR THIS CALL: every SUPPLIED argument binds
         // to a parameter of the same type in all of them — they differ only in parameters the call doesn't
         // supply (which take their defaults), so either renders identically. Pick the smallest deterministically.
@@ -1470,6 +1472,7 @@ class KotlinTreeResolver(
         // genuine overload set like `Icon(ImageVector)` vs `Icon(Painter)` is already narrowed by argument type
         // above, since the supplied arg binds to DIFFERENT types and `boundParamsAgree` would be false.)
         if (mostConcrete.size > 1 && mostConcrete.all { boundParamsAgree(it, mostConcrete.first(), valueArgs) }) {
+            preferTrailingLambdaOverload(mostConcrete, valueArgs)?.let { return it }
             return mostConcrete.minByOrNull { it.paramTypes.size }
         }
         // Still tied. If every remaining candidate is the SAME callable surfacing from different sources or with
@@ -1480,6 +1483,48 @@ class KotlinTreeResolver(
         // concrete types (`Icon(ImageVector)` vs `Icon(Painter)`) — is NOT collapsed, so it stays rejected as
         // ambiguous until argument types narrow it.
         return mostConcrete.takeIf { pool2 -> pool2.all { sameCallableShape(it, pool2.first()) } }?.first()
+    }
+
+    /**
+     * Compose pointer-input APIs surface several overloads for the same source call shape:
+     * `pointerInput(key1, block)`, `pointerInput(key1, key2, block)`, `pointerInput(vararg keys, block)`, plus
+     * newer SAM overloads beside synthetic `Function2` compatibility overloads. For `pointerInput(Unit) { ... }`
+     * the intended source target is the single-key fixed overload. Prefer a fixed overload whose trailing lambda
+     * lands on a Kotlin function type, because that preserves receiver typing for the block; if only SAM overloads
+     * are present, accept the SAM.
+     */
+    private fun preferTrailingLambdaOverload(candidates: List<KotlinSymbol>, valueArgs: List<KtValueArgument>): KotlinSymbol? {
+        if (valueArgs.lastOrNull() !is KtLambdaArgument) return null
+        fun fixedLambdaCandidate(c: KotlinSymbol): Boolean {
+            val bound = bindIndices(c, valueArgs) ?: return false
+            val supplied = bound.toSet()
+            if (c.varargParamIndex >= 0) return false
+            if (bound.lastOrNull() != c.paramTypes.lastIndex) return false
+            if (!missingParamsAreDefaulted(c, supplied)) return false
+            return lambdaParamRank(c) > 0
+        }
+        val fixed = candidates.filter(::fixedLambdaCandidate)
+        if (fixed.isEmpty()) return null
+        val bestRank = fixed.maxOf { lambdaParamRank(it) }
+        val ranked = fixed.filter { lambdaParamRank(it) == bestRank }
+        val minParams = ranked.minOf { it.paramTypes.size }
+        return ranked.filter { it.paramTypes.size == minParams }.singleOrNull()
+    }
+
+    private fun missingParamsAreDefaulted(callee: KotlinSymbol, supplied: Set<Int>): Boolean {
+        if (callee.paramTypes.isNotEmpty() && callee.paramHasDefault.size != callee.paramTypes.size) return false
+        return callee.paramTypes.indices.all { i ->
+            i in supplied || i == callee.varargParamIndex || callee.paramHasDefault.getOrElse(i) { false }
+        }
+    }
+
+    private fun lambdaParamRank(callee: KotlinSymbol): Int {
+        val pt = callee.paramTypes.lastOrNull() as? KotlinType ?: return 0
+        return when {
+            TypeRendering.isFunctionType(pt.qualifiedName) -> 2
+            service.functionalShape(pt) != null -> 1
+            else -> 0
+        }
     }
 
     /** Whether [a] and [b] bind every SUPPLIED argument to a parameter of a compatible type — so the call site

@@ -611,6 +611,22 @@ class KotlinTreeResolverTest {
     }
 
     @Test
+    fun pointerInputSingleKeyTrailingLambdaPicksSmallestFunctionOverload() {
+        // Compose exposes `pointerInput` as single-key, multi-key, vararg, SAM, and synthetic Function2 overloads.
+        // `pointerInput(Unit) { detectTapGestures { offset -> ... } }` must bind to the single-key function-typed
+        // overload so the lambda has a PointerInputScope receiver and the nested gesture call can resolve.
+        val fn = lower(
+            "package demo\n" +
+                "fun f() { Mod.pointerInput(Unit) { detectTapGestures { offset -> offset.x } } }",
+        )
+        val call = assertIs<RNode.Call>(fn.stmts()[0], "pointerInput should resolve")
+        assertEquals("pointerInput", call.callee.displayName)
+        val callee = assertIs<ResolvedCallable.Source>(call.callee)
+        assertEquals(listOf("key1", "block"), callee.paramNames)
+        assertTrue(fn.isComplete, "pointerInput with a single key should lower completely; diags=${fn.diagnostics}")
+    }
+
+    @Test
     fun sourceInfixMemberCallResolvesToMemberDispatch() {
         // `c add 2` — `add` is a source `infix fun` member of `Calc`. An infix call is `c.add(2)`: a MEMBER
         // dispatch on the left operand with the right operand as the single argument.
@@ -802,6 +818,20 @@ class KotlinTreeResolverTest {
                     fun Scaff(top: Int = 0, content: (Pads) -> Unit) {}
                     fun <T> hold(calc: () -> T): T = calc()
                     fun <T> hold(vararg keys: Any?, calc: () -> T): T = calc()
+                    class Offset(val x: Float, val y: Float)
+                    class PointerInputScope {
+                        fun detectTapGestures(onTap: (Offset) -> Unit) {}
+                    }
+                    fun interface PointerInputEventHandler {
+                        fun invoke(scope: PointerInputScope)
+                    }
+                    fun Mod.pointerInput(key1: Any?, block: PointerInputScope.() -> Unit): Mod = this
+                    fun Mod.pointerInput(key1: Any?, key2: Any?, block: PointerInputScope.() -> Unit): Mod = this
+                    fun Mod.pointerInput(key1: Any?, key2: Any?, key3: Any?, block: PointerInputScope.() -> Unit): Mod = this
+                    fun Mod.pointerInput(vararg keys: Any?, block: PointerInputScope.() -> Unit): Mod = this
+                    fun Mod.pointerInput(key1: Any?, block: PointerInputEventHandler): Mod = this
+                    fun Mod.pointerInput(key1: Any?, key2: Any?, block: PointerInputEventHandler): Mod = this
+                    fun Mod.pointerInput(vararg keys: Any?, block: PointerInputEventHandler): Mod = this
                     class Calc { infix fun add(n: Int): Int = n }
                     infix fun Greeter.combinedWith(other: Greeter): String = ""
                     fun Banner(onClick: () -> Unit, label: String = "", content: () -> Unit) {}
