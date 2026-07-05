@@ -43,7 +43,6 @@ import dev.ide.ui.CodeAssistApp
 import dev.ide.ui.backend.FileActions
 import dev.ide.ui.backend.IdeBackend
 import dev.ide.ui.backend.TreeNode
-import dev.ide.ui.platform.UiTrace
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -67,9 +66,6 @@ class MainActivity : ComponentActivity() {
         )
 
         super.onCreate(savedInstanceState)
-        UiThreadWatchdog.start(this, Thread.currentThread())
-        UiTrace.sink = UiThreadWatchdog::mark
-        UiThreadWatchdog.mark("MainActivity.onCreate")
         inbound.value = extractStream(intent)
 
         setContent {
@@ -195,37 +191,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        UiThreadWatchdog.mark("MainActivity.onNewIntent action=${intent.action}")
         setIntent(intent)
         extractStream(intent)?.let { inbound.value = it }
     }
 
-    override fun onStart() {
-        super.onStart()
-        UiThreadWatchdog.mark("MainActivity.onStart")
-    }
-
-    override fun onResume() {
-        super.onResume()
-        UiThreadWatchdog.mark("MainActivity.onResume")
-    }
-
-    override fun onPause() {
-        UiThreadWatchdog.mark("MainActivity.onPause")
-        super.onPause()
-    }
-
-    override fun onStop() {
-        UiThreadWatchdog.mark("MainActivity.onStop")
-        super.onStop()
-    }
-
     override fun onDestroy() {
-        UiThreadWatchdog.mark("MainActivity.onDestroy closingSession=${session != null}")
         super.onDestroy()
         // Close the *active* engine (a project switch may have swapped it), not just the initial one.
         session?.backend?.close()
-        UiThreadWatchdog.mark("MainActivity.onDestroy closedSession")
     }
 
     /** Hand the APK at [path] to the system package installer (the OS install-confirmation UI). */

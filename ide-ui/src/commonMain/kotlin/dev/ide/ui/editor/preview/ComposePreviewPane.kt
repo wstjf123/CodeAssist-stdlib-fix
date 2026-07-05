@@ -42,7 +42,6 @@ import dev.ide.ui.backend.IdeBackend
 import dev.ide.ui.backend.UiComposePreview
 import dev.ide.ui.components.CaDropdownMenu
 import dev.ide.ui.icons.CaIcons
-import dev.ide.ui.platform.UiTrace
 import dev.ide.ui.theme.Ca
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
@@ -217,7 +216,6 @@ fun ComposePreviewPane(
             if (host != null) {
                 Divider()
                 PillButton({
-                    UiTrace.mark(if (live) "composePreview stopLive" else "composePreview resumeLive")
                     live = !live
                 }) {
                     Icon(
@@ -231,7 +229,6 @@ fun ComposePreviewPane(
             Divider()
             // Render the current buffer now (also the manual trigger while paused).
             PillButton({
-                UiTrace.mark("composePreview rebuild nonce=${nonce + 1}")
                 renderText = text
                 nonce++
             }) {

@@ -10,9 +10,11 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
@@ -214,6 +216,10 @@ internal fun EditorCenter(
                         )
                     }
                 }
+                val currentPreviewSurface by rememberUpdatedState(previewSurface)
+                val movablePreviewSurface = remember(active.path) {
+                    movableContentOf<Modifier> { mod -> currentPreviewSurface(mod) }
+                }
                 when (active.viewMode) {
                     EditorViewMode.Blocks -> BlockEditor(
                         path = active.path,
@@ -222,12 +228,12 @@ internal fun EditorCenter(
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                     )
 
-                    EditorViewMode.Preview -> previewSurface(Modifier.weight(1f).fillMaxWidth())
+                    EditorViewMode.Preview -> movablePreviewSurface(Modifier.weight(1f).fillMaxWidth())
                     // Edit + watch at once: stacked on a phone (the only way both fit), side-by-side when wide.
                     EditorViewMode.Split -> SplitEditorPreview(
                         stacked = compact,
                         editor = { mod -> codeSurface(mod, false) },
-                        preview = previewSurface,
+                        preview = { mod -> movablePreviewSurface(mod) },
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                     )
 

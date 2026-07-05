@@ -28,7 +28,6 @@ import dev.ide.ui.components.Breadcrumb
 import dev.ide.ui.editor.preview.isLayoutPreviewable
 import dev.ide.ui.editor.preview.isPreviewable
 import dev.ide.ui.icons.CaIcons
-import dev.ide.ui.platform.UiTrace
 import dev.ide.ui.theme.Ca
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
@@ -101,25 +100,21 @@ private fun ViewModeToggle(
             "Code",
             mode == EditorViewMode.Text
         ) {
-            UiTrace.mark("viewMode Code")
             onSelect(EditorViewMode.Text)
         }
         SegmentItem(CaIcons.layers, "Blocks", mode == EditorViewMode.Blocks) {
-            UiTrace.mark("viewMode Blocks")
             onSelect(
                 EditorViewMode.Blocks
             )
         }
         if (canPreview) {
             SegmentItem(CaIcons.image, "Preview", mode == EditorViewMode.Preview) {
-                UiTrace.mark("viewMode Preview")
                 onSelect(
                     EditorViewMode.Preview
                 )
             }
             // Split = code + preview together, so you can edit and watch it update (the phone-friendly path).
             SegmentItem(CaIcons.split, "Split", mode == EditorViewMode.Split) {
-                UiTrace.mark("viewMode Split")
                 onSelect(
                     EditorViewMode.Split
                 )
