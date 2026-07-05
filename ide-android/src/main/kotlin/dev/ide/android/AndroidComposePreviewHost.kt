@@ -12,6 +12,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.key
 import android.content.res.Configuration
+import android.os.Handler
+import android.os.Looper
+import android.view.View
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -23,6 +26,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.AbstractComposeView
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -274,7 +278,7 @@ private fun IsolatedComposePreview(
         modifier = modifier,
         factory = { context ->
             ComposeView(context).apply {
-                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+                setViewCompositionStrategy(DeferredDisposeOnDetachedFromWindow)
                 isFocusable = true
                 isFocusableInTouchMode = true
                 setContent {
@@ -288,6 +292,28 @@ private fun IsolatedComposePreview(
             }
         },
     )
+}
+
+private object DeferredDisposeOnDetachedFromWindow : ViewCompositionStrategy {
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    override fun installFor(view: AbstractComposeView): () -> Unit {
+        var active = true
+        val listener = object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: View) = Unit
+
+            override fun onViewDetachedFromWindow(v: View) {
+                mainHandler.post {
+                    if (active && !view.isAttachedToWindow) view.disposeComposition()
+                }
+            }
+        }
+        view.addOnAttachStateChangeListener(listener)
+        return {
+            active = false
+            view.removeOnAttachStateChangeListener(listener)
+        }
+    }
 }
 
 private fun Throwable.mayNeedProjectLoader(): Boolean =
