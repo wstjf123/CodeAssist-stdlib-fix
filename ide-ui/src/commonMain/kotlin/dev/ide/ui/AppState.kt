@@ -14,6 +14,8 @@ import dev.ide.ui.backend.UiNewFileTemplate
 import dev.ide.ui.editor.core.EditorSession
 import dev.ide.ui.editor.languageFor
 import dev.ide.ui.platform.isMobilePlatform
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.MainScope
 
 /**
  * Top-level screens, ordered by depth so the transition helper can infer direction: a move to a
@@ -123,6 +125,7 @@ class IdeUiState(val backend: IdeBackend, val composePreviewHost: ComposePreview
         private set
     var agentPrompt by mutableStateOf("")
     var agentSending by mutableStateOf(false)
+    val agentScope: CoroutineScope = MainScope()
     val agentMessages = mutableStateListOf<AgentMessage>()
     var paletteOpen by mutableStateOf(false)
     /** The in-file structure / outline bottom sheet (opened from the breadcrumb tap or Ctrl-F12). */

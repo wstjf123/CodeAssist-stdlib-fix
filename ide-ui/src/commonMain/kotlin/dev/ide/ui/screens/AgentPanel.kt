@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -24,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,6 +56,7 @@ import dev.ide.ui.components.FieldLabel
 import dev.ide.ui.components.IconButtonCa
 import dev.ide.ui.icons.CaIcons
 import dev.ide.ui.theme.Ca
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 @Composable
@@ -85,8 +88,15 @@ internal fun AgentSheets(state: IdeUiState, compact: Boolean) {
 @Composable
 private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
     val active = state.active
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
     val messages = state.agentMessages
+    val listState = rememberLazyListState()
+    val lastMessageText = messages.lastOrNull()?.text.orEmpty()
+
+    LaunchedEffect(messages.size, lastMessageText) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.lastIndex)
+        }
+    }
 
     Column(modifier.fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -127,8 +137,12 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
                 )
             }
         } else {
-            LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(messages) { message -> MessageBubble(message) }
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(messages, key = { it.hashCode() }) { message -> MessageBubble(message) }
             }
         }
 
@@ -146,18 +160,16 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
                 messages += AgentMessage("user", request)
                 state.agentPrompt = ""
                 state.agentSending = true
-                scope.launch {
+                state.agentScope.launch {
                     try {
-                        val result = runCatching {
-                            runAgentLoop(state, request, messages) { delta ->
-                                scope.launch { appendAgentDelta(messages, delta) }
-                            }
+                        val text = runAgentLoop(state, request, messages) { delta ->
+                            state.agentScope.launch { appendAgentDelta(messages, delta) }
                         }
-                        val text = result.fold(
-                            onSuccess = { it },
-                            onFailure = { e -> "请求失败：${e.message ?: "unknown error"}" },
-                        )
                         if (text.isNotBlank()) messages += AgentMessage("agent", text)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        messages += AgentMessage("agent", "请求失败：${e.message ?: "unknown error"}")
                     } finally {
                         state.agentSending = false
                     }
@@ -219,24 +231,63 @@ private fun ToolRow(title: String, detail: String, enabled: Boolean) {
 private fun MessageBubble(message: AgentMessage) {
     val agent = message.role == "agent"
     val tool = message.role == "tool"
+    if (tool) {
+        ToolMessageBubble(message)
+        return
+    }
     Column(
         Modifier.fillMaxWidth()
-            .background(if (agent || tool) Ca.colors.surface2 else Ca.colors.accentSoft, RoundedCornerShape(Ca.radius.sm))
+            .background(if (agent) Ca.colors.surface2 else Ca.colors.accentSoft, RoundedCornerShape(Ca.radius.sm))
             .padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
             when {
                 agent -> "Agent"
-                tool -> "Tool"
                 else -> "You"
             },
-            color = if (agent || tool) Ca.colors.textTertiary else Ca.colors.accent,
+            color = if (agent) Ca.colors.textTertiary else Ca.colors.accent,
             style = Ca.type.caption2,
             fontWeight = FontWeight.SemiBold,
         )
         Text(message.text, color = Ca.colors.textPrimary, style = Ca.type.codeSmall)
     }
+}
+
+@Composable
+private fun ToolMessageBubble(message: AgentMessage) {
+    var expanded by remember(message) { mutableStateOf(false) }
+    val (name, output) = remember(message.text) { splitToolMessage(message.text) }
+    Column(
+        Modifier.fillMaxWidth()
+            .background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.sm))
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().clickable { expanded = !expanded },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(
+                if (expanded) CaIcons.caretDown else CaIcons.caretRight,
+                null,
+                Modifier.size(13.dp),
+                tint = Ca.colors.textTertiary,
+            )
+            Text("Tool", color = Ca.colors.textTertiary, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold)
+            Text(name, color = Ca.colors.textPrimary, style = Ca.type.codeSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        }
+        if (expanded && output.isNotBlank()) {
+            Text(output, color = Ca.colors.textPrimary, style = Ca.type.codeSmall)
+        }
+    }
+}
+
+private fun splitToolMessage(text: String): Pair<String, String> {
+    val lineEnd = text.indexOf('\n')
+    if (lineEnd < 0) return text to ""
+    return text.substring(0, lineEnd) to text.substring(lineEnd + 1)
 }
 
 @Composable
