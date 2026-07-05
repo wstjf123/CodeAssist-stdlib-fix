@@ -596,14 +596,28 @@ data class UiAgentConfig(
 
 data class UiAgentRequest(
     val config: UiAgentConfig,
-    val prompt: String,
-    val context: String,
-    val stream: Boolean = true,
+    val input: String,
+    val tools: List<UiAgentTool> = emptyList(),
+    val previousResponseId: String? = null,
 )
 
 data class UiAgentResponse(
     val text: String,
+    val responseId: String? = null,
+    val toolCalls: List<UiAgentToolCall> = emptyList(),
     val raw: String = "",
+)
+
+data class UiAgentTool(
+    val name: String,
+    val description: String,
+    val parametersJson: String,
+)
+
+data class UiAgentToolCall(
+    val callId: String,
+    val name: String,
+    val argumentsJson: String,
 )
 
 interface AgentService {

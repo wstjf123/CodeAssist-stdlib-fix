@@ -44,6 +44,8 @@ import dev.ide.ui.backend.BuildLogLine
 import dev.ide.ui.backend.TreeNode
 import dev.ide.ui.backend.UiAgentConfig
 import dev.ide.ui.backend.UiAgentRequest
+import dev.ide.ui.backend.UiAgentTool
+import dev.ide.ui.backend.UiAgentToolCall
 import dev.ide.ui.backend.UiDiagnostic
 import dev.ide.ui.backend.UiLogEntry
 import dev.ide.ui.components.BottomSheet
@@ -181,26 +183,12 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
                 prompt = ""
                 sending = true
                 scope.launch {
-                    val result = runCatching {
-                        state.backend.agent.respond(
-                            UiAgentRequest(
-                                config = UiAgentConfig(
-                                    baseUrl = state.agentConfig.baseUrl,
-                                    apiKey = state.agentConfig.apiKey,
-                                    model = state.agentConfig.model,
-                                    reasoningEffort = state.agentConfig.reasoningEffort,
-                                ),
-                                prompt = request,
-                                context = context,
-                                stream = true,
-                            )
-                        )
-                    }
+                    val result = runCatching { runAgentLoop(state, request, context, messages) }
                     val text = result.fold(
-                        onSuccess = { it.text },
+                        onSuccess = { it },
                         onFailure = { e -> "请求失败：${e.message ?: "unknown error"}" },
                     )
-                    messages += AgentMessage("agent", text)
+                    if (text.isNotBlank()) messages += AgentMessage("agent", text)
                     sending = false
                 }
             },
@@ -259,11 +247,23 @@ private fun ToolRow(title: String, detail: String, enabled: Boolean) {
 @Composable
 private fun MessageBubble(message: AgentMessage) {
     val agent = message.role == "agent"
+    val tool = message.role == "tool"
     Column(
-        Modifier.fillMaxWidth().background(if (agent) Ca.colors.surface2 else Ca.colors.accentSoft, RoundedCornerShape(Ca.radius.sm)).padding(10.dp),
+        Modifier.fillMaxWidth()
+            .background(if (agent || tool) Ca.colors.surface2 else Ca.colors.accentSoft, RoundedCornerShape(Ca.radius.sm))
+            .padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text(if (agent) "Agent" else "You", color = if (agent) Ca.colors.textTertiary else Ca.colors.accent, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold)
+        Text(
+            when {
+                agent -> "Agent"
+                tool -> "Tool"
+                else -> "You"
+            },
+            color = if (agent || tool) Ca.colors.textTertiary else Ca.colors.accent,
+            style = Ca.type.caption2,
+            fontWeight = FontWeight.SemiBold,
+        )
         Text(message.text, color = Ca.colors.textPrimary, style = Ca.type.codeSmall)
     }
 }
@@ -413,6 +413,206 @@ private fun buildAgentContext(
         }
     }
     return out.toString().trim()
+}
+
+private suspend fun runAgentLoop(
+    state: IdeUiState,
+    request: String,
+    context: String,
+    messages: MutableList<AgentMessage>,
+): String {
+    val config = UiAgentConfig(
+        baseUrl = state.agentConfig.baseUrl,
+        apiKey = state.agentConfig.apiKey,
+        model = state.agentConfig.model,
+        reasoningEffort = state.agentConfig.reasoningEffort,
+    )
+    val tools = agentTools()
+    var input = jsonString(
+        buildString {
+            append("You are an AI coding agent embedded in CodeAssist IDE. ")
+            append("Use tools to inspect the workspace, diagnostics, logs, and to modify the currently edited buffer when needed. ")
+            append("When modifying code, prefer replace_current_selection for focused edits and replace_current_file only when a whole-file rewrite is necessary.")
+            append("\n\nUser request:\n").append(request)
+            if (context.isNotBlank()) append("\n\nInitial IDE context:\n").append(context)
+        }
+    )
+    var previousResponseId: String? = null
+    repeat(8) {
+        val response = state.backend.agent.respond(
+            UiAgentRequest(
+                config = config,
+                input = input,
+                tools = tools,
+                previousResponseId = previousResponseId,
+            )
+        )
+        previousResponseId = response.responseId ?: previousResponseId
+        if (response.toolCalls.isEmpty()) return response.text.ifBlank { "完成。" }
+        val outputs = response.toolCalls.map { call ->
+            val output = executeAgentTool(state, call)
+            messages += AgentMessage("tool", "${call.name}\n$output")
+            call.callId to output
+        }
+        input = buildToolOutputsInput(outputs)
+    }
+    return "工具调用次数过多，已停止。"
+}
+
+private fun agentTools(): List<UiAgentTool> = listOf(
+    UiAgentTool(
+        "list_workspace_files",
+        "List openable files in the current workspace. Returns absolute paths.",
+        """{"type":"object","properties":{},"additionalProperties":false}""",
+    ),
+    UiAgentTool(
+        "read_workspace_file",
+        "Read a workspace file by absolute path. Reads the unsaved editor buffer when the path is currently open.",
+        """{"type":"object","properties":{"path":{"type":"string"}},"required":["path"],"additionalProperties":false}""",
+    ),
+    UiAgentTool(
+        "get_current_file",
+        "Return the current editor file path and unsaved buffer text.",
+        """{"type":"object","properties":{},"additionalProperties":false}""",
+    ),
+    UiAgentTool(
+        "get_diagnostics",
+        "Return current editor diagnostics and warning/error messages.",
+        """{"type":"object","properties":{},"additionalProperties":false}""",
+    ),
+    UiAgentTool(
+        "get_build_logs",
+        "Return recent build logs.",
+        """{"type":"object","properties":{},"additionalProperties":false}""",
+    ),
+    UiAgentTool(
+        "get_ide_logs",
+        "Return recent IDE logs.",
+        """{"type":"object","properties":{},"additionalProperties":false}""",
+    ),
+    UiAgentTool(
+        "replace_current_selection",
+        "Replace the current editor selection, or insert at the caret if the selection is empty.",
+        """{"type":"object","properties":{"text":{"type":"string"}},"required":["text"],"additionalProperties":false}""",
+    ),
+    UiAgentTool(
+        "replace_current_file",
+        "Replace the entire current editor buffer with the supplied text.",
+        """{"type":"object","properties":{"text":{"type":"string"}},"required":["text"],"additionalProperties":false}""",
+    ),
+)
+
+private fun executeAgentTool(state: IdeUiState, call: UiAgentToolCall): String {
+    val active = state.active
+    return runCatching {
+        when (call.name) {
+            "list_workspace_files" -> collectFilePaths(state.tree).take(500).joinToString("\n")
+            "read_workspace_file" -> {
+                val path = jsonArg(call.argumentsJson, "path") ?: return "missing path"
+                val known = collectFilePaths(state.tree).toSet()
+                if (path !in known && !path.startsWith(state.backend.project.rootPath)) return "path is outside workspace"
+                if (active?.path == path) active.text else state.backend.files.readFile(path).take(20000)
+            }
+            "get_current_file" -> {
+                if (active == null) "no current file"
+                else "path: ${active.path}\n```\n${active.text.take(20000)}\n```"
+            }
+            "get_diagnostics" -> {
+                val diagnostics = active?.session?.diagnostics.orEmpty()
+                if (diagnostics.isEmpty()) "no diagnostics"
+                else buildString { appendDiagnostics(this, diagnostics) }
+            }
+            "get_build_logs" -> {
+                val log = state.backend.build.buildState.value.log.takeLast(160)
+                if (log.isEmpty()) "no build logs"
+                else log.joinToString("\n") { "${it.timeLabel} ${it.level}: ${it.message}" }
+            }
+            "get_ide_logs" -> {
+                val logs = state.backend.diagnostics.recentLogs().takeLast(160)
+                if (logs.isEmpty()) "no IDE logs"
+                else logs.joinToString("\n") { "${it.timeLabel} ${it.level}/${it.tag}: ${it.message}" }
+            }
+            "replace_current_selection" -> {
+                val text = jsonArg(call.argumentsJson, "text") ?: return "missing text"
+                val session = active?.session ?: return "no current file"
+                val start = session.selection.min
+                session.replaceRange(start, session.selection.max, text, TextRange(start + text.length))
+                "updated ${active.path} at selection"
+            }
+            "replace_current_file" -> {
+                val text = jsonArg(call.argumentsJson, "text") ?: return "missing text"
+                val session = active?.session ?: return "no current file"
+                session.replaceRange(0, session.doc.length, text, TextRange(text.length.coerceAtMost(session.doc.length + text.length)))
+                "replaced ${active.path}"
+            }
+            else -> "unknown tool: ${call.name}"
+        }
+    }.getOrElse { "tool failed: ${it.message ?: "unknown error"}" }
+}
+
+private fun buildToolOutputsInput(outputs: List<Pair<String, String>>): String = buildString {
+    append('[')
+    outputs.forEachIndexed { index, (callId, output) ->
+        if (index > 0) append(',')
+        append("{\"type\":\"function_call_output\",\"call_id\":\"")
+        append(jsonEscape(callId))
+        append("\",\"output\":")
+        append(jsonString(output))
+        append('}')
+    }
+    append(']')
+}
+
+private fun jsonArg(json: String, key: String): String? {
+    val keyAt = json.indexOf("\"$key\"")
+    if (keyAt < 0) return null
+    val colon = json.indexOf(':', keyAt)
+    if (colon < 0) return null
+    val quote = json.indexOf('"', colon + 1)
+    if (quote < 0) return null
+    val out = StringBuilder()
+    var i = quote + 1
+    while (i < json.length) {
+        val c = json[i++]
+        when (c) {
+            '"' -> return out.toString()
+            '\\' -> {
+                if (i >= json.length) return null
+                when (val esc = json[i++]) {
+                    '"', '\\', '/' -> out.append(esc)
+                    'b' -> out.append('\b')
+                    'f' -> out.append('\u000C')
+                    'n' -> out.append('\n')
+                    'r' -> out.append('\r')
+                    't' -> out.append('\t')
+                    'u' -> {
+                        if (i + 4 > json.length) return null
+                        out.append(json.substring(i, i + 4).toIntOrNull(16)?.toChar() ?: return null)
+                        i += 4
+                    }
+                }
+            }
+            else -> out.append(c)
+        }
+    }
+    return null
+}
+
+private fun jsonString(value: String): String = "\"" + jsonEscape(value) + "\""
+
+private fun jsonEscape(value: String): String = buildString {
+    value.forEach { c ->
+        when (c) {
+            '\\' -> append("\\\\")
+            '"' -> append("\\\"")
+            '\b' -> append("\\b")
+            '\u000C' -> append("\\f")
+            '\n' -> append("\\n")
+            '\r' -> append("\\r")
+            '\t' -> append("\\t")
+            else -> if (c < ' ') append("\\u").append(c.code.toString(16).padStart(4, '0')) else append(c)
+        }
+    }
 }
 
 private fun collectFilePaths(root: TreeNode): List<String> {
