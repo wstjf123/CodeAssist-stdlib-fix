@@ -152,10 +152,14 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
                 messages += AgentMessage("user", request)
                 state.agentPrompt = ""
                 state.agentSending = true
+                state.agentReceivedChars = 0
                 state.agentJob = state.agentScope.launch {
                     try {
                         val text = runAgentLoop(state, request, messages) { delta ->
-                            state.agentScope.launch { appendAgentDelta(messages, delta) }
+                            state.agentScope.launch {
+                                state.agentReceivedChars += delta.length
+                                appendAgentDelta(messages, delta)
+                            }
                         }
                         if (text.isNotBlank()) messages += AgentMessage("agent", text)
                     } catch (e: CancellationException) {
@@ -175,6 +179,7 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
                 state.agentJob?.cancel()
             },
             sending = state.agentSending,
+            receivedChars = state.agentReceivedChars,
         )
     }
 }
@@ -276,56 +281,67 @@ private fun Composer(
     onSend: () -> Unit,
     onStop: () -> Unit,
     sending: Boolean,
+    receivedChars: Int,
 ) {
-    Box(
-        Modifier.fillMaxWidth().heightIn(min = 54.dp, max = 132.dp)
-            .background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.control))
-            .border(1.dp, Ca.colors.hairline, RoundedCornerShape(Ca.radius.control)),
-    ) {
-        if (value.isEmpty()) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (sending) {
             Text(
-                "询问或要求修改当前文件…",
+                "流式接收 · $receivedChars 字符",
                 color = Ca.colors.textTertiary,
-                style = Ca.type.footnote,
-                modifier = Modifier.padding(start = 12.dp, top = 9.dp, end = 52.dp, bottom = 38.dp),
+                style = Ca.type.caption2,
+                maxLines = 1,
             )
         }
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            textStyle = Ca.type.footnote.copy(color = Ca.colors.textPrimary),
-            cursorBrush = SolidColor(Ca.colors.accent),
-            modifier = Modifier.fillMaxWidth().padding(start = 12.dp, top = 9.dp, end = 52.dp, bottom = 38.dp),
-        )
-        val canSend = value.isNotBlank()
         Box(
-            Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 10.dp, bottom = 10.dp)
-                .size(32.dp)
-                .background(
-                    when {
-                        sending -> Ca.colors.error.copy(alpha = 0.16f)
-                        canSend -> Ca.colors.accent
-                        else -> Ca.colors.surface3
-                    },
-                    RoundedCornerShape(Ca.radius.pill),
-                )
-                .clickable(enabled = sending || canSend) {
-                    if (sending) onStop() else onSend()
-                },
-            contentAlignment = Alignment.Center,
+            Modifier.fillMaxWidth().heightIn(min = 48.dp, max = 120.dp)
+                .background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.control))
+                .border(1.dp, Ca.colors.hairline, RoundedCornerShape(Ca.radius.control)),
         ) {
-            Icon(
-                if (sending) CaIcons.stop else CaIcons.arrowUp,
-                if (sending) "Stop" else "Send",
-                Modifier.size(15.dp),
-                tint = when {
-                    sending -> Ca.colors.error
-                    canSend -> Ca.colors.textOnAccent
-                    else -> Ca.colors.textTertiary
-                },
+            if (value.isEmpty()) {
+                Text(
+                    "询问或要求修改当前文件…",
+                    color = Ca.colors.textTertiary,
+                    style = Ca.type.footnote,
+                    modifier = Modifier.padding(start = 12.dp, top = 9.dp, end = 44.dp, bottom = 12.dp),
+                )
+            }
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                textStyle = Ca.type.footnote.copy(color = Ca.colors.textPrimary),
+                cursorBrush = SolidColor(Ca.colors.accent),
+                modifier = Modifier.fillMaxWidth().padding(start = 12.dp, top = 9.dp, end = 44.dp, bottom = 12.dp),
             )
+            val canSend = value.isNotBlank()
+            Box(
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 8.dp, bottom = 8.dp)
+                    .size(26.dp)
+                    .background(
+                        when {
+                            sending -> Ca.colors.error.copy(alpha = 0.16f)
+                            canSend -> Ca.colors.accent
+                            else -> Ca.colors.surface3
+                        },
+                        RoundedCornerShape(Ca.radius.pill),
+                    )
+                    .clickable(enabled = sending || canSend) {
+                        if (sending) onStop() else onSend()
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    if (sending) CaIcons.stop else CaIcons.arrowUp,
+                    if (sending) "Stop" else "Send",
+                    Modifier.size(if (sending) 20.dp else 13.dp),
+                    tint = when {
+                        sending -> Ca.colors.error
+                        canSend -> Ca.colors.textOnAccent
+                        else -> Ca.colors.textTertiary
+                    },
+                )
+            }
         }
     }
 }

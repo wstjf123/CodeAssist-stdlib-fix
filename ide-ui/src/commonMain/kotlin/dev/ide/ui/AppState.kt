@@ -127,6 +127,7 @@ class IdeUiState(val backend: IdeBackend, val composePreviewHost: ComposePreview
     var agentPrompt by mutableStateOf("")
     var agentSending by mutableStateOf(false)
     var agentJob by mutableStateOf<Job?>(null)
+    var agentReceivedChars by mutableStateOf(0)
     val agentScope: CoroutineScope = MainScope()
     val agentMessages = mutableStateListOf<AgentMessage>()
     var paletteOpen by mutableStateOf(false)
