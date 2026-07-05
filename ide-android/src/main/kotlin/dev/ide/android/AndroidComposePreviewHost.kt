@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
@@ -58,10 +59,12 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
     override fun Preview(path: String, preview: UiComposePreview, text: String, dark: Boolean, onProblems: (List<PreviewIssue>) -> Unit, onBusy: (Boolean) -> Unit, modifier: Modifier) {
         val report by rememberUpdatedState(onProblems)
         val reportBusy by rememberUpdatedState(onBusy)
+        val appContext = LocalContext.current.applicationContext
         var useProjectLoader by remember(path) { mutableStateOf(false) }
         val apk by produceState<ComposePreviewApk?>(null, path, preview.functionName, text) {
             value = runCatching { backend.composePreviewApk(path, text, preview.functionName) }.getOrNull()
         }
+        var apkError by remember(path, preview.variantId, text, apk?.fingerprint) { mutableStateOf<Throwable?>(null) }
         val state by produceState<PreviewState>(PreviewState.Loading, path, preview.functionName, preview.arity, text) {
             value = PreviewState.Loading
             val lowered = runCatching { backend.lowerComposePreview(path, preview.functionName, preview.arity, text) }.getOrNull()
@@ -88,8 +91,18 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
         val apkLoader by produceState<ClassLoader?>(null, apk, loader) {
             value = null
             apk?.let { artifact ->
-                value = withContext(Dispatchers.IO) {
-                    ApkComposePreviewLoader.loaderFor(artifact, loader ?: AndroidComposePreviewHost::class.java.classLoader)
+                val result = withContext(Dispatchers.IO) {
+                    runCatching {
+                        ApkComposePreviewLoader.loaderFor(
+                            artifact,
+                            java.io.File(appContext.cacheDir, "preview-apks").toPath(),
+                            loader ?: AndroidComposePreviewHost::class.java.classLoader,
+                        )
+                    }
+                }
+                result.onSuccess { value = it }.onFailure {
+                    log.warn("Compiled Compose preview APK loader failed", it)
+                    apkError = it
                 }
             }
         }
@@ -97,8 +110,8 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
         val apkRenderer = remember(apkLoader) { apkLoader?.let { ApkComposePreviewRenderer(it) } }
         var renderError by remember(path, preview.variantId, text, useProjectLoader, loader) { mutableStateOf<Throwable?>(null) }
         var partialError by remember(path, preview.variantId, text, useProjectLoader, loader) { mutableStateOf<Throwable?>(null) }
-        var apkError by remember(path, preview.variantId, text, apk?.fingerprint) { mutableStateOf<Throwable?>(null) }
         val compiledPreviewActive = apkRenderer != null && apk != null && !preview.hasParameter && preview.arity == 0 && apkError == null
+        val compiledPreviewUnavailable = apk != null && !preview.hasParameter && preview.arity == 0 && apkError != null
         // The interpreter re-runs on every recomposition pass, so a content lambda that fails deterministically
         // hands the renderer a FRESH Throwable each pass. Writing that to `partialError` (read during
         // composition) every pass would invalidate → re-run → invalidate … an unbounded recomposition loop.
@@ -120,7 +133,7 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
             report(
                 when {
                     compiledPreviewActive -> emptyList()
-                    apkError != null && state is PreviewState.Loading -> listOf(PreviewIssue(PreviewIssueLevel.WARNING, "Compiled preview unavailable", apkError?.message ?: apkError!!::class.simpleName ?: "Unknown error"))
+                    compiledPreviewUnavailable -> listOf(PreviewIssue(PreviewIssueLevel.ERROR, "Compiled preview unavailable", apkError?.message ?: apkError!!::class.simpleName ?: "Unknown error"))
                     err != null -> listOf(PreviewIssue(PreviewIssueLevel.ERROR, "Preview failed to render", err.message ?: err::class.simpleName ?: "Unknown error"))
                     partial != null -> listOf(PreviewIssue(PreviewIssueLevel.WARNING, "Preview partially rendered", partial.message ?: partial::class.simpleName ?: "Unknown error"))
                     state is PreviewState.NotInterpretable -> (state as PreviewState.NotInterpretable).reasons.map { PreviewIssue(PreviewIssueLevel.WARNING, "Preview not interpretable", it) }
@@ -174,7 +187,9 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
                             if (compiledError != null) {
                                 LaunchedEffect(compiledError.message, compiledError::class) { apkError = compiledError }
                             }
-                            if (!compiledPreviewActive || compiledError != null) {
+                            if (compiledPreviewUnavailable) {
+                                PreviewRenderError(apkError!!)
+                            } else if (!compiledPreviewActive || compiledError != null) {
                                 PreviewVariants(renderer, s.lowered, onErr, onPartial)
                             }
                         }
@@ -193,6 +208,8 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
                             }
                         }
                     }
+                } else if (compiledPreviewUnavailable) {
+                    Box(modifier, contentAlignment = Alignment.Center) { PreviewRenderError(apkError!!) }
                 } else CompositionLocalProvider(LocalConfiguration provides cfg) {
                     Box(modifier, contentAlignment = Alignment.Center) {
                         when (state) {

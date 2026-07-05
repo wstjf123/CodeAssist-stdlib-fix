@@ -3,6 +3,7 @@ package dev.ide.android
 import dalvik.system.DexClassLoader
 import dev.ide.core.ComposePreviewApk
 import java.io.File
+import java.nio.file.Path
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.concurrent.ConcurrentHashMap
@@ -16,22 +17,24 @@ object ApkComposePreviewLoader {
 
     private val cache = ConcurrentHashMap<String, ClassLoader>()
 
-    fun loaderFor(apk: ComposePreviewApk, parent: ClassLoader?): ClassLoader? {
+    fun loaderFor(apk: ComposePreviewApk, cacheRoot: Path, parent: ClassLoader?): ClassLoader {
         cache[apk.fingerprint]?.let { return it }
         return synchronized(this) {
-            cache[apk.fingerprint] ?: build(apk, parent)?.also { cache[apk.fingerprint] = it }
+            cache[apk.fingerprint] ?: build(apk, cacheRoot, parent).also { cache[apk.fingerprint] = it }
         }
     }
 
-    private fun build(apk: ComposePreviewApk, parent: ClassLoader?): ClassLoader? {
-        val base = apk.cacheDir.resolve(apk.fingerprint)
+    private fun build(apk: ComposePreviewApk, cacheRoot: Path, parent: ClassLoader?): ClassLoader {
+        val base = cacheRoot.resolve(apk.fingerprint)
         val dir = base.toFile().apply { mkdirs() }
         val cachedApk = File(dir, "app.apk").toPath()
         val oatDir = File(dir, "oat").apply { mkdirs() }
-        return runCatching {
-            Files.copy(apk.apk, cachedApk, StandardCopyOption.REPLACE_EXISTING)
-            cachedApk.toFile().setWritable(false, false)
-            DexClassLoader(cachedApk.toString(), oatDir.absolutePath, null, parent ?: javaClass.classLoader)
-        }.getOrNull()
+        Files.copy(apk.apk, cachedApk, StandardCopyOption.REPLACE_EXISTING)
+        val apkFile = cachedApk.toFile()
+        apkFile.setWritable(false, false)
+        if (apkFile.canWrite()) {
+            throw IllegalStateException("Preview APK cache is still writable: $cachedApk")
+        }
+        return DexClassLoader(cachedApk.toString(), oatDir.absolutePath, null, parent ?: javaClass.classLoader)
     }
 }

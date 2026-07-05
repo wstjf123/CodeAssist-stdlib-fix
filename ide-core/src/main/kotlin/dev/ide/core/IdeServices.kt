@@ -276,8 +276,6 @@ data class ComposePreviewApk(
     val packageName: String?,
     /** True when the built APK is older than the source file on disk; callers may still render it as fallback. */
     val stale: Boolean,
-    /** Base dir for the launcher's read-only APK copies and oat output. */
-    val cacheDir: Path,
 )
 
 /**
@@ -2046,7 +2044,6 @@ class IdeServices private constructor(
             variant = variant,
             packageName = facet.namespace,
             stale = sourceModified > modified,
-            cacheDir = store.rootPath.resolve(".platform").resolve("caches").resolve("preview-apks"),
         )
     }
 
