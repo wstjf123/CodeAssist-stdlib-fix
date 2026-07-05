@@ -2035,6 +2035,9 @@ class IdeServices private constructor(
         val size = runCatching { Files.size(apk) }.getOrDefault(-1L)
         val modified = runCatching { Files.getLastModifiedTime(apk).toMillis() }.getOrDefault(0L)
         val sourceModified = runCatching { Files.getLastModifiedTime(file).toMillis() }.getOrDefault(0L)
+        val bufferDiffersFromDisk = runCatching {
+            String(Files.readAllBytes(file), Charsets.UTF_8) != text
+        }.getOrDefault(false)
         val fingerprint = "$apk:$size:$modified:$facade:$functionName"
         return ComposePreviewApk(
             apk = apk,
@@ -2043,7 +2046,7 @@ class IdeServices private constructor(
             functionName = functionName,
             variant = variant,
             packageName = facet.namespace,
-            stale = sourceModified > modified,
+            stale = sourceModified > modified || bufferDiffersFromDisk,
         )
     }
 

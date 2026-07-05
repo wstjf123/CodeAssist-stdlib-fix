@@ -247,7 +247,7 @@ fun ComposePreviewPane(
         val contentMod = if (wrap) Modifier.wrapContentSize() else Modifier.fillMaxSize()
         Box(contentMod, contentAlignment = Alignment.Center) {
             when {
-                host != null && current != null -> key(current.variantId) {
+                host != null && current != null -> key(current.variantId, nonce) {
                     // Render at DEVICE scale by lowering the DENSITY the content sees: the card is already
                     // sized to the device viewport in px, so telling the content it has the device's density
                     // makes it lay out at the device's dp (a phone UI uses a phone's worth of width), and the

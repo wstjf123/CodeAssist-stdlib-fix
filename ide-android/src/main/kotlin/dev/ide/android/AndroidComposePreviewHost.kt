@@ -69,7 +69,8 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
             value = runCatching { backend.composePreviewApk(path, text, preview.functionName) }.getOrNull()
         }
         var apkError by remember(path, preview.variantId, text, refreshKey, apk?.fingerprint) { mutableStateOf<Throwable?>(null) }
-        val compiledCandidate = apk != null && !preview.hasParameter && preview.arity == 0
+        val compiledApk = apk?.takeIf { !it.stale && !preview.hasParameter && preview.arity == 0 }
+        val compiledCandidate = compiledApk != null
         val state by produceState<PreviewState>(PreviewState.Loading, path, preview.functionName, preview.arity, text, refreshKey, compiledCandidate) {
             value = PreviewState.Loading
             if (compiledCandidate) {
@@ -97,9 +98,9 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
                 }.getOrNull()
             }
         }
-        val apkLoader by produceState<ClassLoader?>(null, apk, loader) {
+        val apkLoader by produceState<ClassLoader?>(null, compiledApk, loader) {
             value = null
-            apk?.let { artifact ->
+            compiledApk?.let { artifact ->
                 val result = withContext(Dispatchers.IO) {
                     runCatching {
                         ApkComposePreviewLoader.loaderFor(
@@ -174,7 +175,7 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
                     IsolatedComposePreview(modifier) {
                         CompositionLocalProvider(LocalConfiguration provides cfg) {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                val compiledError = apkRenderer?.Render(apk!!.facadeFqn, apk!!.functionName)
+                                val compiledError = apkRenderer?.Render(compiledApk!!.facadeFqn, compiledApk!!.functionName)
                                 if (compiledError != null) {
                                     LaunchedEffect(compiledError.message, compiledError::class) { apkError = compiledError }
                                 }
@@ -211,7 +212,7 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
                     CompositionLocalProvider(LocalConfiguration provides cfg) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             val compiledError = if (compiledPreviewActive) {
-                                apkRenderer?.Render(apk!!.facadeFqn, apk!!.functionName)
+                                apkRenderer?.Render(compiledApk!!.facadeFqn, compiledApk!!.functionName)
                             } else null
                             if (compiledError != null) {
                                 LaunchedEffect(compiledError.message, compiledError::class) { apkError = compiledError }
@@ -230,7 +231,7 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
                     IsolatedComposePreview(modifier) {
                         CompositionLocalProvider(LocalConfiguration provides cfg) {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                val compiledError = apkRenderer?.Render(apk!!.facadeFqn, apk!!.functionName)
+                                val compiledError = apkRenderer?.Render(compiledApk!!.facadeFqn, compiledApk!!.functionName)
                                 if (compiledError != null) {
                                     LaunchedEffect(compiledError.message, compiledError::class) { apkError = compiledError }
                                 }
