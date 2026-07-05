@@ -332,6 +332,10 @@ class IdeServicesBackend(
     suspend fun composePreviewLibs(path: String): ComposePreviewLibs? =
         preview { services.composePreviewLibs(Paths.get(path)) }
 
+    /** The last built APK for compiled-bytecode Compose preview, if this file belongs to an Android module. */
+    suspend fun composePreviewApk(path: String, text: String, functionName: String): ComposePreviewApk? =
+        preview { services.composePreviewApk(Paths.get(path), text, functionName) }
+
     // The owned XML-layout preview (LayoutPreviewBackend); the preview host calls this directly. Runs on the
     // preview lane so the render (real-view dex-load + resource-context build + inflate/measure/draw, or the
     // owned engine pass) executes off the UI thread and is preempted by analysis and completion.

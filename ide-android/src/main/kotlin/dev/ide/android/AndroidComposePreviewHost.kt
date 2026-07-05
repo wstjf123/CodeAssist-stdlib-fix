@@ -31,6 +31,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ide.core.IdeServicesBackend
+import dev.ide.core.ComposePreviewApk
 import dev.ide.core.LoweredComposePreview
 import dev.ide.interp.compose.ComposePreviewRenderer
 import dev.ide.interp.compose.PreviewParameterBinding
@@ -58,6 +59,9 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
         val report by rememberUpdatedState(onProblems)
         val reportBusy by rememberUpdatedState(onBusy)
         var useProjectLoader by remember(path) { mutableStateOf(false) }
+        val apk by produceState<ComposePreviewApk?>(null, path, preview.functionName, text) {
+            value = runCatching { backend.composePreviewApk(path, text, preview.functionName) }.getOrNull()
+        }
         val state by produceState<PreviewState>(PreviewState.Loading, path, preview.functionName, preview.arity, text) {
             value = PreviewState.Loading
             val lowered = runCatching { backend.lowerComposePreview(path, preview.functionName, preview.arity, text) }.getOrNull()
@@ -81,9 +85,20 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
                 }.getOrNull()
             }
         }
+        val apkLoader by produceState<ClassLoader?>(null, apk, loader) {
+            value = null
+            apk?.let { artifact ->
+                value = withContext(Dispatchers.IO) {
+                    ApkComposePreviewLoader.loaderFor(artifact, loader ?: AndroidComposePreviewHost::class.java.classLoader)
+                }
+            }
+        }
         val renderer = remember(loader) { ComposePreviewRenderer(loader) }
+        val apkRenderer = remember(apkLoader) { apkLoader?.let { ApkComposePreviewRenderer(it) } }
         var renderError by remember(path, preview.variantId, text, useProjectLoader, loader) { mutableStateOf<Throwable?>(null) }
         var partialError by remember(path, preview.variantId, text, useProjectLoader, loader) { mutableStateOf<Throwable?>(null) }
+        var apkError by remember(path, preview.variantId, text, apk?.fingerprint) { mutableStateOf<Throwable?>(null) }
+        val compiledPreviewActive = apkRenderer != null && apk != null && !preview.hasParameter && preview.arity == 0 && apkError == null
         // The interpreter re-runs on every recomposition pass, so a content lambda that fails deterministically
         // hands the renderer a FRESH Throwable each pass. Writing that to `partialError` (read during
         // composition) every pass would invalidate → re-run → invalidate … an unbounded recomposition loop.
@@ -99,11 +114,13 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
         // so the details live in the tappable chip rather than covering the device frame.
         // renderError = top-level failure (preview replaced by error view); partialError = content-lambda error
         // (preview still shows, but lazy content like LazyColumn items may be incomplete).
-        LaunchedEffect(state, renderError, partialError) {
+        LaunchedEffect(state, renderError, partialError, compiledPreviewActive, apkError) {
             val err = renderError
             val partial = partialError
             report(
                 when {
+                    compiledPreviewActive -> emptyList()
+                    apkError != null && state is PreviewState.Loading -> listOf(PreviewIssue(PreviewIssueLevel.WARNING, "Compiled preview unavailable", apkError?.message ?: apkError!!::class.simpleName ?: "Unknown error"))
                     err != null -> listOf(PreviewIssue(PreviewIssueLevel.ERROR, "Preview failed to render", err.message ?: err::class.simpleName ?: "Unknown error"))
                     partial != null -> listOf(PreviewIssue(PreviewIssueLevel.WARNING, "Preview partially rendered", partial.message ?: partial::class.simpleName ?: "Unknown error"))
                     state is PreviewState.NotInterpretable -> (state as PreviewState.NotInterpretable).reasons.map { PreviewIssue(PreviewIssueLevel.WARNING, "Preview not interpretable", it) }
@@ -151,20 +168,41 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
                 IsolatedComposePreview(modifier) {
                     CompositionLocalProvider(LocalConfiguration provides cfg) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            PreviewVariants(renderer, s.lowered, onErr, onPartial)
+                            val compiledError = if (compiledPreviewActive) {
+                                apkRenderer?.Render(apk!!.facadeFqn, apk!!.functionName)
+                            } else null
+                            if (compiledError != null) {
+                                LaunchedEffect(compiledError.message, compiledError::class) { apkError = compiledError }
+                            }
+                            if (!compiledPreviewActive || compiledError != null) {
+                                PreviewVariants(renderer, s.lowered, onErr, onPartial)
+                            }
                         }
                     }
                 }
             }
-            else -> CompositionLocalProvider(LocalConfiguration provides cfg) {
-                Box(modifier, contentAlignment = Alignment.Center) {
-                    when (state) {
-                        is PreviewState.Loading -> CircularProgressIndicator(Modifier.size(28.dp))
-                        is PreviewState.NotInterpretable -> Text(
-                            "Preview not interpretable", color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 12.sp, modifier = Modifier.padding(16.dp),
-                        )
-                        is PreviewState.Ready -> Unit
+            else -> {
+                if (compiledPreviewActive) {
+                    IsolatedComposePreview(modifier) {
+                        CompositionLocalProvider(LocalConfiguration provides cfg) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                val compiledError = apkRenderer?.Render(apk!!.facadeFqn, apk!!.functionName)
+                                if (compiledError != null) {
+                                    LaunchedEffect(compiledError.message, compiledError::class) { apkError = compiledError }
+                                }
+                            }
+                        }
+                    }
+                } else CompositionLocalProvider(LocalConfiguration provides cfg) {
+                    Box(modifier, contentAlignment = Alignment.Center) {
+                        when (state) {
+                            is PreviewState.Loading -> CircularProgressIndicator(Modifier.size(28.dp))
+                            is PreviewState.NotInterpretable -> Text(
+                                "Preview not interpretable", color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 12.sp, modifier = Modifier.padding(16.dp),
+                            )
+                            is PreviewState.Ready -> Unit
+                        }
                     }
                 }
             }

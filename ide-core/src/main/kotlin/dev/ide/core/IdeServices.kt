@@ -262,6 +262,25 @@ data class ComposePreviewLibs(
 )
 
 /**
+ * A compiled debug APK that can render a `@Preview` by loading the APK dex and invoking the Compose-compiled
+ * facade function directly. This complements [LoweredComposePreview]: the lowered/interpreted path previews
+ * the live editor buffer, while this path runs the last successful build's real Kotlin/Compose bytecode, so
+ * suspend lambdas, `LaunchedEffect`, and animation state machines behave like they do in the app.
+ */
+data class ComposePreviewApk(
+    val apk: Path,
+    val fingerprint: String,
+    val facadeFqn: String,
+    val functionName: String,
+    val variant: String,
+    val packageName: String?,
+    /** True when the built APK is older than the source file on disk; callers may still render it as fallback. */
+    val stale: Boolean,
+    /** Base dir for the launcher's read-only APK copies and oat output. */
+    val cacheDir: Path,
+)
+
+/**
  * Renders a lowered `@Preview` composable into the real Compose runtime (the interpreter half lives in
  * :interp-core / :ide-android). Supplied by :ide-android (it needs the real `androidx.compose.runtime` + a
  * composition surface); null on the desktop / until wired, where preview "runs" report only interpretability.
@@ -1999,6 +2018,41 @@ class IdeServices private constructor(
         val cacheDir = store.rootPath.resolve(".platform").resolve("caches").resolve("preview-libs")
         return ComposePreviewLibs(jars, fingerprint, previewAndroidJar(), minApi, cacheDir)
     }
+
+    /**
+     * The last successful APK build for [file]'s module, if present. Android preview hosts can load this APK's
+     * compiled dex and call [functionName] as real Compose bytecode. It intentionally does not build: this is a
+     * low-latency render path for an already-built debug artifact, and stale artifacts are reported so the UI
+     * can still prefer live interpretation when needed.
+     */
+    fun composePreviewApk(file: Path, text: String, functionName: String): ComposePreviewApk? {
+        val module = moduleForEditableFile(file) ?: moduleForFile(file) ?: return null
+        val facet = module.facets.get(AndroidFacet.KEY) ?: return null
+        val variant = activeVariant(module).takeIf { it.isNotBlank() } ?: "debug"
+        val apk = dev.ide.android.support.AndroidBuildSystem.signedApkPath(module, variant)
+            .takeIf { Files.isRegularFile(it) } ?: return null
+        val packageName = kotlinPackageName(text)
+        val simple = file.fileName.toString().removeSuffix(".kt").replace(Regex("[^A-Za-z0-9_]"), "_") + "Kt"
+        val facade = packageName?.takeIf { it.isNotBlank() }?.let { "$it.$simple" } ?: simple
+        val size = runCatching { Files.size(apk) }.getOrDefault(-1L)
+        val modified = runCatching { Files.getLastModifiedTime(apk).toMillis() }.getOrDefault(0L)
+        val sourceModified = runCatching { Files.getLastModifiedTime(file).toMillis() }.getOrDefault(0L)
+        val fingerprint = "$apk:$size:$modified:$facade:$functionName"
+        return ComposePreviewApk(
+            apk = apk,
+            fingerprint = fingerprint.hashCode().toString(16),
+            facadeFqn = facade,
+            functionName = functionName,
+            variant = variant,
+            packageName = facet.namespace,
+            stale = sourceModified > modified,
+            cacheDir = store.rootPath.resolve(".platform").resolve("caches").resolve("preview-apks"),
+        )
+    }
+
+    private fun kotlinPackageName(text: String): String? =
+        Regex("""(?m)^\s*package\s+([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)""")
+            .find(text)?.groupValues?.getOrNull(1)
 
 
     /**
