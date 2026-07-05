@@ -93,7 +93,7 @@ object UiThreadWatchdog {
         append(file, text)
     }
 
-    private fun StringBuilder.appendStack(stack: Array<StackTraceElement>) {
+    private fun StringBuilder.appendStack(stack: Array<out StackTraceElement>) {
         if (stack.isEmpty()) {
             appendLine("  <no Java stack>")
             return
