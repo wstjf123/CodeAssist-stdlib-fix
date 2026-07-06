@@ -165,13 +165,13 @@ private fun AgentPanel(
                         val detailsKey = "${item.key}:details"
                         val detailsIndex = rowIndex + 1
                         rowIndex += 3
-                        val detailsVisible by remember(detailsKey, detailsIndex) {
-                            derivedStateOf {
-                                listState.firstVisibleItemIndex <= detailsIndex ||
-                                    listState.layoutInfo.visibleItemsInfo.any { it.key == detailsKey }
-                            }
-                        }
                         stickyHeader {
+                            val detailsVisible by remember(detailsKey, detailsIndex) {
+                                derivedStateOf {
+                                    listState.firstVisibleItemIndex <= detailsIndex ||
+                                        listState.layoutInfo.visibleItemsInfo.any { it.key == detailsKey }
+                                }
+                            }
                             Box(
                                 Modifier.fillMaxWidth()
                                     .background(listBackground)
