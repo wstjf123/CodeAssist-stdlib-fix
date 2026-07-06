@@ -34,7 +34,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -43,13 +42,6 @@ import dev.ide.ui.AgentConfig
 import dev.ide.ui.AgentConversation
 import dev.ide.ui.AgentConversationItem
 import dev.ide.ui.IdeUiState
-import dev.ide.ui.backend.TreeNode
-import dev.ide.ui.backend.UiAgentConfig
-import dev.ide.ui.backend.UiAgentInputItem
-import dev.ide.ui.backend.UiAgentRequest
-import dev.ide.ui.backend.UiAgentTool
-import dev.ide.ui.backend.UiAgentToolCall
-import dev.ide.ui.backend.UiDiagnostic
 import dev.ide.ui.components.BottomSheet
 import dev.ide.ui.components.Chip
 import dev.ide.ui.components.DialogButton
@@ -230,12 +222,17 @@ private fun ContextToggle(label: String, selected: Boolean, enabled: Boolean, on
 
 @Composable
 private fun MessageBubble(message: AgentConversationItem) {
-    val agent = message.role == "assistant"
-    val tool = message.type == "function_call_output"
-    if (tool) {
-        ToolMessageBubble(message)
-        return
+    when (message.type) {
+        "compaction" -> Unit
+        "function_call" -> Unit
+        "function_call_output" -> ToolMessageBubble(message)
+        "message" -> if (message.text.isNotBlank()) TextMessageBubble(message)
     }
+}
+
+@Composable
+private fun TextMessageBubble(message: AgentConversationItem) {
+    val agent = message.role == "assistant"
     Row(
         Modifier.fillMaxWidth(),
         horizontalArrangement = if (agent) Arrangement.Start else Arrangement.End,
@@ -263,6 +260,8 @@ private fun ToolMessageBubble(message: AgentConversationItem) {
     var expanded by remember(message) { mutableStateOf(false) }
     val name = message.name ?: "tool"
     val output = message.text
+    val arguments = message.argumentsJson.orEmpty()
+    val failed = message.toolSuccess == false
     Column(
         Modifier.fillMaxWidth()
             .background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.sm))
@@ -282,8 +281,14 @@ private fun ToolMessageBubble(message: AgentConversationItem) {
             )
             Text("Tool", color = Ca.colors.textTertiary, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold)
             Text(name, color = Ca.colors.textPrimary, style = Ca.type.codeSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            if (failed) {
+                Text("failed", color = Ca.colors.error, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold)
+            }
         }
         if (expanded && output.isNotBlank()) {
+            if (arguments.isNotBlank()) {
+                Text(arguments, color = Ca.colors.textSecondary, style = Ca.type.codeSmall)
+            }
             Text(output, color = Ca.colors.textPrimary, style = Ca.type.codeSmall)
         }
     }
@@ -342,7 +347,7 @@ private fun AgentConversationRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                "${conversation.items.count { it.type == "message" }} 条消息",
+                "${conversation.items.count { it.type == "message" && it.text.isNotBlank() }} 条消息",
                 color = Ca.colors.textTertiary,
                 style = Ca.type.caption2,
                 maxLines = 1,
@@ -490,412 +495,5 @@ private fun ConfigTextField(
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
         )
-    }
-}
-
-private suspend fun runAgentLoop(
-    state: IdeUiState,
-    messages: MutableList<AgentConversationItem>,
-    onTextDelta: (String) -> Unit,
-    onStreamChars: (Int) -> Unit,
-): String {
-    val config = UiAgentConfig(
-        baseUrl = state.agentConfig.baseUrl,
-        apiKey = state.agentConfig.apiKey,
-        model = state.agentConfig.model,
-        reasoningEffort = state.agentConfig.reasoningEffort,
-    )
-    val tools = agentTools()
-    repeat(8) {
-        var receivedTextDelta = false
-        val response = state.backend.agent.respond(
-            request = UiAgentRequest(
-                config = config,
-                instructions = agentInstructions(),
-                input = compactAgentInput(messages),
-                tools = tools,
-            ),
-            onTextDelta = { delta ->
-                if (isUsefulAgentText(delta)) {
-                    receivedTextDelta = true
-                    onTextDelta(delta)
-                }
-            },
-            onStreamChars = onStreamChars,
-        )
-        if (response.toolCalls.isEmpty()) {
-            if (receivedTextDelta && isUsefulAgentText(response.text)) return ""
-            if (isUsefulAgentText(response.text)) return response.text
-            return "完成。"
-        }
-        response.toolCalls.forEach { call ->
-            messages += AgentConversationItem(
-                type = "function_call",
-                callId = call.callId,
-                name = call.name,
-                argumentsJson = call.argumentsJson,
-            )
-            val output = executeAgentTool(state, call)
-            messages += AgentConversationItem(
-                type = "function_call_output",
-                text = output,
-                callId = call.callId,
-                name = call.name,
-            )
-            state.recordAgentChanged()
-        }
-    }
-    return "工具调用次数过多，已停止。"
-}
-
-private fun agentInstructions(): String =
-    "You are an AI coding agent embedded in CodeAssist IDE. " +
-        "Use tools to inspect the workspace, diagnostics, logs, and to modify the currently edited buffer when needed. " +
-        "When modifying code, use apply_patch with a unified patch for the current editor file."
-
-private fun compactAgentInput(messages: List<AgentConversationItem>): List<UiAgentInputItem> {
-    val (dropped, retainedItems) = splitTailFromLastUserMessages(messages, userMessageCount = 10)
-    val retained = retainedItems.toMutableList()
-    truncateAssistantText(retained, maxChars = 12000)
-    val input = ArrayList<UiAgentInputItem>()
-    buildCompactedSummary(dropped)?.let { summary ->
-        input += UiAgentInputItem(
-            type = "message",
-            role = "developer",
-            content = summary,
-        )
-    }
-    input += retained.mapNotNull { item ->
-        when (item.type) {
-            "message" -> UiAgentInputItem(
-                type = "message",
-                role = item.role ?: "user",
-                content = item.text,
-            )
-            "function_call" -> UiAgentInputItem(
-                type = "function_call",
-                callId = item.callId,
-                name = item.name,
-                argumentsJson = item.argumentsJson,
-            )
-            "function_call_output" -> UiAgentInputItem(
-                type = "function_call_output",
-                callId = item.callId,
-                output = item.text,
-            )
-            else -> null
-        }
-    }
-    return input
-}
-
-private fun splitTailFromLastUserMessages(
-    items: List<AgentConversationItem>,
-    userMessageCount: Int,
-): Pair<List<AgentConversationItem>, List<AgentConversationItem>> {
-    if (userMessageCount <= 0) return items to emptyList()
-    val latestUser = items.indexOfLast { it.type == "message" && it.role == "user" }
-    if (latestUser < 0) return items to emptyList()
-    val throughLatestUser = items.take(latestUser + 1)
-    var seen = 0
-    var start = latestUser
-    for (i in throughLatestUser.indices.reversed()) {
-        val item = throughLatestUser[i]
-        if (item.type == "message" && item.role == "user") {
-            seen++
-            start = i
-            if (seen >= userMessageCount) break
-        }
-    }
-    return items.take(start) to normalizeToolPairs(items.drop(start))
-}
-
-private fun buildCompactedSummary(items: List<AgentConversationItem>): String? {
-    if (items.isEmpty()) return null
-    val lines = ArrayList<String>()
-    items.forEach { item ->
-        when {
-            item.type == "message" && item.role == "user" -> {
-                lines += "User: ${item.text.oneLineForSummary()}"
-            }
-            item.type == "message" && item.role == "assistant" -> {
-                lines += "Assistant: ${item.text.oneLineForSummary()}"
-            }
-            item.type == "function_call" -> {
-                lines += "Tool call: ${item.name.orEmpty()} ${item.argumentsJson.orEmpty().oneLineForSummary(220)}"
-            }
-            item.type == "function_call_output" -> {
-                lines += "Tool output: ${item.name.orEmpty()} ${item.text.oneLineForSummary(220)}"
-            }
-        }
-    }
-    if (lines.isEmpty()) return null
-    return "Earlier conversation was compacted. Preserve these facts and decisions:\n" +
-        lines.takeLast(80).joinToString("\n")
-}
-
-private fun String.oneLineForSummary(limit: Int = 360): String {
-    val value = trim().replace(Regex("\\s+"), " ")
-    return if (value.length <= limit) value else value.take(limit) + "..."
-}
-
-private fun normalizeToolPairs(items: List<AgentConversationItem>): List<AgentConversationItem> {
-    val callIds = items.asSequence()
-        .filter { it.type == "function_call" }
-        .mapNotNull { it.callId }
-        .toSet()
-    return items.filter { item ->
-        item.type != "function_call_output" || item.callId in callIds
-    }
-}
-
-private fun truncateAssistantText(items: MutableList<AgentConversationItem>, maxChars: Int) {
-    var remaining = maxChars
-    val iterator = items.listIterator()
-    while (iterator.hasNext()) {
-        val item = iterator.next()
-        if (item.type != "message" || item.role != "assistant") continue
-        if (remaining <= 0) {
-            iterator.remove()
-            continue
-        }
-        if (item.text.length > remaining) {
-            iterator.set(AgentConversationItem("message", "assistant", item.text.take(remaining) + "\n... [truncated]"))
-            remaining = 0
-        } else {
-            remaining -= item.text.length
-        }
-    }
-}
-
-private fun isUsefulAgentText(text: String): Boolean {
-    val value = text.trim()
-    if (value.isEmpty() || value == "null") return false
-    if (Regex("""(?:\{\}|\[\])+\s*""").matches(value)) return false
-    return true
-}
-
-private fun appendAgentDelta(messages: MutableList<AgentConversationItem>, delta: String) {
-    val last = messages.lastOrNull()
-    val msg = if (last?.type == "message" && last.role == "assistant") {
-        last
-    } else {
-        AgentConversationItem("message", "assistant", "").also { messages += it }
-    }
-    msg.text += delta
-}
-
-private fun agentTools(): List<UiAgentTool> = listOf(
-    UiAgentTool(
-        "list_workspace_files",
-        "List openable files in the current workspace. Returns absolute paths.",
-        """{"type":"object","properties":{},"additionalProperties":false}""",
-    ),
-    UiAgentTool(
-        "read_workspace_file",
-        "Read a workspace file by absolute path. Reads the unsaved editor buffer when the path is currently open.",
-        """{"type":"object","properties":{"path":{"type":"string"}},"required":["path"],"additionalProperties":false}""",
-    ),
-    UiAgentTool(
-        "get_current_file",
-        "Return the current editor file path and unsaved buffer text.",
-        """{"type":"object","properties":{},"additionalProperties":false}""",
-    ),
-    UiAgentTool(
-        "get_diagnostics",
-        "Return current editor diagnostics and warning/error messages.",
-        """{"type":"object","properties":{},"additionalProperties":false}""",
-    ),
-    UiAgentTool(
-        "get_build_logs",
-        "Return recent build logs.",
-        """{"type":"object","properties":{},"additionalProperties":false}""",
-    ),
-    UiAgentTool(
-        "get_ide_logs",
-        "Return recent IDE logs.",
-        """{"type":"object","properties":{},"additionalProperties":false}""",
-    ),
-    UiAgentTool(
-        "apply_patch",
-        "Apply a unified patch to the current editor file. The patch must use *** Begin Patch, *** Update File: <current path>, @@ hunks, and *** End Patch.",
-        """{"type":"object","properties":{"patch":{"type":"string"}},"required":["patch"],"additionalProperties":false}""",
-    ),
-)
-
-private fun executeAgentTool(state: IdeUiState, call: UiAgentToolCall): String {
-    val active = state.active
-    return runCatching {
-        when (call.name) {
-            "list_workspace_files" -> collectFilePaths(state.tree).take(500).joinToString("\n")
-            "read_workspace_file" -> {
-                val path = call.stringArguments["path"] ?: return "missing path"
-                val known = collectFilePaths(state.tree).toSet()
-                if (path !in known && !path.startsWith(state.backend.project.rootPath)) return "path is outside workspace"
-                if (active?.path == path) active.text else state.backend.files.readFile(path).take(20000)
-            }
-            "get_current_file" -> {
-                if (active == null) "no current file"
-                else "path: ${active.path}\n```\n${active.text.take(20000)}\n```"
-            }
-            "get_diagnostics" -> {
-                val diagnostics = active?.session?.diagnostics.orEmpty()
-                if (diagnostics.isEmpty()) "no diagnostics"
-                else buildString { appendDiagnostics(this, diagnostics) }
-            }
-            "get_build_logs" -> {
-                val log = state.backend.build.buildState.value.log.takeLast(160)
-                if (log.isEmpty()) "no build logs"
-                else log.joinToString("\n") { "${it.timeLabel} ${it.level}: ${it.message}" }
-            }
-            "get_ide_logs" -> {
-                val logs = state.backend.diagnostics.recentLogs().takeLast(160)
-                if (logs.isEmpty()) "no IDE logs"
-                else logs.joinToString("\n") { "${it.timeLabel} ${it.level}/${it.tag}: ${it.message}" }
-            }
-            "apply_patch" -> {
-                val patch = call.stringArguments["patch"] ?: return "missing patch"
-                val file = active ?: return "no current file"
-                val result = applyAgentPatch(file.path, file.text, patch)
-                if (!result.ok) return result.message
-                if (result.text == file.text) return "patch applied to ${file.path}: ${result.message}"
-                val session = file.session
-                session.replaceRange(0, session.doc.length, result.text, TextRange(result.text.length))
-                "applied patch to ${file.path}: ${result.message}"
-            }
-            else -> "unknown tool: ${call.name}"
-        }
-    }.getOrElse { "tool failed: ${it.message ?: "unknown error"}" }
-}
-
-private data class AgentPatchResult(val ok: Boolean, val text: String, val message: String)
-
-private data class AgentPatchHunk(val oldText: String, val newText: String)
-
-private data class AgentPatchParseResult(val ok: Boolean, val hunks: List<AgentPatchHunk> = emptyList(), val message: String = "")
-
-private fun applyAgentPatch(currentPath: String, currentText: String, patch: String): AgentPatchResult {
-    val parsed = parseAgentPatch(currentPath, patch)
-    if (!parsed.ok) return AgentPatchResult(false, currentText, parsed.message)
-    var text = currentText
-    var searchFrom = 0
-    var applied = 0
-    parsed.hunks.forEachIndexed { index, hunk ->
-        val match = findPatchMatch(text, hunk.oldText, searchFrom)
-            ?: findPatchMatch(text, hunk.oldText, 0)
-            ?: return AgentPatchResult(false, currentText, "hunk ${index + 1} did not match current file")
-        text = text.replaceRange(match.first, match.last + 1, hunk.newText)
-        searchFrom = match.first + hunk.newText.length
-        applied++
-    }
-    if (applied == 0) return AgentPatchResult(false, currentText, "patch contained no hunks")
-    if (text == currentText) return AgentPatchResult(true, text, "no text changed")
-    return AgentPatchResult(true, text, "$applied hunk(s)")
-}
-
-private fun parseAgentPatch(currentPath: String, patch: String): AgentPatchParseResult {
-    val lines = patch.replace("\r\n", "\n").replace('\r', '\n').split('\n')
-    var inPatch = false
-    var inCurrentFile = false
-    var sawTargetFile = false
-    var hunkStarted = false
-    val hunks = ArrayList<AgentPatchHunk>()
-    val oldText = StringBuilder()
-    val newText = StringBuilder()
-
-    fun flushHunk(): AgentPatchResult? {
-        if (!hunkStarted) return null
-        if (oldText.isEmpty() && newText.isEmpty()) {
-            return AgentPatchResult(false, "", "empty hunk")
-        }
-        hunks += AgentPatchHunk(oldText.toString(), newText.toString())
-        oldText.clear()
-        newText.clear()
-        hunkStarted = false
-        return null
-    }
-
-    lines.forEach { line ->
-        when {
-            line == "*** Begin Patch" -> {
-                inPatch = true
-            }
-            line == "*** End Patch" -> {
-                flushHunk()?.let { return AgentPatchParseResult(false, message = it.message) }
-                inCurrentFile = false
-                inPatch = false
-            }
-            inPatch && line.startsWith("*** Update File:") -> {
-                flushHunk()?.let { return AgentPatchParseResult(false, message = it.message) }
-                val path = line.removePrefix("*** Update File:").trim()
-                inCurrentFile = pathMatchesCurrentFile(path, currentPath)
-                sawTargetFile = sawTargetFile || inCurrentFile
-            }
-            inPatch && line.startsWith("*** ") -> {
-                flushHunk()?.let { return AgentPatchParseResult(false, message = it.message) }
-                inCurrentFile = false
-            }
-            inPatch && inCurrentFile && line.startsWith("@@") -> {
-                flushHunk()?.let { return AgentPatchParseResult(false, message = it.message) }
-                hunkStarted = true
-            }
-            inPatch && inCurrentFile && hunkStarted && line.isNotEmpty() -> {
-                when (line[0]) {
-                    ' ' -> {
-                        oldText.append(line.drop(1)).append('\n')
-                        newText.append(line.drop(1)).append('\n')
-                    }
-                    '-' -> oldText.append(line.drop(1)).append('\n')
-                    '+' -> newText.append(line.drop(1)).append('\n')
-                    else -> return AgentPatchParseResult(false, message = "invalid hunk line: $line")
-                }
-            }
-            inPatch && inCurrentFile && hunkStarted && line.isEmpty() -> {
-                oldText.append('\n')
-                newText.append('\n')
-            }
-        }
-    }
-    flushHunk()?.let { return AgentPatchParseResult(false, message = it.message) }
-    if (!sawTargetFile) return AgentPatchParseResult(false, message = "patch does not target current file")
-    if (hunks.isEmpty()) return AgentPatchParseResult(false, message = "patch contained no hunks")
-    return AgentPatchParseResult(true, hunks)
-}
-
-private fun pathMatchesCurrentFile(path: String, currentPath: String): Boolean {
-    val normalized = path.replace('\\', '/')
-    val current = currentPath.replace('\\', '/')
-    return normalized == current ||
-        current.endsWith("/$normalized") ||
-        normalized == current.substringAfterLast('/')
-}
-
-private fun findPatchMatch(text: String, oldText: String, startIndex: Int): IntRange? {
-    if (oldText.isEmpty()) return null
-    val exact = text.indexOf(oldText, startIndex.coerceIn(0, text.length))
-    if (exact >= 0) return exact until exact + oldText.length
-    if (oldText.endsWith('\n')) {
-        val trimmed = oldText.dropLast(1)
-        val trimmedIndex = text.indexOf(trimmed, startIndex.coerceIn(0, text.length))
-        if (trimmedIndex >= 0) return trimmedIndex until trimmedIndex + trimmed.length
-    }
-    return null
-}
-
-private fun collectFilePaths(root: TreeNode): List<String> {
-    val out = ArrayList<String>()
-    fun walk(node: TreeNode) {
-        node.filePath?.let { out += it }
-        node.children.forEach(::walk)
-    }
-    walk(root)
-    return out
-}
-
-private fun appendDiagnostics(out: StringBuilder, diagnostics: List<UiDiagnostic>) {
-    if (diagnostics.isEmpty()) return
-    out.append("## 编辑器诊断\n")
-    diagnostics.forEach { d ->
-        out.append(d.severity).append(' ').append(d.line).append(':').append(d.col).append(' ').append(d.message).append('\n')
     }
 }

@@ -609,6 +609,7 @@ data class UiAgentInputItem(
     val name: String? = null,
     val argumentsJson: String? = null,
     val output: String? = null,
+    val outputSuccess: Boolean? = null,
 )
 
 data class UiAgentConversationStore(
@@ -632,13 +633,21 @@ data class UiAgentConversationItemRecord(
     val callId: String? = null,
     val name: String? = null,
     val argumentsJson: String? = null,
+    val toolSuccess: Boolean? = null,
 )
 
 data class UiAgentResponse(
     val text: String,
     val responseId: String? = null,
     val toolCalls: List<UiAgentToolCall> = emptyList(),
+    val usage: UiAgentTokenUsage? = null,
     val raw: String = "",
+)
+
+data class UiAgentTokenUsage(
+    val inputTokens: Int = 0,
+    val outputTokens: Int = 0,
+    val totalTokens: Int = 0,
 )
 
 data class UiAgentTool(

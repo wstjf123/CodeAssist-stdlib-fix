@@ -14,6 +14,7 @@ import dev.ide.ui.backend.UiAgentConversationStore
 import dev.ide.ui.backend.UiAgentInputItem
 import dev.ide.ui.backend.UiAgentRequest
 import dev.ide.ui.backend.UiAgentResponse
+import dev.ide.ui.backend.UiAgentTokenUsage
 import dev.ide.ui.backend.UiAgentToolCall
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -92,6 +93,7 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
                 text = extractResponseText(root),
                 responseId = root?.string("id")?.takeIf { it.startsWith("resp_") },
                 toolCalls = extractToolCalls(root),
+                usage = extractUsage(root),
                 raw = raw,
             )
         } finally {
@@ -136,9 +138,7 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
         onStreamChars: (Int) -> Unit,
     ): UiAgentResponse {
         val raw = StringBuilder()
-        val text = StringBuilder()
-        var responseId: String? = null
-        val calls = ArrayList<UiAgentToolCall>()
+        val state = SseResponseState()
         conn.inputStream.use { input ->
             BufferedReader(InputStreamReader(input, Charsets.UTF_8)).useLines { lines ->
                 lines.forEach { line ->
@@ -148,12 +148,16 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
                     val data = trimmed.removePrefix("data:").trim()
                     if (data.isEmpty()) return@forEach
                     onStreamChars(data.length)
-                    if (data == "[DONE]") return@forEach
-                    handleSseData(data, text, calls, onTextDelta) { id -> responseId = id }
+                    if (data == "[DONE]") {
+                        state.completed = true
+                        return@forEach
+                    }
+                    handleSseData(data, state, onTextDelta)
                 }
             }
         }
-        return UiAgentResponse(text.toString(), responseId, calls.distinctBy { it.callId }, raw.toString())
+        requireCompletedStream(state.completed)
+        return state.toResponse(raw.toString())
     }
 
     private fun parseSse(
@@ -161,9 +165,7 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
         onTextDelta: (String) -> Unit,
         onStreamChars: (Int) -> Unit,
     ): UiAgentResponse {
-        val text = StringBuilder()
-        var responseId: String? = null
-        val calls = ArrayList<UiAgentToolCall>()
+        val state = SseResponseState()
         raw.lineSequence()
             .map { it.trim() }
             .filter { it.startsWith("data:") }
@@ -171,38 +173,149 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
             .filter { it.isNotEmpty() }
             .forEach { data ->
                 onStreamChars(data.length)
-                if (data == "[DONE]") return@forEach
-                handleSseData(data, text, calls, onTextDelta) { id -> responseId = id }
+                if (data == "[DONE]") {
+                    state.completed = true
+                    return@forEach
+                }
+                handleSseData(data, state, onTextDelta)
             }
-        return UiAgentResponse(text.toString(), responseId, calls.distinctBy { it.callId }, raw)
+        requireCompletedStream(state.completed)
+        return state.toResponse(raw)
     }
 
     private fun handleSseData(
         data: String,
-        text: StringBuilder,
-        calls: MutableList<UiAgentToolCall>,
+        state: SseResponseState,
         onTextDelta: (String) -> Unit,
-        onResponseId: (String) -> Unit,
     ) {
         val event = parseObject(data) ?: return
         when (event.string("type")) {
+            "response.output_item.added" -> {
+                event.obj("item")?.let { item ->
+                    state.activeItem = ActiveOutputItem(
+                        id = item.string("id"),
+                        outputIndex = event.int("output_index"),
+                        type = item.string("type"),
+                        callId = item.string("call_id"),
+                        name = item.string("name"),
+                        arguments = item.string("arguments").orEmpty(),
+                    )
+                }
+            }
             "response.output_text.delta" -> {
                 val delta = event.string("delta").orEmpty()
-                if (delta.isNotEmpty()) {
-                    text.append(delta)
+                if (delta.isNotEmpty() && state.acceptsTextDelta(event)) {
+                    state.text.append(delta)
                     onTextDelta(delta)
                 }
             }
             "response.output_item.done" -> {
                 val item = event.obj("item") ?: return
-                collectMessageText(item).takeIf { it.isNotEmpty() && text.isEmpty() }?.let { value ->
-                    text.append(value)
+                collectMessageText(item).takeIf { it.isNotEmpty() && state.text.isEmpty() }?.let { value ->
+                    state.text.append(value)
                 }
-                collectToolCall(item)?.let { calls += it }
+                collectToolCall(item, state.activeItem)?.let { state.calls += it }
+                if (state.activeItem?.matches(event, item) == true) {
+                    state.activeItem = null
+                }
+            }
+            "response.function_call_arguments.delta" -> {
+                state.activeItem?.appendFunctionArguments(event)
+            }
+            "response.function_call_arguments.done" -> {
+                state.activeItem?.setFunctionArguments(event)
             }
             "response.completed" -> {
-                event.obj("response")?.string("id")?.let(onResponseId)
+                event.obj("response")?.let { response ->
+                    response.string("id")?.let { state.responseId = it }
+                    state.usage = extractUsage(response)
+                }
+                state.completed = true
             }
+            "response.failed" -> throw IllegalStateException(responseFailureMessage(event, "response failed"))
+            "response.incomplete" -> throw IllegalStateException(responseFailureMessage(event, "response incomplete"))
+        }
+    }
+
+    private fun requireCompletedStream(completed: Boolean) {
+        if (!completed) {
+            throw IllegalStateException("stream disconnected before response.completed")
+        }
+    }
+
+    private fun responseFailureMessage(event: JsonObject, fallback: String): String {
+        val response = event.obj("response")
+        val error = event.obj("error") ?: response?.obj("error")
+        return error?.string("message")
+            ?: error?.string("code")
+            ?: response?.string("incomplete_details")
+            ?: fallback
+    }
+
+    private class SseResponseState {
+        val text = StringBuilder()
+        val calls = ArrayList<UiAgentToolCall>()
+        var activeItem: ActiveOutputItem? = null
+        var responseId: String? = null
+        var usage: UiAgentTokenUsage? = null
+        var completed: Boolean = false
+
+        fun acceptsTextDelta(event: JsonObject): Boolean {
+            val active = activeItem ?: return true
+            val eventItemId = event.string("item_id")
+            val eventOutputIndex = event.int("output_index")
+            return active.isMessage &&
+                (eventItemId == null || active.id == null || eventItemId == active.id) &&
+                (eventOutputIndex == null || active.outputIndex == null || eventOutputIndex == active.outputIndex)
+        }
+
+        fun toResponse(raw: String): UiAgentResponse =
+            UiAgentResponse(
+                text = text.toString(),
+                responseId = responseId,
+                toolCalls = calls.distinctBy { it.callId },
+                usage = usage,
+                raw = raw,
+            )
+    }
+
+    private class ActiveOutputItem(
+        val id: String?,
+        val outputIndex: Int?,
+        val type: String?,
+        val callId: String?,
+        val name: String?,
+        arguments: String,
+    ) {
+        val isMessage: Boolean get() = type == "message"
+        val isFunctionCall: Boolean get() = type == "function_call"
+        private val argumentsBuilder = StringBuilder(arguments)
+        val argumentsText: String get() = argumentsBuilder.toString()
+
+        fun matches(event: JsonObject, item: JsonObject): Boolean {
+            val doneId = item.string("id")
+            val doneIndex = event.int("output_index")
+            return (id == null || doneId == null || id == doneId) &&
+                (outputIndex == null || doneIndex == null || outputIndex == doneIndex)
+        }
+
+        fun appendFunctionArguments(event: JsonObject) {
+            if (!isFunctionCall || !matchesEvent(event)) return
+            argumentsBuilder.append(event.string("delta").orEmpty())
+        }
+
+        fun setFunctionArguments(event: JsonObject) {
+            if (!isFunctionCall || !matchesEvent(event)) return
+            val arguments = event.string("arguments") ?: return
+            argumentsBuilder.setLength(0)
+            argumentsBuilder.append(arguments)
+        }
+
+        private fun matchesEvent(event: JsonObject): Boolean {
+            val eventItemId = event.string("item_id")
+            val eventOutputIndex = event.int("output_index")
+            return (eventItemId == null || id == null || eventItemId == id) &&
+                (eventOutputIndex == null || outputIndex == null || eventOutputIndex == outputIndex)
         }
     }
 
@@ -254,11 +367,24 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
         return output.objects().mapNotNull(::collectToolCall)
     }
 
-    private fun collectToolCall(item: JsonObject): UiAgentToolCall? {
+    private fun extractUsage(root: JsonObject?): UiAgentTokenUsage? {
+        val usage = root?.obj("usage") ?: return null
+        val input = usage.int("input_tokens") ?: 0
+        val output = usage.int("output_tokens") ?: 0
+        val total = usage.int("total_tokens") ?: input + output
+        if (input == 0 && output == 0 && total == 0) return null
+        return UiAgentTokenUsage(
+            inputTokens = input,
+            outputTokens = output,
+            totalTokens = total,
+        )
+    }
+
+    private fun collectToolCall(item: JsonObject, active: ActiveOutputItem? = null): UiAgentToolCall? {
         if (item.string("type") != "function_call") return null
-        val callId = item.string("call_id") ?: item.string("id")
-        val name = item.string("name")
-        val args = item.string("arguments").orEmpty()
+        val callId = item.string("call_id") ?: active?.callId ?: item.string("id")
+        val name = item.string("name") ?: active?.name
+        val args = item.string("arguments") ?: active?.argumentsText.orEmpty()
         if (callId.isNullOrBlank() || name.isNullOrBlank()) return null
         return UiAgentToolCall(callId, name, args, parseStringArguments(args))
     }
@@ -330,6 +456,9 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
     private fun JsonObject.string(key: String): String? =
         get(key)?.asStringOrNull()
 
+    private fun JsonObject.int(key: String): Int? =
+        get(key)?.asIntOrNull()
+
     private fun JsonObject.obj(key: String): JsonObject? =
         get(key)?.takeIf { it.isJsonObject }?.asJsonObject
 
@@ -341,6 +470,9 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
 
     private fun JsonElement.asStringOrNull(): String? =
         takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }?.asString
+
+    private fun JsonElement.asIntOrNull(): Int? =
+        takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isNumber }?.asInt
 
     private class LegacyConversationBuilder(
         val id: String,

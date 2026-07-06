@@ -61,6 +61,7 @@ class AgentConversationItem(
     val callId: String? = null,
     val name: String? = null,
     val argumentsJson: String? = null,
+    val toolSuccess: Boolean? = null,
 ) {
     var text by mutableStateOf(text)
 }
@@ -281,6 +282,7 @@ class IdeUiState(val backend: IdeBackend, val composePreviewHost: ComposePreview
                     callId = item.callId,
                     name = item.name,
                     argumentsJson = item.argumentsJson,
+                    toolSuccess = item.toolSuccess,
                 )
             }
             agentConversations += conversation
@@ -298,12 +300,10 @@ class IdeUiState(val backend: IdeBackend, val composePreviewHost: ComposePreview
                 activeConversationId = activeAgentConversationId,
                 nextSeq = agentConversationSeq,
                 conversations = agentConversations.take(40).map { conversation ->
-                    UiAgentConversationRecord(
-                        id = conversation.id,
-                        title = conversation.title,
-                        createdSeq = conversation.createdSeq,
-                        updatedSeq = conversation.updatedSeq,
-                        items = conversation.items.takeLast(220).map { item ->
+                    val items = conversation.items
+                        .filterNot { it.type == "message" && it.text.isBlank() }
+                        .takeLast(220)
+                        .map { item ->
                             UiAgentConversationItemRecord(
                                 type = item.type,
                                 role = item.role,
@@ -311,8 +311,15 @@ class IdeUiState(val backend: IdeBackend, val composePreviewHost: ComposePreview
                                 callId = item.callId,
                                 name = item.name,
                                 argumentsJson = item.argumentsJson,
+                                toolSuccess = item.toolSuccess,
                             )
-                        },
+                        }
+                    UiAgentConversationRecord(
+                        id = conversation.id,
+                        title = conversation.title,
+                        createdSeq = conversation.createdSeq,
+                        updatedSeq = conversation.updatedSeq,
+                        items = items,
                     )
                 },
             )
