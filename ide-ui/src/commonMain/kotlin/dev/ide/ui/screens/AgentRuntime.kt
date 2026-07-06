@@ -333,7 +333,6 @@ private fun estimateAgentItemsTokens(items: List<AgentConversationItem>): Int =
 private fun isModelGeneratedItem(item: AgentConversationItem): Boolean =
     (item.type == "message" && item.role == "assistant") ||
         item.type == "function_call"
-}
 
 private data class AgentToolResult(val text: String, val success: Boolean)
 
