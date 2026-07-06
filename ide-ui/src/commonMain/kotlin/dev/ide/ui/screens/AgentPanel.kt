@@ -52,6 +52,7 @@ import dev.ide.ui.icons.CaIcons
 import dev.ide.ui.theme.Ca
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 
 @Composable
 internal fun AgentDock(state: IdeUiState, modifier: Modifier = Modifier) {
@@ -90,10 +91,13 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
     val active = state.active
     val messages = state.agentMessages
     val listState = rememberLazyListState()
+    val displayItems = buildAgentDisplayItems(messages)
+    val scrollContentTick = (displayItems.lastOrNull()?.contentLength ?: 0) / 240
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.scrollToItem(messages.lastIndex)
+    LaunchedEffect(displayItems.size, scrollContentTick) {
+        if (displayItems.isNotEmpty()) {
+            yield()
+            listState.scrollToItem(displayItems.lastIndex)
         }
     }
 
@@ -123,7 +127,7 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
 
         Box(Modifier.fillMaxWidth().height(1.dp).background(Ca.colors.separator))
 
-        if (messages.isEmpty()) {
+        if (displayItems.isEmpty()) {
             Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("描述要处理的问题。Agent 会按需读取文件、诊断和日志，并在需要时修改当前编辑器。", color = Ca.colors.textTertiary, style = Ca.type.caption)
                 Spacer(Modifier.weight(1f))
@@ -134,7 +138,7 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(messages, key = { it.hashCode() }) { message -> MessageBubble(message) }
+                items(displayItems, key = { it.key }) { item -> MessageBubble(item) }
             }
         }
 
@@ -219,12 +223,47 @@ private fun ContextToggle(label: String, selected: Boolean, enabled: Boolean, on
     }
 }
 
+private data class AgentDisplayItem(
+    val key: String,
+    val message: AgentConversationItem,
+    val output: AgentConversationItem? = null,
+) {
+    val contentLength: Int get() =
+        message.text.length + message.argumentsJson.orEmpty().length + output?.text.orEmpty().length
+}
+
+private fun buildAgentDisplayItems(messages: List<AgentConversationItem>): List<AgentDisplayItem> {
+    val callsById = messages.asSequence()
+        .filter { it.type == "function_call" }
+        .mapNotNull { item -> item.callId?.let { it to item } }
+        .toMap()
+    val outputsById = messages.asSequence()
+        .filter { it.type == "function_call_output" }
+        .mapNotNull { item -> item.callId?.let { it to item } }
+        .toMap()
+    return messages.mapNotNull { item ->
+        when (item.type) {
+            "function_call" -> AgentDisplayItem(
+                key = "tool:${item.callId ?: System.identityHashCode(item)}",
+                message = item,
+                output = item.callId?.let { outputsById[it] },
+            )
+            "function_call_output" -> {
+                if (item.callId != null && callsById.containsKey(item.callId)) null
+                else AgentDisplayItem("tool-output:${item.callId ?: System.identityHashCode(item)}", item)
+            }
+            else -> AgentDisplayItem("item:${System.identityHashCode(item)}", item)
+        }
+    }
+}
+
 @Composable
-private fun MessageBubble(message: AgentConversationItem) {
+private fun MessageBubble(item: AgentDisplayItem) {
+    val message = item.message
     when (message.type) {
         "compaction" -> Unit
-        "function_call" -> ToolMessageBubble(message, running = true)
-        "function_call_output" -> ToolMessageBubble(message)
+        "function_call" -> ToolMessageBubble(message, item.output)
+        "function_call_output" -> ToolMessageBubble(message, null)
         "message" -> if (message.text.isNotBlank()) TextMessageBubble(message)
     }
 }
@@ -255,12 +294,13 @@ private fun TextMessageBubble(message: AgentConversationItem) {
 }
 
 @Composable
-private fun ToolMessageBubble(message: AgentConversationItem, running: Boolean = false) {
+private fun ToolMessageBubble(message: AgentConversationItem, outputItem: AgentConversationItem?) {
     var expanded by remember(message) { mutableStateOf(false) }
     val name = message.name ?: "tool"
-    val output = message.text
+    val output = outputItem?.text ?: message.text
     val arguments = message.argumentsJson.orEmpty()
-    val failed = message.toolSuccess == false
+    val running = message.type == "function_call" && outputItem == null
+    val failed = (outputItem ?: message).toolSuccess == false
     Column(
         Modifier.fillMaxWidth()
             .background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.sm))
