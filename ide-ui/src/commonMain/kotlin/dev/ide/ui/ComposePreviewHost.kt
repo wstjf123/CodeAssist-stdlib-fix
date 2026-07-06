@@ -25,4 +25,15 @@ interface ComposePreviewHost {
      */
     @Composable
     fun Preview(path: String, preview: UiComposePreview, text: String, dark: Boolean, refreshKey: Int, onProblems: (List<PreviewIssue>) -> Unit, onBusy: (Boolean) -> Unit, modifier: Modifier)
+
+    suspend fun capturePreview(path: String, preview: UiComposePreview, text: String, dark: Boolean): ComposePreviewCaptureResult =
+        ComposePreviewCaptureResult(false, "Compose preview capture is not available")
 }
+
+data class ComposePreviewCaptureResult(
+    val ok: Boolean,
+    val message: String,
+    val imageDataUrl: String? = null,
+    val widthPx: Int = 0,
+    val heightPx: Int = 0,
+)

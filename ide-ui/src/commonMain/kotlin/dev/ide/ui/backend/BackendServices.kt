@@ -609,7 +609,15 @@ data class UiAgentInputItem(
     val name: String? = null,
     val argumentsJson: String? = null,
     val output: String? = null,
+    val outputContent: List<UiAgentContentItem> = emptyList(),
     val outputSuccess: Boolean? = null,
+)
+
+data class UiAgentContentItem(
+    val type: String,
+    val text: String? = null,
+    val imageUrl: String? = null,
+    val detail: String? = null,
 )
 
 data class UiAgentConversationStore(

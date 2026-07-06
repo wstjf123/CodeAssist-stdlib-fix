@@ -345,7 +345,29 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
                 }
                 "function_call_output" -> {
                     callId?.let { addProperty("call_id", it) }
-                    addProperty("output", output.orEmpty())
+                    if (outputContent.isNotEmpty()) {
+                        add(
+                            "output",
+                            JsonArray().apply {
+                                outputContent.forEach { content ->
+                                    add(
+                                        JsonObject().apply {
+                                            addProperty("type", content.type)
+                                            when (content.type) {
+                                                "input_image" -> {
+                                                    addProperty("image_url", content.imageUrl.orEmpty())
+                                                    content.detail?.let { addProperty("detail", it) }
+                                                }
+                                                else -> addProperty("text", content.text.orEmpty())
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        )
+                    } else {
+                        addProperty("output", output.orEmpty())
+                    }
                 }
             }
         }

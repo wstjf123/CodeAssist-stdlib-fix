@@ -4,12 +4,14 @@ import androidx.compose.ui.text.TextRange
 import dev.ide.ui.AgentConversationItem
 import dev.ide.ui.IdeUiState
 import dev.ide.ui.backend.TreeNode
+import dev.ide.ui.backend.UiAgentContentItem
 import dev.ide.ui.backend.UiAgentConfig
 import dev.ide.ui.backend.UiAgentInputItem
 import dev.ide.ui.backend.UiAgentRequest
 import dev.ide.ui.backend.UiAgentTokenUsage
 import dev.ide.ui.backend.UiAgentTool
 import dev.ide.ui.backend.UiAgentToolCall
+import dev.ide.ui.backend.UiComposePreview
 import dev.ide.ui.backend.UiDiagnostic
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -72,6 +74,7 @@ internal suspend fun runAgentLoop(
                 name = result.call.name,
                 argumentsJson = result.call.argumentsJson,
                 toolSuccess = result.output.success,
+                contentItems = result.output.contentItems,
             )
         }
         maybeAutoCompactForUsage(messages, response.usage)
@@ -126,6 +129,7 @@ private fun compactAgentInput(messages: List<AgentConversationItem>): List<UiAge
                     type = "function_call_output",
                     callId = item.callId,
                     output = item.modelVisibleToolOutput(),
+                    outputContent = item.modelVisibleToolContent(),
                     outputSuccess = item.toolSuccess,
                 )
             }
@@ -213,6 +217,12 @@ private fun AgentConversationItem.modelVisibleToolOutput(): String {
     return "success=false\n$text"
 }
 
+private fun AgentConversationItem.modelVisibleToolContent(): List<UiAgentContentItem> {
+    if (contentItems.isEmpty()) return emptyList()
+    if (toolSuccess != false) return contentItems
+    return listOf(UiAgentContentItem(type = "input_text", text = modelVisibleToolOutput()))
+}
+
 private fun String.oneLineForSummary(limit: Int = 360): String {
     val value = trim().replace(Regex("\\s+"), " ")
     return if (value.length <= limit) value else value.take(limit) + "..."
@@ -276,6 +286,7 @@ private fun AgentConversationItem.copyAgentItem(): AgentConversationItem =
         name = name,
         argumentsJson = argumentsJson,
         toolSuccess = toolSuccess,
+        contentItems = contentItems,
     )
 
 private fun isUsefulAgentText(text: String): Boolean {
@@ -326,6 +337,7 @@ private fun estimateTokensAfterLastModelGeneratedItem(items: List<AgentConversat
 private fun estimateAgentItemsTokens(items: List<AgentConversationItem>): Int =
     items.fold(0) { total, item ->
         total + approximateTokenCount(item.text) +
+            item.contentItems.sumOf { approximateTokenCount(it.text.orEmpty()) } +
             approximateTokenCount(item.argumentsJson.orEmpty()) +
             approximateTokenCount(item.name.orEmpty())
     }
@@ -334,7 +346,11 @@ private fun isModelGeneratedItem(item: AgentConversationItem): Boolean =
     (item.type == "message" && item.role == "assistant") ||
         item.type == "function_call"
 
-private data class AgentToolResult(val text: String, val success: Boolean)
+private data class AgentToolResult(
+    val text: String,
+    val success: Boolean,
+    val contentItems: List<UiAgentContentItem> = emptyList(),
+)
 
 private data class AgentToolCallResult(val call: UiAgentToolCall, val output: AgentToolResult)
 
@@ -351,8 +367,8 @@ private data class AgentToolContext(
     val readFile: (String) -> String,
 )
 
-private fun toolSuccess(text: String): AgentToolResult =
-    AgentToolResult(text, true)
+private fun toolSuccess(text: String, contentItems: List<UiAgentContentItem> = emptyList()): AgentToolResult =
+    AgentToolResult(text, true, contentItems)
 
 private fun toolFailure(text: String): AgentToolResult =
     AgentToolResult(text, false)
@@ -392,6 +408,11 @@ private fun agentTools(): List<UiAgentTool> = listOf(
         "apply_patch",
         "Apply a unified patch to the current editor file. The patch must use *** Begin Patch, *** Update File: <current path>, @@ hunks, and *** End Patch.",
         """{"type":"object","properties":{"patch":{"type":"string"}},"required":["patch"],"additionalProperties":false}""",
+    ),
+    UiAgentTool(
+        "capture_compose_preview",
+        "Capture a PNG screenshot of a Compose @Preview in the current editor file and return it as an input_image tool output. If previewName is omitted, captures the currently selected preview or the first preview.",
+        """{"type":"object","properties":{"previewName":{"type":"string"},"dark":{"type":"string","description":"Optional true/false night mode override"}},"additionalProperties":false}""",
     ),
 )
 
@@ -448,7 +469,7 @@ private fun executeAgentTool(context: AgentToolContext, call: UiAgentToolCall): 
     }
 }
 
-private fun executeAgentTool(state: IdeUiState, call: UiAgentToolCall): AgentToolResult {
+private suspend fun executeAgentTool(state: IdeUiState, call: UiAgentToolCall): AgentToolResult {
     return runCatching {
         executeAgentToolUnchecked(state, call)
     }.getOrElse {
@@ -493,7 +514,7 @@ private fun executeAgentToolUnchecked(context: AgentToolContext, call: UiAgentTo
     }
 }
 
-private fun executeAgentToolUnchecked(state: IdeUiState, call: UiAgentToolCall): AgentToolResult {
+private suspend fun executeAgentToolUnchecked(state: IdeUiState, call: UiAgentToolCall): AgentToolResult {
     val active = state.active
     return when (call.name) {
         "list_workspace_files" -> {
@@ -541,8 +562,43 @@ private fun executeAgentToolUnchecked(state: IdeUiState, call: UiAgentToolCall):
             session.replaceRange(0, session.doc.length, result.text, TextRange(result.text.length))
             toolSuccess("applied patch to ${file.path}: ${result.message}")
         }
+        "capture_compose_preview" -> {
+            val file = active ?: return toolFailure("no current file")
+            val host = state.composePreviewHost ?: return toolFailure("Compose preview capture is not available")
+            val previews = state.backend.preview.composePreviews(file.path, file.text)
+            val target = selectComposePreview(previews, call.stringArguments["previewName"], file.previewTarget)
+                ?: return toolFailure("no Compose @Preview found in ${file.path}")
+            val dark = call.stringArguments["dark"]?.equals("true", ignoreCase = true) ?: (target.config.nightMode == true)
+            val capture = host.capturePreview(file.path, target, file.text, dark)
+            if (!capture.ok || capture.imageDataUrl.isNullOrBlank()) {
+                return toolFailure(capture.message)
+            }
+            val label = target.label.ifBlank { target.functionName }
+            val text = "Captured Compose preview `$label` (${capture.widthPx}x${capture.heightPx}px)."
+            toolSuccess(
+                text,
+                listOf(
+                    UiAgentContentItem(type = "input_text", text = text),
+                    UiAgentContentItem(type = "input_image", imageUrl = capture.imageDataUrl, detail = "high"),
+                )
+            )
+        }
         else -> toolFailure("unknown tool: ${call.name}")
     }
+}
+
+private fun selectComposePreview(
+    previews: List<UiComposePreview>,
+    requested: String?,
+    selected: String?,
+): UiComposePreview? {
+    val key = requested?.takeIf { it.isNotBlank() } ?: selected
+    if (!key.isNullOrBlank()) {
+        previews.firstOrNull { it.variantId == key }?.let { return it }
+        previews.firstOrNull { it.functionName == key }?.let { return it }
+        previews.firstOrNull { it.label == key }?.let { return it }
+    }
+    return previews.firstOrNull()
 }
 
 private data class AgentPatchResult(val ok: Boolean, val text: String, val message: String)

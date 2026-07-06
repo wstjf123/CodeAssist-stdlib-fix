@@ -1,5 +1,6 @@
 package dev.ide.android
 
+import android.app.Activity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,10 +12,16 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.key
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.content.res.Configuration
 import android.os.Handler
 import android.os.Looper
+import android.util.Base64
 import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
+import androidx.compose.foundation.background
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -26,12 +33,14 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.AbstractComposeView
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,14 +49,20 @@ import dev.ide.core.ComposePreviewApk
 import dev.ide.core.LoweredComposePreview
 import dev.ide.interp.compose.ComposePreviewRenderer
 import dev.ide.interp.compose.PreviewParameterBinding
+import dev.ide.ui.ComposePreviewCaptureResult
 import dev.ide.ui.ComposePreviewHost
 import dev.ide.ui.backend.UiComposePreview
+import dev.ide.ui.editor.preview.DeviceProfile
 import dev.ide.ui.editor.preview.PreviewIssue
 import dev.ide.ui.editor.preview.PreviewIssueLevel
 import dev.ide.ui.editor.preview.PreviewRenderError
+import dev.ide.ui.editor.preview.PreviewDevices
 import dev.ide.platform.log.Log
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
+import java.io.File
 
 /**
  * The on-device Compose preview host (the editor's live-pixel renderer). Lowers the open file's `@Preview`
@@ -55,7 +70,7 @@ import kotlinx.coroutines.withContext
  * [ComposePreviewRenderer] into the IDE's own composition. Held by [MainActivity] over a stable
  * [IdeServicesBackend] — which swaps its inner services on project switch — so one host serves all projects.
  */
-class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : ComposePreviewHost {
+class AndroidComposePreviewHost(private val activity: Activity, private val backend: IdeServicesBackend) : ComposePreviewHost {
 
     private val log = Log.logger("AndroidComposePreviewHost")
 
@@ -257,12 +272,153 @@ class AndroidComposePreviewHost(private val backend: IdeServicesBackend) : Compo
         }
     }
 
+    override suspend fun capturePreview(path: String, preview: UiComposePreview, text: String, dark: Boolean): ComposePreviewCaptureResult {
+        val device = PreviewDevices.resolve(preview.config.device, preview.config.widthDp, preview.config.heightDp)
+            ?: DeviceProfile("Phone", 360, 800, 2f)
+        val widthPx = (device.wdp * device.density).toInt().coerceIn(1, MAX_CAPTURE_SIZE_PX)
+        val heightPx = (device.hdp * device.density).toInt().coerceIn(1, MAX_CAPTURE_SIZE_PX)
+        val loader = runCatching {
+            backend.composePreviewLibs(path)?.let { libs ->
+                withContext(Dispatchers.IO) { ComposeLibraryLoader.loaderFor(libs) }
+            }
+        }.getOrNull()
+        val compiledApk = runCatching { backend.composePreviewApk(path, text, preview.functionName) }
+            .getOrNull()
+            ?.takeIf { !it.stale && !preview.hasParameter && preview.arity == 0 }
+        val apkLoader = compiledApk?.let { artifact ->
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    ApkComposePreviewLoader.loaderFor(
+                        artifact,
+                        File(activity.cacheDir, "preview-apks").toPath(),
+                        loader ?: AndroidComposePreviewHost::class.java.classLoader,
+                    )
+                }
+            }.getOrNull()
+        }
+        val lowered = if (apkLoader == null) {
+            runCatching { backend.lowerComposePreview(path, preview.functionName, preview.arity, text) }.getOrNull()
+                ?: return ComposePreviewCaptureResult(false, "Compose preview is not interpretable")
+        } else {
+            null
+        }
+        return withContext(Dispatchers.Main.immediate) {
+            captureRenderedPreview(
+                preview = preview,
+                dark = dark,
+                widthPx = widthPx,
+                heightPx = heightPx,
+                density = device.density,
+                loader = loader,
+                compiledApk = compiledApk?.takeIf { apkLoader != null },
+                apkLoader = apkLoader,
+                lowered = lowered,
+            )
+        }
+    }
+
+    private suspend fun captureRenderedPreview(
+        preview: UiComposePreview,
+        dark: Boolean,
+        widthPx: Int,
+        heightPx: Int,
+        density: Float,
+        loader: ClassLoader?,
+        compiledApk: ComposePreviewApk?,
+        apkLoader: ClassLoader?,
+        lowered: LoweredComposePreview?,
+    ): ComposePreviewCaptureResult {
+        val root = activity.findViewById<ViewGroup>(android.R.id.content)
+            ?: return ComposePreviewCaptureResult(false, "Activity content root is not available")
+        val container = FrameLayout(activity).apply {
+            layoutParams = FrameLayout.LayoutParams(widthPx, heightPx)
+            translationX = -(widthPx + 64).toFloat()
+            translationY = -(heightPx + 64).toFloat()
+        }
+        val view = ComposeView(activity).apply {
+            layoutParams = FrameLayout.LayoutParams(widthPx, heightPx)
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+        }
+        val renderError = arrayOfNulls<Throwable>(1)
+        container.addView(view)
+        root.addView(container)
+        try {
+            view.setContent {
+                val night = dark || (preview.config.nightMode == true)
+                val base = LocalConfiguration.current
+                val locale = preview.config.locale?.takeIf { it.isNotBlank() }
+                val cfg = Configuration(base).apply {
+                    uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
+                        (if (night) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO)
+                    locale?.let { setLocale(java.util.Locale.forLanguageTag(it.replace("-r", "-"))) }
+                }
+                val fontScale = base.fontScale * (preview.config.fontScale ?: 1f)
+                val background = preview.config.takeIf { it.showBackground && it.backgroundColor != null }
+                    ?.let { Color(it.backgroundColor!!) } ?: if (night) Color(0xFF161719) else Color.White
+                CompositionLocalProvider(
+                    LocalConfiguration provides cfg,
+                    LocalDensity provides Density(density, fontScale),
+                ) {
+                    Box(Modifier.fillMaxSize().background(background), contentAlignment = Alignment.Center) {
+                        when {
+                            compiledApk != null && apkLoader != null -> {
+                                val error = ApkComposePreviewRenderer(apkLoader)
+                                    .Render(compiledApk.facadeFqn, compiledApk.functionName)
+                                if (error != null) renderError[0] = error
+                            }
+                            lowered != null -> {
+                                val renderer = remember(loader) { ComposePreviewRenderer(loader) }
+                                PreviewVariants(
+                                    renderer,
+                                    lowered,
+                                    onError = { error ->
+                                        renderError[0] = error
+                                        PreviewRenderError(error)
+                                    },
+                                    onPartialError = { error -> if (error != null) renderError[0] = error },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            measureAndLayout(container, widthPx, heightPx)
+            delay(CAPTURE_SETTLE_MS)
+            measureAndLayout(container, widthPx, heightPx)
+            renderError[0]?.let { return ComposePreviewCaptureResult(false, it.message ?: it::class.java.simpleName) }
+            val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
+            container.draw(Canvas(bitmap))
+            val png = ByteArrayOutputStream().use { out ->
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                out.toByteArray()
+            }
+            bitmap.recycle()
+            val dataUrl = "data:image/png;base64," + Base64.encodeToString(png, Base64.NO_WRAP)
+            return ComposePreviewCaptureResult(true, "Captured Compose preview", dataUrl, widthPx, heightPx)
+        } finally {
+            root.removeView(container)
+            view.disposeComposition()
+        }
+    }
+
     private sealed interface PreviewState {
         object Loading : PreviewState
         object CompiledReady : PreviewState
         data class Ready(val lowered: LoweredComposePreview) : PreviewState
         data class NotInterpretable(val reasons: List<String>) : PreviewState
     }
+
+    private companion object {
+        private const val CAPTURE_SETTLE_MS = 160L
+        private const val MAX_CAPTURE_SIZE_PX = 4096
+    }
+}
+
+private fun measureAndLayout(view: View, width: Int, height: Int) {
+    val widthSpec = View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY)
+    val heightSpec = View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY)
+    view.measure(widthSpec, heightSpec)
+    view.layout(0, 0, width, height)
 }
 
 @Composable

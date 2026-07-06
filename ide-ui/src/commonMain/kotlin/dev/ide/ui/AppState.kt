@@ -9,6 +9,7 @@ import dev.ide.ui.backend.IdeBackend
 import dev.ide.ui.backend.NodeKind
 import dev.ide.ui.backend.TreeNode
 import dev.ide.ui.backend.TreeViewMode
+import dev.ide.ui.backend.UiAgentContentItem
 import dev.ide.ui.backend.UiAgentConversationItemRecord
 import dev.ide.ui.backend.UiAgentConversationRecord
 import dev.ide.ui.backend.UiAgentConversationStore
@@ -62,6 +63,7 @@ class AgentConversationItem(
     val name: String? = null,
     val argumentsJson: String? = null,
     val toolSuccess: Boolean? = null,
+    val contentItems: List<UiAgentContentItem> = emptyList(),
 ) {
     var text by mutableStateOf(text)
 }
