@@ -219,7 +219,7 @@ private fun FileHeader(name: String, pkg: String?, imports: Int) {
         Icon(CaIcons.box, null, Modifier.size(15.dp), tint = Ca.colors.syntax.type)
         Text(name, color = Ca.colors.textPrimary, style = Ca.type.code, fontWeight = FontWeight.SemiBold)
         if (pkg != null) Text(pkg, color = Ca.colors.textTertiary, style = Ca.type.codeSmall)
-        if (imports > 0) Text("· $imports imports", color = Ca.colors.textTertiary, fontSize = 10.5.sp)
+        if (imports > 0) Text("· $imports 个导入", color = Ca.colors.textTertiary, fontSize = 10.5.sp)
     }
 }
 
@@ -255,7 +255,7 @@ private fun MethodHat(node: UiBlockNode, ctx: Ctx) {
             Icon(if (expanded) CaIcons.caretDown else CaIcons.caretRight, "fold", Modifier.size(13.dp), tint = Ca.colors.block.text.copy(alpha = 0.8f))
             Text(signatureOf(node, ctx.source), color = Ca.colors.block.text, style = Ca.type.code, fontWeight = FontWeight.SemiBold)
             body?.let {
-                if (!expanded) Text("· ${it.children.size} block${if (it.children.size == 1) "" else "s"}",
+                if (!expanded) Text("· ${it.children.size} 个块",
                     color = Ca.colors.block.text.copy(alpha = 0.78f), fontSize = 10.5.sp)
             }
         }

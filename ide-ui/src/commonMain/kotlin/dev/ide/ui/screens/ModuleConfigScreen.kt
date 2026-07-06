@@ -95,9 +95,9 @@ private data class ConfigToast(val text: String, val error: Boolean)
 /** The tabs of a module's detail view. */
 enum class ModulesTab(val label: String) {
     Settings("设置"),
-    BuildFeatures("Build Features"),
-    Signing("Signing"),
-    Dependencies("Dependencies"),
+    BuildFeatures("构建特性"),
+    Signing("签名"),
+    Dependencies("依赖"),
 }
 
 /**
@@ -192,7 +192,7 @@ private fun ModulesList(backend: IdeBackend, codeFont: FontFamily, onOpen: (Stri
             onConfirm = {
                 val name = pendingRemove
                 if (name != null && backend.modules.removeModule(name)) {
-                    toast = ConfigToast("Removed $name", error = false); modules = backend.modules.configurableModules()
+                    toast = ConfigToast("已移除 $name", error = false); modules = backend.modules.configurableModules()
                 }
                 pendingRemove = null
             },
@@ -281,7 +281,7 @@ private fun BuildFeaturesPane(backend: IdeBackend, moduleName: String, modifier:
             loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(color = Ca.colors.accent) }
             f == null -> Box(Modifier.fillMaxSize().padding(32.dp), Alignment.Center) {
                 Text(
-                    "Build features apply to Android modules only.",
+                    "构建特性仅适用于 Android 模块。",
                     color = Ca.colors.textTertiary, style = Ca.type.subhead,
                 )
             }
@@ -292,7 +292,7 @@ private fun BuildFeaturesPane(backend: IdeBackend, moduleName: String, modifier:
             ) {
                 item("intro") {
                     Text(
-                        "Turn build features on per module. Enabling one adds the dependencies it needs.",
+                        "按模块启用构建特性。启用后会自动添加所需依赖。",
                         color = Ca.colors.textSecondary, style = Ca.type.footnote,
                     )
                 }
@@ -373,7 +373,7 @@ private fun SigningPane(backend: IdeBackend, moduleName: String, onOpenKeystoreM
                 item("intro") {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
-                            "Choose the keystore that signs each build type. An unassigned type signs with the debug keystore.",
+                            "为每个构建类型选择签名密钥库。未指定时会使用 debug 密钥库签名。",
                             color = Ca.colors.textSecondary, style = Ca.type.footnote,
                         )
                         Row(
@@ -420,7 +420,7 @@ private fun BuildTypeSigningRow(assignment: UiSigningAssignment, keystores: List
         Text(assignment.buildType, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold, color = Ca.colors.textPrimary)
         // The choices: the default debug keystore (null) plus every registered keystore.
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SigningPill("debug (default)", selected = assignment.keystoreId == null, enabled = !busy) { onAssign(null) }
+            SigningPill("debug（默认）", selected = assignment.keystoreId == null, enabled = !busy) { onAssign(null) }
             keystores.forEach { ks ->
                 SigningPill(ks.name, selected = assignment.keystoreId == ks.id, enabled = !busy) { onAssign(ks.id) }
             }
@@ -476,7 +476,7 @@ private fun ModuleSettingsTab(backend: IdeBackend, moduleName: String, codeFont:
                 scope.launch {
                     val created = backend.modules.createProguardFile(moduleName, entry)
                     toast = ConfigToast(
-                        if (created != null) "Created $entry" else "Couldn't create $entry",
+                        if (created != null) "已创建 $entry" else "无法创建 $entry",
                         error = created == null,
                     )
                     if (created != null) reloadKey++
@@ -692,7 +692,7 @@ private fun ConfigForm(
 
         item("save") {
             Row(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 8.dp), horizontalArrangement = Arrangement.End) {
-                PrimaryButton(if (dirty) "Save changes" else "保存", icon = CaIcons.check, onClick = {
+                PrimaryButton(if (dirty) "保存更改" else "保存", icon = CaIcons.check, onClick = {
                     onSave(UiModuleConfigEdit(
                         languageLevel = level,
                         facetValues = forms.associate { it.table to it.toValues() },
@@ -713,7 +713,7 @@ private fun ConfigForm(
 private fun RunConfigCard(rc: UiRunConfig, mainClass: MutableState<String>, codeFont: FontFamily) {
     SectionCard("运行") {
         Text(
-            "The main class the Run button launches for this module. Leave blank to auto-detect.",
+            "运行按钮会启动此模块的主类。留空时自动检测。",
             color = Ca.colors.textSecondary, style = Ca.type.caption,
         )
         Box(
@@ -723,7 +723,7 @@ private fun RunConfigCard(rc: UiRunConfig, mainClass: MutableState<String>, code
         ) {
             if (mainClass.value.isEmpty()) {
                 Text(
-                    rc.autoDetected?.let { "$it  (auto-detected)" } ?: "e.g. com.example.Main",
+                    rc.autoDetected?.let { "$it  (自动检测)" } ?: "例如 com.example.Main",
                     color = Ca.colors.textTertiary,
                     style = Ca.type.footnote.copy(fontFamily = codeFont),
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -743,7 +743,7 @@ private fun RunConfigCard(rc: UiRunConfig, mainClass: MutableState<String>, code
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                LevelChip("Auto-detect", selected = mainClass.value.isBlank()) { mainClass.value = "" }
+                LevelChip("自动检测", selected = mainClass.value.isBlank()) { mainClass.value = "" }
                 rc.detectedMainClasses.forEach { fqn ->
                     LevelChip(fqn, selected = mainClass.value.trim() == fqn) { mainClass.value = fqn }
                 }
@@ -773,7 +773,7 @@ private fun MissingProguardCard(
             Text("缺少 keep 规则文件", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
         }
         Text(
-            "These files are referenced by a build type but don't exist, so R8 skips them when minify is on.",
+            "这些文件被构建类型引用，但当前不存在。启用 minify 时 R8 会跳过它们。",
             color = Ca.colors.textSecondary, style = Ca.type.caption,
         )
         missing.forEach { mf ->
@@ -877,7 +877,7 @@ private fun FacetPanel(form: FacetForm, codeFont: FontFamily) {
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Icon(CaIcons.box, null, Modifier.size(18.dp), tint = Ca.colors.accent)
-            Text(form.title, color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text(displayConfigLabel(form.title), color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
             Icon(if (open) CaIcons.caretDown else CaIcons.caretRight, null, Modifier.size(16.dp), tint = Ca.colors.textTertiary)
         }
         AnimatedVisibility(open, enter = expandVertically(tween(Motion.FAST)) + fadeIn(), exit = shrinkVertically(tween(Motion.FAST)) + fadeOut()) {
@@ -891,17 +891,17 @@ private fun FacetPanel(form: FacetForm, codeFont: FontFamily) {
 @Composable
 private fun FieldEditor(field: FieldState, codeFont: FontFamily) {
     when (field) {
-        is FieldState.TextF -> LabeledField(field.label) {
+        is FieldState.TextF -> LabeledField(displayConfigLabel(field.label)) {
             BoxedTextField(field.value, codeFont)
         }
-        is FieldState.NumberF -> LabeledField(field.label) {
+        is FieldState.NumberF -> LabeledField(displayConfigLabel(field.label)) {
             BoxedTextField(field.value, codeFont, numeric = true)
         }
         is FieldState.BoolF -> Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(field.label, color = Ca.colors.textPrimary, style = Ca.type.footnote, modifier = Modifier.weight(1f))
+            Text(displayConfigLabel(field.label), color = Ca.colors.textPrimary, style = Ca.type.footnote, modifier = Modifier.weight(1f))
             ToggleSwitch(field.value.value) { field.value.value = it }
         }
-        is FieldState.ListF -> LabeledField(field.label) { StringListEditor(field.values, codeFont) }
+        is FieldState.ListF -> LabeledField(displayConfigLabel(field.label)) { StringListEditor(field.values, codeFont) }
         is FieldState.TableF -> TableListEditor(field, codeFont)
     }
 }
@@ -979,10 +979,11 @@ private fun TableListEditor(field: FieldState.TableF, codeFont: FontFamily) {
     // Highlight the just-added row briefly so it's obvious a new item appeared (it animates in at the bottom).
     var justAdded by remember { mutableStateOf(-1) }
     LaunchedEffect(justAdded) { if (justAdded >= 0) { delay(1600); justAdded = -1 } }
-    val singular = field.label.lowercase().removeSuffix("s")
+    val label = displayConfigLabel(field.label)
+    val singular = displayConfigSingular(field.label, label)
 
     Column(Modifier.fillMaxWidth().animateContentSize(tween(Motion.BASE, easing = Motion.spring)), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(field.label, color = Ca.colors.textSecondary, style = Ca.type.caption, fontWeight = FontWeight.Medium)
+        Text(label, color = Ca.colors.textSecondary, style = Ca.type.caption, fontWeight = FontWeight.Medium)
         if (field.rows.isEmpty()) Text("还没有 ${singular}，请在下方添加。", color = Ca.colors.textTertiary, style = Ca.type.caption2)
         field.rows.forEachIndexed { i, row ->
             val isNew = i == justAdded
@@ -994,13 +995,13 @@ private fun TableListEditor(field: FieldState.TableF, codeFont: FontFamily) {
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(rowTitle(row, i), color = Ca.colors.textPrimary, style = Ca.type.footnote, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                    if (isNew) Chip("new", fill = Ca.colors.accentSoft, textColor = Ca.colors.accent)
+                    if (isNew) Chip("新建", fill = Ca.colors.accentSoft, textColor = Ca.colors.accent)
                     IconButtonCa(CaIcons.close, "移除", { val at = i; field.rows.removeAt(at); if (justAdded == at) justAdded = -1 }, boxSize = 24, iconSize = 14, tint = Ca.colors.textTertiary)
                 }
                 row.forEach { FieldEditor(it, codeFont) }
             }
         }
-        AddRowButton("Add $singular") { field.rows.add(cloneTemplateRow(field)); justAdded = field.rows.lastIndex }
+        AddRowButton("添加 $singular") { field.rows.add(cloneTemplateRow(field)); justAdded = field.rows.lastIndex }
     }
 }
 
@@ -1089,6 +1090,43 @@ private fun UiConfigField.toFieldState(): FieldState = when (this) {
             rows.forEach { row -> outer.add(mutableStateListOf<FieldState>().also { it.addAll(row.map { f -> f.toFieldState() }) }) }
         },
     )
+}
+
+private fun displayConfigLabel(label: String): String = when (label) {
+    "Default Config", "defaultConfig" -> "默认配置"
+    "Build Types", "buildTypes" -> "构建类型"
+    "Product Flavors", "productFlavors" -> "产品风味"
+    "Flavor Dimensions", "flavorDimensions" -> "风味维度"
+    "Manifest Placeholders", "manifestPlaceholders" -> "Manifest 占位符"
+    "Application ID", "applicationId" -> "Application ID"
+    "Namespace", "namespace" -> "Namespace"
+    "Minimum SDK", "minSdk" -> "最低 SDK"
+    "Target SDK", "targetSdk" -> "目标 SDK"
+    "Version Code", "versionCode" -> "版本号"
+    "Version Name", "versionName" -> "版本名称"
+    "Name", "name" -> "名称"
+    "Dimension", "dimension" -> "维度"
+    "Debuggable", "debuggable" -> "可调试"
+    "Minify Enabled", "minifyEnabled" -> "启用混淆"
+    "Shrink Resources", "shrinkResources" -> "压缩资源"
+    "Proguard Files", "proguardFiles" -> "Proguard 文件"
+    "Consumer Proguard Files", "consumerProguardFiles" -> "Consumer Proguard 文件"
+    "Signing Config", "signingConfig" -> "签名配置"
+    "Build Config Fields", "buildConfigFields" -> "BuildConfig 字段"
+    "Res Values", "resValues" -> "资源值"
+    else -> label
+}
+
+private fun displayConfigSingular(rawLabel: String, displayLabel: String): String = when (rawLabel) {
+    "Build Types", "buildTypes" -> "构建类型"
+    "Product Flavors", "productFlavors" -> "产品风味"
+    "Flavor Dimensions", "flavorDimensions" -> "风味维度"
+    "Manifest Placeholders", "manifestPlaceholders" -> "Manifest 占位符"
+    "Proguard Files", "proguardFiles" -> "Proguard 文件"
+    "Consumer Proguard Files", "consumerProguardFiles" -> "Consumer Proguard 文件"
+    "Build Config Fields", "buildConfigFields" -> "BuildConfig 字段"
+    "Res Values", "resValues" -> "资源值"
+    else -> displayLabel
 }
 
 /** A fresh row for a [FieldState.TableF] add, cloning the first row's field shape with blank/default values. */

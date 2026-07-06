@@ -107,16 +107,16 @@ fun CodeStyleScreen(backend: IdeBackend, hasProject: Boolean, onBack: () -> Unit
         ) {
             SettingsCard(null) {
                 SettingsChoiceRow(
-                    "语言", "Each language keeps its own profile", language,
+                    "语言", "每种语言使用独立的代码样式配置", language,
                     listOf(LANG_JAVA to "Java", LANG_KOTLIN to "Kotlin"),
                 ) { language = it }
                 SettingsDivider()
                 SettingsChoiceRow(
-                    "Style", "A preset starting point; changing any option below switches to Custom", style.preset,
+                    "样式", "选择预设作为起点；修改下方任一选项后会切换为自定义", style.preset,
                     presetOptions(language),
                 ) { picked -> update(if (picked == PRESET_CUSTOM) display.copy(preset = PRESET_CUSTOM) else presetDefaults(picked)) }
                 SettingsDivider()
-                SettingsToggleRow("Reformat on save", "Reformat the file each time you save it", formatOnSave) {
+                SettingsToggleRow("保存时重新格式化", "每次保存文件时自动重新格式化", formatOnSave) {
                     formatOnSave = it
                     backend.settings.setPreference(FORMAT_ON_SAVE_KEY, it.toString())
                 }
@@ -126,84 +126,84 @@ fun CodeStyleScreen(backend: IdeBackend, hasProject: Boolean, onBack: () -> Unit
 
             if (!javaOnly) {
                 Text(
-                    "Kotlin formatting normalizes indentation, tabs, blank lines, and inline spacing. Brace placement and line wrapping follow the code as written.",
+                    "Kotlin 格式化会规范缩进、制表符、空行和行内空格。大括号位置和换行方式会保留代码原样。",
                     color = Ca.colors.textTertiary, style = Ca.type.caption2,
                     modifier = Modifier.padding(horizontal = 4.dp),
                 )
             }
 
             if (custom) {
-                SettingsCard("Indentation") {
-                    SettingsSliderRow("Indent size", "Spaces per level", display.indentSize, 1, 8, 1, null) { edit { copy(indentSize = it) } }
+                SettingsCard("缩进") {
+                    SettingsSliderRow("缩进大小", "每一级缩进使用的空格数", display.indentSize, 1, 8, 1, null) { edit { copy(indentSize = it) } }
                     if (javaOnly) {
                         SettingsDivider()
-                        SettingsSliderRow("Continuation indent", "Extra indent for a wrapped line", display.continuationIndent, 1, 16, 1, null) { edit { copy(continuationIndent = it) } }
+                        SettingsSliderRow("续行缩进", "换行后的额外缩进", display.continuationIndent, 1, 16, 1, null) { edit { copy(continuationIndent = it) } }
                         SettingsDivider()
-                        SettingsSliderRow("Line width", "Column the formatter wraps at", display.maxLineLength, 60, 200, 10, null) { edit { copy(maxLineLength = it) } }
+                        SettingsSliderRow("行宽", "格式化器触发换行的列数", display.maxLineLength, 60, 200, 10, null) { edit { copy(maxLineLength = it) } }
                     }
                     SettingsDivider()
-                    SettingsToggleRow("Indent with tabs", "Use tabs instead of spaces", display.useTabs) { edit { copy(useTabs = it) } }
+                    SettingsToggleRow("使用制表符缩进", "使用 tab 代替空格", display.useTabs) { edit { copy(useTabs = it) } }
                 }
 
                 if (javaOnly) {
-                    SettingsCard("Wrapping & braces") {
-                        SettingsChoiceRow("Brace placement", null, display.braceStyle, listOf("endOfLine" to "End of line", "nextLine" to "Next line")) { edit { copy(braceStyle = it) } }
+                    SettingsCard("换行和大括号") {
+                        SettingsChoiceRow("大括号位置", null, display.braceStyle, listOf("endOfLine" to "行尾", "nextLine" to "下一行")) { edit { copy(braceStyle = it) } }
                         SettingsDivider()
-                        SettingsChoiceRow("Method parameters", null, display.wrapMethodParameters, wrapOptions()) { edit { copy(wrapMethodParameters = it) } }
+                        SettingsChoiceRow("方法参数", null, display.wrapMethodParameters, wrapOptions()) { edit { copy(wrapMethodParameters = it) } }
                         SettingsDivider()
-                        SettingsChoiceRow("Method arguments", null, display.wrapMethodArguments, wrapOptions()) { edit { copy(wrapMethodArguments = it) } }
+                        SettingsChoiceRow("方法实参", null, display.wrapMethodArguments, wrapOptions()) { edit { copy(wrapMethodArguments = it) } }
                         SettingsDivider()
-                        SettingsChoiceRow("Chained calls", null, display.wrapChainedCalls, wrapOptions()) { edit { copy(wrapChainedCalls = it) } }
+                        SettingsChoiceRow("链式调用", null, display.wrapChainedCalls, wrapOptions()) { edit { copy(wrapChainedCalls = it) } }
                         SettingsDivider()
-                        SettingsChoiceRow("Binary expressions", null, display.wrapBinaryExpressions, wrapOptions()) { edit { copy(wrapBinaryExpressions = it) } }
+                        SettingsChoiceRow("二元表达式", null, display.wrapBinaryExpressions, wrapOptions()) { edit { copy(wrapBinaryExpressions = it) } }
                     }
                 }
 
                 // Inline spacing. The first five rules are honored by Kotlin too (token-level rewriting); the
                 // rest need Java's full formatter, so they are Java-only.
-                SettingsCard("Spaces") {
-                    SettingsToggleRow("Within parentheses", "`( x )` instead of `(x)`", display.spaceWithinParens) { edit { copy(spaceWithinParens = it) } }
+                SettingsCard("空格") {
+                    SettingsToggleRow("括号内侧", "使用 `( x )` 而不是 `(x)`", display.spaceWithinParens) { edit { copy(spaceWithinParens = it) } }
                     SettingsDivider()
-                    SettingsToggleRow("After comma", "`a, b` instead of `a,b`", display.spaceAfterComma) { edit { copy(spaceAfterComma = it) } }
+                    SettingsToggleRow("逗号后", "使用 `a, b` 而不是 `a,b`", display.spaceAfterComma) { edit { copy(spaceAfterComma = it) } }
                     SettingsDivider()
-                    SettingsToggleRow("Around operators", "`a + b`, `x = 1`", display.spaceAroundOperators) { edit { copy(spaceAroundOperators = it) } }
+                    SettingsToggleRow("运算符两侧", "`a + b`、`x = 1`", display.spaceAroundOperators) { edit { copy(spaceAroundOperators = it) } }
                     SettingsDivider()
-                    SettingsToggleRow("Before brace", "`) {` instead of `){`", display.spaceBeforeBrace) { edit { copy(spaceBeforeBrace = it) } }
+                    SettingsToggleRow("大括号前", "使用 `) {` 而不是 `){`", display.spaceBeforeBrace) { edit { copy(spaceBeforeBrace = it) } }
                     SettingsDivider()
-                    SettingsToggleRow("Around lambda arrow", "`a -> b`", display.spaceAroundLambdaArrow) { edit { copy(spaceAroundLambdaArrow = it) } }
+                    SettingsToggleRow("Lambda 箭头两侧", "`a -> b`", display.spaceAroundLambdaArrow) { edit { copy(spaceAroundLambdaArrow = it) } }
                     if (javaOnly) {
                         SettingsDivider()
-                        SettingsToggleRow("Before parentheses", "`if (` `for (` `while (`", display.spaceBeforeParens) { edit { copy(spaceBeforeParens = it) } }
+                        SettingsToggleRow("括号前", "`if (` `for (` `while (`", display.spaceBeforeParens) { edit { copy(spaceBeforeParens = it) } }
                         SettingsDivider()
-                        SettingsToggleRow("Before semicolon", "`x ;` instead of `x;`", display.spaceBeforeSemicolon) { edit { copy(spaceBeforeSemicolon = it) } }
+                        SettingsToggleRow("分号前", "使用 `x ;` 而不是 `x;`", display.spaceBeforeSemicolon) { edit { copy(spaceBeforeSemicolon = it) } }
                         SettingsDivider()
-                        SettingsToggleRow("Around ternary", "`c ? a : b`", display.spaceAroundTernary) { edit { copy(spaceAroundTernary = it) } }
+                        SettingsToggleRow("三元运算符两侧", "`c ? a : b`", display.spaceAroundTernary) { edit { copy(spaceAroundTernary = it) } }
                         SettingsDivider()
-                        SettingsToggleRow("After type cast", "`(Foo) x` instead of `(Foo)x`", display.spaceAfterTypeCast) { edit { copy(spaceAfterTypeCast = it) } }
+                        SettingsToggleRow("类型转换后", "使用 `(Foo) x` 而不是 `(Foo)x`", display.spaceAfterTypeCast) { edit { copy(spaceAfterTypeCast = it) } }
                     }
                 }
 
-                SettingsCard("Blank lines") {
-                    SettingsSliderRow("Keep at most", "Maximum consecutive blank lines", display.blankLinesToKeep, 0, 5, 1, null) { edit { copy(blankLinesToKeep = it) } }
+                SettingsCard("空行") {
+                    SettingsSliderRow("最多保留", "连续空行的最大数量", display.blankLinesToKeep, 0, 5, 1, null) { edit { copy(blankLinesToKeep = it) } }
                     if (javaOnly) {
                         SettingsDivider()
-                        SettingsSliderRow("After imports", null, display.blankLinesAfterImports, 0, 5, 1, null) { edit { copy(blankLinesAfterImports = it) } }
+                        SettingsSliderRow("导入后", null, display.blankLinesAfterImports, 0, 5, 1, null) { edit { copy(blankLinesAfterImports = it) } }
                         SettingsDivider()
-                        SettingsSliderRow("Before method", null, display.blankLinesBeforeMethod, 0, 5, 1, null) { edit { copy(blankLinesBeforeMethod = it) } }
+                        SettingsSliderRow("方法前", null, display.blankLinesBeforeMethod, 0, 5, 1, null) { edit { copy(blankLinesBeforeMethod = it) } }
                         SettingsDivider()
-                        SettingsSliderRow("Before field", null, display.blankLinesBeforeField, 0, 5, 1, null) { edit { copy(blankLinesBeforeField = it) } }
+                        SettingsSliderRow("字段前", null, display.blankLinesBeforeField, 0, 5, 1, null) { edit { copy(blankLinesBeforeField = it) } }
                         SettingsDivider()
-                        SettingsSliderRow("Before first member", null, display.blankLinesBeforeFirstMember, 0, 5, 1, null) { edit { copy(blankLinesBeforeFirstMember = it) } }
+                        SettingsSliderRow("首个成员前", null, display.blankLinesBeforeFirstMember, 0, 5, 1, null) { edit { copy(blankLinesBeforeFirstMember = it) } }
                         SettingsDivider()
-                        SettingsSliderRow("Between types", null, display.blankLinesBetweenTypes, 0, 5, 1, null) { edit { copy(blankLinesBetweenTypes = it) } }
+                        SettingsSliderRow("类型之间", null, display.blankLinesBetweenTypes, 0, 5, 1, null) { edit { copy(blankLinesBetweenTypes = it) } }
                     }
                 }
 
                 if (javaOnly) {
-                    SettingsCard("Comments") {
-                        SettingsToggleRow("Format comments", "Reindent Javadoc / block / line comments", display.formatComments) { edit { copy(formatComments = it) } }
+                    SettingsCard("注释") {
+                        SettingsToggleRow("格式化注释", "重新缩进 Javadoc、块注释和行注释", display.formatComments) { edit { copy(formatComments = it) } }
                         SettingsDivider()
-                        SettingsToggleRow("Wrap comments", "Wrap comment text at the line width", display.wrapComments) { edit { copy(wrapComments = it) } }
+                        SettingsToggleRow("注释换行", "按行宽换行注释文本", display.wrapComments) { edit { copy(wrapComments = it) } }
                     }
                 }
             }
@@ -213,7 +213,7 @@ fun CodeStyleScreen(backend: IdeBackend, hasProject: Boolean, onBack: () -> Unit
 
 @Composable
 private fun PreviewCard(preview: String, language: String, hasProject: Boolean) {
-    SettingsCard("Preview") {
+    SettingsCard("预览") {
         Column(
             Modifier.fillMaxWidth().heightIn(max = 320.dp)
                 .background(Ca.colors.editorBg, RoundedCornerShape(Ca.radius.control))
@@ -221,7 +221,7 @@ private fun PreviewCard(preview: String, language: String, hasProject: Boolean) 
         ) {
             if (!hasProject) {
                 Text(
-                    "Open a project to preview formatting.",
+                    "打开项目后可预览格式化效果。",
                     color = Ca.colors.textTertiary,
                     style = Ca.type.codeSmall,
                 )
@@ -242,12 +242,12 @@ private fun PreviewCard(preview: String, language: String, hasProject: Boolean) 
 }
 
 private fun presetOptions(language: String): List<Pair<String, String>> = when (language) {
-    LANG_KOTLIN -> listOf("kotlin_official" to "Kotlin official", "android" to "Android", PRESET_CUSTOM to "Custom")
-    else -> listOf("google" to "Google", "android" to "Android", PRESET_CUSTOM to "Custom")
+    LANG_KOTLIN -> listOf("kotlin_official" to "Kotlin 官方", "android" to "Android", PRESET_CUSTOM to "自定义")
+    else -> listOf("google" to "Google", "android" to "Android", PRESET_CUSTOM to "自定义")
 }
 
 private fun wrapOptions(): List<Pair<String, String>> =
-    listOf("never" to "Never", "ifLong" to "If long", "onePerLine" to "One per line")
+    listOf("never" to "不换行", "ifLong" to "过长时换行", "onePerLine" to "每项一行")
 
 /** What the controls display: a named preset shows its canonical values; Custom shows the stored fields. */
 private fun displayStyle(style: UiCodeStyle): UiCodeStyle =

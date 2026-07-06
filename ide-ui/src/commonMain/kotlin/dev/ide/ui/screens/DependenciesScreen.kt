@@ -92,17 +92,17 @@ import kotlinx.coroutines.launch
  *  Declared tab is the place a declared-but-unresolved dependency stays visible (with a red badge) instead of
  *  silently vanishing from the resolved graph. */
 private enum class DepTab(val label: String, val icon: ImageVector) {
-    Declared("Declared", CaIcons.resources), Resolved("Resolved", CaIcons.gitBranch)
+    Declared("已声明", CaIcons.resources), Resolved("已解析", CaIcons.gitBranch)
 }
 
 /** Sub-views of the Resolved tab: the transitive closure as an expandable tree or a flat listing. */
 private enum class DepView(val label: String, val icon: ImageVector) {
-    Tree("Tree", CaIcons.layers), Graph("Graph", CaIcons.gitBranch)
+    Tree("树形", CaIcons.layers), Graph("图表", CaIcons.gitBranch)
 }
 
 /** The Add flow can add a library/AAR, import a BOM as a platform (Gradle `platform(...)`), depend on
  *  another module, or attach a local jar/aar file. */
-private enum class AddMode(val label: String) { Library("Library"), Platform("Platform (BOM)"), Module("Module"), Local("Local file") }
+private enum class AddMode(val label: String) { Library("库"), Platform("平台 (BOM)"), Module("模块"), Local("本地文件") }
 
 /** A typed string is treated as a direct coordinate when it carries a `:` — `group:name[:version]`. */
 private fun looksLikeCoordinate(s: String): Boolean =
@@ -156,7 +156,7 @@ fun DependenciesPane(
         coroutine.launch {
             val gn = "${transitive.group}:${transitive.name}"
             val result = backend.deps.setDependencyExclusions(moduleName, root.coordinate, (root.exclusions + gn).distinct())
-            toast = ToastMsg(if (result.success) "Excluded $gn from ${root.name}" else result.message, error = !result.success)
+            toast = ToastMsg(if (result.success) "已从 ${root.name} 排除 $gn" else result.message, error = !result.success)
             if (result.success) reloadKey++
         }
     }
@@ -164,7 +164,7 @@ fun DependenciesPane(
     val onRemoveExclusion: (UiDependencyNode, String) -> Unit = { root, excl ->
         coroutine.launch {
             val result = backend.deps.setDependencyExclusions(moduleName, root.coordinate, root.exclusions - excl)
-            toast = ToastMsg(if (result.success) "Re-included $excl" else result.message, error = !result.success)
+            toast = ToastMsg(if (result.success) "已重新包含 $excl" else result.message, error = !result.success)
             if (result.success) reloadKey++
         }
     }
@@ -213,7 +213,7 @@ fun DependenciesPane(
             onConfirm = {
                 val coord = pendingRemove
                 if (coord != null && backend.deps.removeDependency(moduleName, coord)) {
-                    toast = ToastMsg("Removed ${shortCoord(coord)}", error = false)
+                    toast = ToastMsg("已移除 ${shortCoord(coord)}", error = false)
                     reloadKey++
                 }
                 pendingRemove = null
@@ -277,7 +277,7 @@ private fun DepPaneToolbar(
         if (tab == DepTab.Resolved) ViewToggle(resolvedView, onView, compact = true)
         if (resolving) {
             CircularProgressIndicator(Modifier.size(16.dp), color = Ca.colors.accent, strokeWidth = 2.dp)
-            if (!compact) Text(resolveMessage.ifBlank { "Resolving…" }, color = Ca.colors.accent, style = Ca.type.caption2,
+            if (!compact) Text(resolveMessage.ifBlank { "正在解析…" }, color = Ca.colors.accent, style = Ca.type.caption2,
                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
         }
         Spacer(Modifier.weight(1f))
@@ -300,7 +300,7 @@ private fun RepositoriesContent(backend: IdeBackend, codeFont: FontFamily, modif
 
     val add = {
         if (backend.deps.addRepository(name, url)) { repos = backend.deps.repositories(); name = ""; url = ""; error = null }
-        else error = "Enter a valid http(s) URL that isn't already added."
+        else error = "请输入尚未添加的有效 http(s) URL。"
     }
 
     Column(modifier) {
@@ -377,7 +377,7 @@ private fun DepBody(
     Crossfade(targetState = loading, animationSpec = tween(Motion.BASE), label = "depBody", modifier = modifier) { isLoading ->
         when {
             isLoading -> ResolvingPanel(resolveState)
-            deps == null -> Empty("Couldn't load dependencies.")
+            deps == null -> Empty("无法加载依赖。")
             // The persistent error state carries the (heuristic) why per coordinate — surface it here too.
             else -> DepContent(deps, tab, resolvedView, codeFont, resolveState.unresolved.associate { it.coordinate to it.reason }, onRemove, onEdit, onExcludeTransitive, onRemoveExclusion)
         }
@@ -399,7 +399,7 @@ private fun ResolvingPanel(state: DepsResolveState) {
         ) {
             CircularProgressIndicator(Modifier.size(30.dp), color = Ca.colors.accent, strokeWidth = 3.dp)
             Text("正在解析依赖", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
-            Text(state.message.ifBlank { "Downloading POMs & artifacts…" }, color = Ca.colors.textSecondary,
+            Text(state.message.ifBlank { "正在下载 POM 和制品…" }, color = Ca.colors.textSecondary,
                 style = Ca.type.caption, maxLines = 2, overflow = TextOverflow.Ellipsis)
             ResolveBar(state.fraction)
         }
@@ -434,12 +434,12 @@ private fun DepContent(deps: UiModuleDeps, tab: DepTab, resolvedView: DepView, c
             ConflictSummaryBanner(deps.conflicts, realConflicts.keys, codeFont, Modifier.animateItem())
         }
         if (deps.cycles.isNotEmpty()) item("cycles") {
-            BannerCard(CaIcons.refresh, Ca.colors.error, "${deps.cycles.size} dependency cycle${plural(deps.cycles.size)}", Modifier.animateItem()) {
+            BannerCard(CaIcons.refresh, Ca.colors.error, "${deps.cycles.size} 个依赖循环", Modifier.animateItem()) {
                 deps.cycles.forEach { cycle -> Text(cycle.joinToString(" → ") { it.substringBeforeLast(':') }, color = Ca.colors.textSecondary, style = Ca.type.caption.copy(fontFamily = codeFont)) }
             }
         }
         if (deps.unresolved.isNotEmpty()) item("unresolved") {
-            BannerCard(CaIcons.error, Ca.colors.error, "${deps.unresolved.size} unresolved", Modifier.animateItem()) {
+            BannerCard(CaIcons.error, Ca.colors.error, "${deps.unresolved.size} 个未解析依赖", Modifier.animateItem()) {
                 deps.unresolved.forEach { coord ->
                     Text(coord, color = Ca.colors.textSecondary, style = Ca.type.caption.copy(fontFamily = codeFont))
                     reasons[coord]?.let { Text(it, color = Ca.colors.textTertiary, style = Ca.type.caption2) }
@@ -452,7 +452,7 @@ private fun DepContent(deps: UiModuleDeps, tab: DepTab, resolvedView: DepView, c
             // red "unresolved" badge when resolution couldn't satisfy it. Expand a row to peek at its
             // (resolved) transitive children.
             DepTab.Declared -> {
-                if (deps.declared.isEmpty()) item("empty") { EmptyRow("No dependencies declared. Tap Add to download one.") }
+                if (deps.declared.isEmpty()) item("empty") { EmptyRow("还没有声明依赖。点击添加下载一个依赖。") }
                 items(deps.declared, key = { "decl:${it.coordinate}" }) { node ->
                     val open = expanded["decl:${node.coordinate}"] == true
                     Column(Modifier.fillMaxWidth().animateItem()) {
@@ -480,13 +480,13 @@ private fun DepContent(deps: UiModuleDeps, tab: DepTab, resolvedView: DepView, c
             // declared deps or a flat listing.
             DepTab.Resolved -> when (resolvedView) {
                 DepView.Tree -> {
-                    if (deps.declared.isEmpty()) item("empty") { EmptyRow("Nothing resolved yet.") }
+                    if (deps.declared.isEmpty()) item("empty") { EmptyRow("还没有解析结果。") }
                     deps.declared.forEach { root ->
                         treeRows(root, root, nodesByCoord, 0, emptyList(), expanded, codeFont, realConflicts, { onRemove(root.coordinate) }, onExcludeTransitive)
                     }
                 }
                 DepView.Graph -> {
-                    if (deps.nodes.isEmpty()) item("empty") { EmptyRow("Nothing resolved yet.") }
+                    if (deps.nodes.isEmpty()) item("empty") { EmptyRow("还没有解析结果。") }
                     val sorted = deps.nodes.sortedWith(compareByDescending<UiDependencyNode> { it.declared }.thenBy { it.coordinate })
                     items(sorted, key = { "graph:${it.coordinate}" }) { node -> Box(Modifier.animateItem()) { GraphRow(node, nodesByCoord, codeFont, conflictFor(node)) } }
                 }
@@ -739,8 +739,8 @@ private fun AddDependencyContent(
         ) {
             Icon(CaIcons.search, null, Modifier.size(18.dp), tint = Ca.colors.accent)
             Box(Modifier.weight(1f)) {
-                val hint = if (mode == AddMode.Platform) "Search a BOM, or type group:name:version — e.g. androidx.compose:compose-bom:…"
-                    else "Search Maven Central, or type group:name[:version]…"
+                val hint = if (mode == AddMode.Platform) "搜索 BOM，或输入 group:name:version，例如 androidx.compose:compose-bom:…"
+                    else "搜索 Maven Central，或输入 group:name[:version]…"
                 if (query.isEmpty()) Text(hint, color = Ca.colors.textTertiary, style = Ca.type.subhead, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 BasicTextField(query, { query = it; error = null }, singleLine = true, enabled = !busy,
                     textStyle = Ca.type.subhead.copy(color = Ca.colors.textPrimary, fontFamily = codeFont),
@@ -763,7 +763,7 @@ private fun AddDependencyContent(
             horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("变体", color = Ca.colors.textTertiary, style = Ca.type.caption, modifier = Modifier.padding(end = 4.dp))
-            ScopeChip("All variants", variant == null) { if (!busy) variant = null }
+            ScopeChip("所有变体", variant == null) { if (!busy) variant = null }
             variants.forEach { v -> ScopeChip(v, v == variant) { if (!busy) variant = v } }
         }
 
@@ -812,12 +812,12 @@ private fun AddDependencyContent(
                     Spacer(Modifier.height(20.dp))
                     CircularProgressIndicator(Modifier.size(28.dp), color = Ca.colors.accent, strokeWidth = 3.dp)
                     Text("正在添加 ${adding?.let(::shortCoord) ?: ""}", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
-                    Text(resolveState.message.ifBlank { "Resolving transitive dependencies…" }, color = Ca.colors.textSecondary, style = Ca.type.caption, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(resolveState.message.ifBlank { "正在解析传递依赖…" }, color = Ca.colors.textSecondary, style = Ca.type.caption, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     ResolveBar(resolveState.fraction)
                 }
             } else if (mode == AddMode.Module) {
                 LazyColumn(listModifier) {
-                    if (moduleTargets.isEmpty()) item { EmptyRow("No other modules available to depend on.") }
+                    if (moduleTargets.isEmpty()) item { EmptyRow("没有可依赖的其他模块。") }
                     items(moduleTargets, key = { it }) { target ->
                         ModuleTargetRow(target, Modifier.animateItem()) { performAdd(target) }
                     }
@@ -858,7 +858,7 @@ private fun ModuleTargetRow(name: String, modifier: Modifier, onAdd: () -> Unit)
     ) {
         LetterBox("M", Ca.colors.accent)
         Text(":$name", color = Ca.colors.textPrimary, style = Ca.type.footnote, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        IconButtonCa(CaIcons.plus, "Add $name", onClick = onAdd, active = true, boxSize = 32, iconSize = 18)
+        IconButtonCa(CaIcons.plus, "添加 $name", onClick = onAdd, active = true, boxSize = 32, iconSize = 18)
     }
 }
 
@@ -876,14 +876,14 @@ private fun DirectAddRow(coordinate: String, mode: AddMode, codeFont: FontFamily
             Text(coordinate, color = Ca.colors.textPrimary, style = Ca.type.footnote.copy(fontFamily = codeFont), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
                 when {
-                    mode == AddMode.Platform -> "Import as a platform (BOM)"
-                    versionless -> "Add versionless — version from a platform"
-                    else -> "Add this exact coordinate"
+                    mode == AddMode.Platform -> "作为平台 (BOM) 导入"
+                    versionless -> "不指定版本添加，由平台提供版本"
+                    else -> "添加此精确坐标"
                 },
                 color = Ca.colors.textTertiary, style = Ca.type.caption2,
             )
         }
-        IconButtonCa(CaIcons.plus, "Add $coordinate", onClick = onAdd, active = true, boxSize = 32, iconSize = 18)
+        IconButtonCa(CaIcons.plus, "添加 $coordinate", onClick = onAdd, active = true, boxSize = 32, iconSize = 18)
     }
 }
 
@@ -926,7 +926,7 @@ private fun LocalLibraryBody(
             }
         }
         if (!canPick && candidates.isEmpty()) item("empty") {
-            EmptyRow("No local jars/aars found. Import one into the project, or open this on a device to pick a file.")
+            EmptyRow("没有找到本地 jar/aar。请先导入到项目中，或在设备上打开以选择文件。")
         }
     }
 }
@@ -945,7 +945,7 @@ private fun LocalCandidateRow(path: String, codeFont: FontFamily, modifier: Modi
             Text(fileName, color = Ca.colors.textPrimary, style = Ca.type.footnote, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(path, color = Ca.colors.textTertiary, style = Ca.type.caption2.copy(fontFamily = codeFont), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        IconButtonCa(CaIcons.plus, "Attach $fileName", onClick = onAttach, active = true, boxSize = 32, iconSize = 18)
+        IconButtonCa(CaIcons.plus, "附加 $fileName", onClick = onAttach, active = true, boxSize = 32, iconSize = 18)
     }
 }
 
@@ -975,8 +975,8 @@ private fun AddResultRow(hit: UiArtifactHit, codeFont: FontFamily, modifier: Mod
                 Text(hit.incompatibleReason, color = Ca.colors.error, style = Ca.type.caption2, maxLines = 1, overflow = TextOverflow.Ellipsis)
             else Text(hit.packaging, color = Ca.colors.textTertiary, style = Ca.type.caption2)
         }
-        if (hit.compatible) IconButtonCa(CaIcons.plus, "Add ${hit.coordinate}", onClick = onAdd, active = true, boxSize = 32, iconSize = 18)
-        else Icon(CaIcons.warning, "Incompatible", Modifier.size(18.dp), tint = Ca.colors.error)
+        if (hit.compatible) IconButtonCa(CaIcons.plus, "添加 ${hit.coordinate}", onClick = onAdd, active = true, boxSize = 32, iconSize = 18)
+        else Icon(CaIcons.warning, "不兼容", Modifier.size(18.dp), tint = Ca.colors.error)
     }
 }
 
@@ -1049,22 +1049,22 @@ private fun EditDependencySheet(
             Text(shortCoord(node.coordinate), color = Ca.colors.textSecondary, style = Ca.type.caption.copy(fontFamily = codeFont))
 
             // ---- version ----
-            SheetSection("Version")
+            SheetSection("版本")
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(Modifier.weight(1f)) { SheetField(versionText, "version", codeFont, leading = CaIcons.pkg) { versionText = it } }
+                Box(Modifier.weight(1f)) { SheetField(versionText, "版本", codeFont, leading = CaIcons.pkg) { versionText = it } }
                 if (loadingVersions) CircularProgressIndicator(Modifier.size(16.dp), color = Ca.colors.textTertiary, strokeWidth = 2.dp)
                 else newest?.takeIf { updateAvailable }?.let { UpdateHintChip(it) { versionText = it } }
             }
             VersionList(versions, selected = versionText, loading = loadingVersions, codeFont = codeFont) { versionText = it }
 
             // ---- scope ----
-            SheetSection("Scope")
+            SheetSection("作用域")
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 scopeOptions.forEach { s -> ScopeChip(s, s == scope) { scope = s } }
             }
 
             // ---- exclusions ----
-            SheetSection("Exclusions")
+            SheetSection("排除项")
             Text("要排除的传递 group:name 条目（任一侧可为 *），用逗号或空格分隔。",
                 color = Ca.colors.textTertiary, style = Ca.type.caption2)
             Spacer(Modifier.height(8.dp))
@@ -1147,7 +1147,7 @@ private fun VersionList(versions: List<String>, selected: String, loading: Boole
                     Text(v, color = if (isSel) Ca.colors.accent else Ca.colors.textPrimary,
                         style = Ca.type.caption.copy(fontFamily = codeFont), fontWeight = if (isSel) FontWeight.SemiBold else FontWeight.Normal,
                         modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (isSel) Icon(CaIcons.check, "Selected", Modifier.size(15.dp), tint = Ca.colors.accent)
+                    if (isSel) Icon(CaIcons.check, "已选择", Modifier.size(15.dp), tint = Ca.colors.accent)
                 }
             }
         }
@@ -1287,7 +1287,7 @@ private fun ScopeBadge(scope: String) {
 /** A small pill marking a declared dependency as scoped to one build variant (e.g. `debug`). */
 @Composable
 private fun VariantBadge(variant: String) {
-    WithTooltip("Only in the '$variant' variant") {
+    WithTooltip("仅用于 '$variant' 变体") {
         Box(
             Modifier.background(Ca.colors.textTertiary.copy(alpha = 0.14f), RoundedCornerShape(Ca.radius.pill))
                 .padding(horizontal = 6.dp, vertical = 2.dp),
@@ -1300,8 +1300,8 @@ private fun VariantBadge(variant: String) {
 /** A conflict that's worth flagging on the row: a warning glyph; the requested→chosen detail is the tooltip. */
 @Composable
 private fun ConflictBadge(conflict: UiVersionConflict) {
-    WithTooltip("Version conflict: ${conflict.requested.joinToString(" vs ")} → using ${conflict.chosen}") {
-        Icon(CaIcons.warning, "Version conflict", Modifier.size(16.dp), tint = Ca.colors.warning)
+    WithTooltip("版本冲突：${conflict.requested.joinToString(" vs ")} → 使用 ${conflict.chosen}") {
+        Icon(CaIcons.warning, "版本冲突", Modifier.size(16.dp), tint = Ca.colors.warning)
     }
 }
 
@@ -1338,8 +1338,8 @@ private fun ConflictSummaryBanner(conflicts: List<UiVersionConflict>, realArtifa
     val benign = conflicts.filterNot { it.artifact in realArtifacts }
     var open by remember(conflicts) { mutableStateOf(real.isNotEmpty()) }
     val color = if (real.isNotEmpty()) Ca.colors.warning else Ca.colors.textTertiary
-    val title = if (real.isNotEmpty()) "${real.size} version conflict${plural(real.size)} to review"
-        else "${benign.size} version${plural(benign.size)} auto-resolved (newest wins)"
+    val title = if (real.isNotEmpty()) "${real.size} 个版本冲突需要检查"
+        else "${benign.size} 个版本差异已自动解析（使用最新版本）"
     Column(
         modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp)
             .background(color.copy(alpha = 0.10f), RoundedCornerShape(Ca.radius.md))
@@ -1351,7 +1351,7 @@ private fun ConflictSummaryBanner(conflicts: List<UiVersionConflict>, realArtifa
         ) {
             Icon(if (real.isNotEmpty()) CaIcons.warning else CaIcons.info, null, Modifier.size(16.dp), tint = color)
             Text(title, color = color, style = Ca.type.footnote, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            if (real.isNotEmpty() && benign.isNotEmpty()) Text("+${benign.size} auto-resolved", color = Ca.colors.textTertiary, style = Ca.type.caption2)
+            if (real.isNotEmpty() && benign.isNotEmpty()) Text("+${benign.size} 个已自动解析", color = Ca.colors.textTertiary, style = Ca.type.caption2)
             Icon(if (open) CaIcons.chevronUp else CaIcons.chevronDown, null, Modifier.size(16.dp), tint = Ca.colors.textTertiary)
         }
         AnimatedVisibility(open, enter = expandVertically(tween(Motion.FAST)) + fadeIn(), exit = shrinkVertically(tween(Motion.FAST)) + fadeOut()) {
@@ -1445,9 +1445,9 @@ private fun primaryName(node: UiDependencyNode): String =
 
 /** The dimmed subtitle: the Maven group, or a kind descriptor when there's no group. */
 private fun depSubtitle(node: UiDependencyNode): String? = when {
-    node.kind == UiDepKind.Module -> "module"
-    node.kind == UiDepKind.Platform -> node.group.ifEmpty { "platform (BOM)" }
-    node.local -> if (node.kind == UiDepKind.Aar) "local aar" else "local jar"
+    node.kind == UiDepKind.Module -> "模块"
+    node.kind == UiDepKind.Platform -> node.group.ifEmpty { "平台 (BOM)" }
+    node.local -> if (node.kind == UiDepKind.Aar) "本地 aar" else "本地 jar"
     node.group.isNotEmpty() -> node.group
     else -> null
 }

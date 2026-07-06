@@ -294,7 +294,7 @@ private fun InspectionsCard(backend: IdeBackend) {
     val byLang = inspections.groupBy { it.language }.toList().sortedBy { it.first }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         byLang.forEach { (lang, list) ->
-            SettingsCard("$lang inspections") {
+            SettingsCard("$lang 检查") {
                 list.forEach { insp ->
                     InspectionRow(insp) { enabled, severity ->
                         backend.settings.setInspection(insp.id, enabled, severity)

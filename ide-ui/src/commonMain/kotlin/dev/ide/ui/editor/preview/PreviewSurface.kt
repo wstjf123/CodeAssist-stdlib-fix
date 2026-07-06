@@ -300,10 +300,10 @@ fun PreviewProblemChip(issues: List<PreviewIssue>, modifier: Modifier) {
                 verticalArrangement = Arrangement.spacedBy(Ca.spacing.s2),
             ) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("${issues.size} problem${if (issues.size == 1) "" else "s"}", color = Ca.colors.textSecondary, style = Ca.type.caption)
+                    Text("${issues.size} 个问题", color = Ca.colors.textSecondary, style = Ca.type.caption)
                     PillButton({ clipboard.setText(AnnotatedString(copyText)) }) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(CaIcons.copy, "Copy problems", Modifier.size(13.dp), tint = Ca.colors.textSecondary)
+                            Icon(CaIcons.copy, "复制问题", Modifier.size(13.dp), tint = Ca.colors.textSecondary)
                             Text(" 复制", color = Ca.colors.textSecondary, style = Ca.type.caption)
                         }
                     }

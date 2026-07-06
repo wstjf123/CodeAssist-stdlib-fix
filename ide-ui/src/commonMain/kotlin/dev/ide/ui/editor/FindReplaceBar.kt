@@ -107,9 +107,9 @@ fun FindReplaceBar(
             OptionChip("Aa", options.caseSensitive) { onOptionsChange(options.copy(caseSensitive = !options.caseSensitive)) }
             OptionChip("W", options.wholeWord) { onOptionsChange(options.copy(wholeWord = !options.wholeWord)) }
             OptionChip(".*", options.regex) { onOptionsChange(options.copy(regex = !options.regex)) }
-            IconButtonCa(CaIcons.chevronUp, "Previous match", onClick = onPrev, iconSize = 16, boxSize = 30)
-            IconButtonCa(CaIcons.chevronDown, "Next match", onClick = onNext, iconSize = 16, boxSize = 30)
-            IconButtonCa(CaIcons.close, "Close", onClick = onClose, iconSize = 16, boxSize = 30)
+            IconButtonCa(CaIcons.chevronUp, "上一个匹配项", onClick = onPrev, iconSize = 16, boxSize = 30)
+            IconButtonCa(CaIcons.chevronDown, "下一个匹配项", onClick = onNext, iconSize = 16, boxSize = 30)
+            IconButtonCa(CaIcons.close, "关闭", onClick = onClose, iconSize = 16, boxSize = 30)
         }
         if (replaceMode) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
