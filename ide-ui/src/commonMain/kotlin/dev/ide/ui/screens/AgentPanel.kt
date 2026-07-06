@@ -28,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -111,11 +112,12 @@ private fun AgentPanel(
     val displayItems = buildAgentDisplayItems(messages)
     val scrollRevision = displayItems.sumOf { it.contentLength }
     val expandedTools = remember { mutableStateMapOf<String, Boolean>() }
+    val lazyItemCount = displayItems.sumOf { if (it.isTool && expandedTools[it.key] == true) 3 else 1 } + 1
 
     LaunchedEffect(displayItems.size, scrollRevision) {
         if (displayItems.isNotEmpty()) {
             yield()
-            listState.scrollToItem(displayItems.lastIndex)
+            listState.scrollToItem(lazyItemCount - 1)
         }
     }
 
@@ -155,21 +157,36 @@ private fun AgentPanel(
                 state = listState,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             ) {
+                var rowIndex = 0
                 displayItems.forEach { item ->
                     val tool = item.isTool
                     val expanded = tool && expandedTools[item.key] == true
                     if (tool && expanded) {
+                        val detailsKey = "${item.key}:details"
+                        val detailsIndex = rowIndex + 1
+                        rowIndex += 3
+                        val detailsVisible by remember(detailsKey, detailsIndex) {
+                            derivedStateOf {
+                                listState.firstVisibleItemIndex <= detailsIndex ||
+                                    listState.layoutInfo.visibleItemsInfo.any { it.key == detailsKey }
+                            }
+                        }
                         stickyHeader {
-                            Box(Modifier.fillMaxWidth().background(listBackground)) {
+                            Box(
+                                Modifier.fillMaxWidth()
+                                    .background(listBackground)
+                                    .padding(bottom = if (detailsVisible) 0.dp else 8.dp),
+                            ) {
                                 ToolMessageHeader(
                                     message = item.message,
                                     outputItem = item.output,
                                     expanded = true,
+                                    connected = detailsVisible,
                                     onToggle = { expandedTools[item.key] = false },
                                 )
                             }
                         }
-                        item(key = "${item.key}:details") {
+                        item(key = detailsKey) {
                             Box(Modifier.padding(bottom = 8.dp)) {
                                 ToolMessageDetails(message = item.message, outputItem = item.output)
                             }
@@ -178,6 +195,7 @@ private fun AgentPanel(
                             Spacer(Modifier.height(0.dp))
                         }
                     } else {
+                        rowIndex += 1
                         item(key = item.key) {
                             Box(Modifier.padding(bottom = 8.dp)) {
                                 MessageBubble(
@@ -188,6 +206,9 @@ private fun AgentPanel(
                             }
                         }
                     }
+                }
+                item(key = "agent:bottom") {
+                    Spacer(Modifier.height(1.dp))
                 }
             }
         }
@@ -387,6 +408,7 @@ private fun ToolMessageHeader(
     message: AgentConversationItem,
     outputItem: AgentConversationItem?,
     expanded: Boolean,
+    connected: Boolean = false,
     onToggle: () -> Unit,
 ) {
     Box(
@@ -396,8 +418,8 @@ private fun ToolMessageHeader(
                 RoundedCornerShape(
                     topStart = Ca.radius.sm,
                     topEnd = Ca.radius.sm,
-                    bottomStart = 0.dp,
-                    bottomEnd = 0.dp,
+                    bottomStart = if (connected) 0.dp else Ca.radius.sm,
+                    bottomEnd = if (connected) 0.dp else Ca.radius.sm,
                 ),
             )
             .padding(10.dp),
