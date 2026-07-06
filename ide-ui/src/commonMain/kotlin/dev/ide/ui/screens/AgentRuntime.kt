@@ -2,7 +2,10 @@ package dev.ide.ui.screens
 
 import androidx.compose.ui.text.TextRange
 import dev.ide.ui.AgentConversationItem
+import dev.ide.ui.ComposePreviewHost
+import dev.ide.ui.EditorViewMode
 import dev.ide.ui.IdeUiState
+import dev.ide.ui.OpenFile
 import dev.ide.ui.backend.TreeNode
 import dev.ide.ui.backend.UiAgentContentItem
 import dev.ide.ui.backend.UiAgentConfig
@@ -410,8 +413,13 @@ private fun agentTools(): List<UiAgentTool> = listOf(
         """{"type":"object","properties":{"patch":{"type":"string"}},"required":["patch"],"additionalProperties":false}""",
     ),
     UiAgentTool(
+        "open_compose_preview",
+        "Open an existing Compose @Preview in the IDE preview pane using the normal UI state path. If previewName is omitted, opens the current selected preview or the first preview.",
+        """{"type":"object","properties":{"previewName":{"type":"string"},"mode":{"type":"string","description":"preview or split"}},"additionalProperties":false}""",
+    ),
+    UiAgentTool(
         "capture_compose_preview",
-        "Capture a PNG screenshot of a Compose @Preview in the current editor file and return it as an input_image tool output. If previewName is omitted, captures the currently selected preview or the first preview.",
+        "Capture a PNG screenshot of the visible Compose @Preview in the current editor file and return it as an input_image tool output. Call open_compose_preview first if the requested preview is not already visible.",
         """{"type":"object","properties":{"previewName":{"type":"string"},"dark":{"type":"string","description":"Optional true/false night mode override"}},"additionalProperties":false}""",
     ),
 )
@@ -562,12 +570,29 @@ private suspend fun executeAgentToolUnchecked(state: IdeUiState, call: UiAgentTo
             session.replaceRange(0, session.doc.length, result.text, TextRange(result.text.length))
             toolSuccess("applied patch to ${file.path}: ${result.message}")
         }
+        "open_compose_preview" -> {
+            val file = active ?: return toolFailure("no current file")
+            val host = state.composePreviewHost ?: return toolFailure("Compose preview is not available")
+            val previews = state.backend.preview.composePreviews(file.path, file.text)
+            val target = selectComposePreview(previews, call.stringArguments["previewName"], file.previewTarget)
+                ?: return toolFailure("no Compose @Preview found in ${file.path}")
+            val visible = openComposePreviewUi(host, file, target, call.stringArguments["mode"] ?: "preview")
+            val label = target.label.ifBlank { target.functionName }
+            if (!visible) {
+                return toolFailure("opened Compose preview `$label`, but it did not become visible before timeout")
+            }
+            toolSuccess("opened Compose preview `$label` in ${file.viewMode.name.lowercase()} mode")
+        }
         "capture_compose_preview" -> {
             val file = active ?: return toolFailure("no current file")
             val host = state.composePreviewHost ?: return toolFailure("Compose preview capture is not available")
             val previews = state.backend.preview.composePreviews(file.path, file.text)
             val target = selectComposePreview(previews, call.stringArguments["previewName"], file.previewTarget)
                 ?: return toolFailure("no Compose @Preview found in ${file.path}")
+            if (!openComposePreviewUi(host, file, target, call.stringArguments["mode"])) {
+                val label = target.label.ifBlank { target.functionName }
+                return toolFailure("opened Compose preview `$label`, but it did not become visible before timeout")
+            }
             val dark = call.stringArguments["dark"]?.equals("true", ignoreCase = true) ?: (target.config.nightMode == true)
             val capture = host.capturePreview(file.path, target, file.text, dark)
             if (!capture.ok || capture.imageDataUrl.isNullOrBlank()) {
@@ -599,6 +624,23 @@ private fun selectComposePreview(
         previews.firstOrNull { it.label == key }?.let { return it }
     }
     return previews.firstOrNull()
+}
+
+private suspend fun openComposePreviewUi(
+    host: ComposePreviewHost,
+    file: OpenFile,
+    target: UiComposePreview,
+    mode: String?,
+): Boolean {
+    file.previewTarget = target.variantId
+    when (mode?.lowercase()) {
+        "split" -> file.viewMode = EditorViewMode.Split
+        "preview" -> file.viewMode = EditorViewMode.Preview
+        else -> if (file.viewMode != EditorViewMode.Preview && file.viewMode != EditorViewMode.Split) {
+            file.viewMode = EditorViewMode.Preview
+        }
+    }
+    return host.awaitPreviewVisible(file.path, target, PREVIEW_OPEN_TIMEOUT_MS)
 }
 
 private data class AgentPatchResult(val ok: Boolean, val text: String, val message: String)
@@ -736,6 +778,7 @@ private fun appendDiagnostics(out: StringBuilder, diagnostics: List<UiDiagnostic
 private const val AUTO_COMPACT_INPUT_TOKEN_THRESHOLD = 32_000
 private const val AUTO_COMPACT_TOTAL_TOKEN_THRESHOLD = 48_000
 private const val COMPACT_USER_MESSAGE_MAX_TOKENS = 20_000
+private const val PREVIEW_OPEN_TIMEOUT_MS = 5_000L
 private const val COMPACT_SUMMARY_PREFIX =
     "Another language model started to solve this problem and produced a summary of its thinking process. " +
         "You also have access to the state of the tools that were used by that language model. " +

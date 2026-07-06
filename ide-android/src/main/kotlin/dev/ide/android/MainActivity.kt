@@ -178,7 +178,6 @@ class MainActivity : ComponentActivity() {
                     // one host suffices.
                     composePreviewHost = (b as? IdeServicesBackend)?.let {
                         AndroidComposePreviewHost(
-                            this@MainActivity,
                             it
                         )
                     },

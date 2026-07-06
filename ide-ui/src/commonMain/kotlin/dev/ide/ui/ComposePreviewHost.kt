@@ -26,6 +26,8 @@ interface ComposePreviewHost {
     @Composable
     fun Preview(path: String, preview: UiComposePreview, text: String, dark: Boolean, refreshKey: Int, onProblems: (List<PreviewIssue>) -> Unit, onBusy: (Boolean) -> Unit, modifier: Modifier)
 
+    suspend fun awaitPreviewVisible(path: String, preview: UiComposePreview, timeoutMillis: Long): Boolean = false
+
     suspend fun capturePreview(path: String, preview: UiComposePreview, text: String, dark: Boolean): ComposePreviewCaptureResult =
         ComposePreviewCaptureResult(false, "Compose preview capture is not available")
 }

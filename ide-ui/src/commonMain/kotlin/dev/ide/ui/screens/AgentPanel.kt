@@ -90,11 +90,10 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
     val active = state.active
     val messages = state.agentMessages
     val listState = rememberLazyListState()
-    val lastMessageText = messages.lastOrNull()?.text.orEmpty()
 
-    LaunchedEffect(messages.size, lastMessageText) {
+    LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.lastIndex)
+            listState.scrollToItem(messages.lastIndex)
         }
     }
 
@@ -224,7 +223,7 @@ private fun ContextToggle(label: String, selected: Boolean, enabled: Boolean, on
 private fun MessageBubble(message: AgentConversationItem) {
     when (message.type) {
         "compaction" -> Unit
-        "function_call" -> Unit
+        "function_call" -> ToolMessageBubble(message, running = true)
         "function_call_output" -> ToolMessageBubble(message)
         "message" -> if (message.text.isNotBlank()) TextMessageBubble(message)
     }
@@ -256,7 +255,7 @@ private fun TextMessageBubble(message: AgentConversationItem) {
 }
 
 @Composable
-private fun ToolMessageBubble(message: AgentConversationItem) {
+private fun ToolMessageBubble(message: AgentConversationItem, running: Boolean = false) {
     var expanded by remember(message) { mutableStateOf(false) }
     val name = message.name ?: "tool"
     val output = message.text
@@ -281,15 +280,19 @@ private fun ToolMessageBubble(message: AgentConversationItem) {
             )
             Text("Tool", color = Ca.colors.textTertiary, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold)
             Text(name, color = Ca.colors.textPrimary, style = Ca.type.codeSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            if (failed) {
+            if (running) {
+                Text("running", color = Ca.colors.accent, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold)
+            } else if (failed) {
                 Text("failed", color = Ca.colors.error, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold)
             }
         }
-        if (expanded && output.isNotBlank()) {
+        if (expanded && (arguments.isNotBlank() || output.isNotBlank())) {
             if (arguments.isNotBlank()) {
                 Text(arguments, color = Ca.colors.textSecondary, style = Ca.type.codeSmall)
             }
-            Text(output, color = Ca.colors.textPrimary, style = Ca.type.codeSmall)
+            if (output.isNotBlank()) {
+                Text(output, color = Ca.colors.textPrimary, style = Ca.type.codeSmall)
+            }
         }
     }
 }
