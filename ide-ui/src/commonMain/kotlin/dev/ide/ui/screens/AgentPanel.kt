@@ -1,5 +1,6 @@
 package dev.ide.ui.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -87,6 +89,7 @@ internal fun AgentSheets(state: IdeUiState, compact: Boolean) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
     val active = state.active
@@ -94,6 +97,7 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
     val listState = rememberLazyListState()
     val displayItems = buildAgentDisplayItems(messages)
     val scrollRevision = displayItems.sumOf { it.contentLength }
+    val expandedTools = remember { mutableStateMapOf<String, Boolean>() }
 
     LaunchedEffect(displayItems.size, scrollRevision) {
         if (displayItems.isNotEmpty()) {
@@ -139,7 +143,34 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(displayItems, key = { it.key }) { item -> MessageBubble(item) }
+                displayItems.forEach { item ->
+                    val tool = item.isTool
+                    val expanded = tool && expandedTools[item.key] == true
+                    if (tool && expanded) {
+                        stickyHeader {
+                            ToolMessageHeader(
+                                message = item.message,
+                                outputItem = item.output,
+                                expanded = true,
+                                onToggle = { expandedTools[item.key] = false },
+                            )
+                        }
+                        item(key = "${item.key}:details") {
+                            ToolMessageDetails(message = item.message, outputItem = item.output)
+                        }
+                        stickyHeader {
+                            Spacer(Modifier.height(0.dp))
+                        }
+                    } else {
+                        item(key = item.key) {
+                            MessageBubble(
+                                item = item,
+                                expanded = false,
+                                onToggleTool = { expandedTools[item.key] = true },
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -233,6 +264,8 @@ private data class AgentDisplayItem(
 ) {
     val contentLength: Int get() =
         message.text.length + message.argumentsJson.orEmpty().length + output?.text.orEmpty().length
+    val isTool: Boolean get() =
+        message.type == "function_call" || message.type == "function_call_output"
 }
 
 private fun buildAgentDisplayItems(messages: List<AgentConversationItem>): List<AgentDisplayItem> {
@@ -261,12 +294,12 @@ private fun buildAgentDisplayItems(messages: List<AgentConversationItem>): List<
 }
 
 @Composable
-private fun MessageBubble(item: AgentDisplayItem) {
+private fun MessageBubble(item: AgentDisplayItem, expanded: Boolean, onToggleTool: () -> Unit) {
     val message = item.message
     when (message.type) {
         "compaction" -> Unit
-        "function_call" -> ToolMessageBubble(message, item.output)
-        "function_call_output" -> ToolMessageBubble(message, null)
+        "function_call" -> ToolMessageBubble(message, item.output, expanded, onToggleTool)
+        "function_call_output" -> ToolMessageBubble(message, null, expanded, onToggleTool)
         "message" -> if (message.text.isNotBlank()) TextMessageBubble(message)
     }
 }
@@ -296,46 +329,99 @@ private fun TextMessageBubble(message: AgentConversationItem) {
     }
 }
 
-@Composable
-private fun ToolMessageBubble(message: AgentConversationItem, outputItem: AgentConversationItem?) {
-    var expanded by remember(message) { mutableStateOf(false) }
+private fun toolMessageState(message: AgentConversationItem, outputItem: AgentConversationItem?): ToolMessageState {
     val name = message.name ?: "工具"
     val output = outputItem?.text ?: message.text
     val arguments = message.argumentsJson.orEmpty()
     val running = message.type == "function_call" && outputItem == null
     val failed = (outputItem ?: message).toolSuccess == false
+    return ToolMessageState(name, output, arguments, running, failed)
+}
+
+private data class ToolMessageState(
+    val name: String,
+    val output: String,
+    val arguments: String,
+    val running: Boolean,
+    val failed: Boolean,
+)
+
+@Composable
+private fun ToolMessageBubble(
+    message: AgentConversationItem,
+    outputItem: AgentConversationItem?,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+) {
     Column(
         Modifier.fillMaxWidth()
             .background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.sm))
             .padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Row(
-            Modifier.fillMaxWidth().clickable { expanded = !expanded },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Icon(
-                if (expanded) CaIcons.caretDown else CaIcons.caretRight,
-                null,
-                Modifier.size(13.dp),
-                tint = Ca.colors.textTertiary,
-            )
-            Text("工具", color = Ca.colors.textTertiary, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold)
-            Text(name, color = Ca.colors.textPrimary, style = Ca.type.codeSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            if (running) {
-                Text("运行中", color = Ca.colors.accent, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold)
-            } else if (failed) {
-                Text("失败", color = Ca.colors.error, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold)
-            }
+        ToolMessageHeaderContent(toolMessageState(message, outputItem), expanded, onToggle)
+        if (expanded) ToolMessageDetailsContent(toolMessageState(message, outputItem))
+    }
+}
+
+@Composable
+private fun ToolMessageHeader(
+    message: AgentConversationItem,
+    outputItem: AgentConversationItem?,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+) {
+    Box(
+        Modifier.fillMaxWidth()
+            .background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.sm))
+            .padding(10.dp),
+    ) {
+        ToolMessageHeaderContent(toolMessageState(message, outputItem), expanded, onToggle)
+    }
+}
+
+@Composable
+private fun ToolMessageHeaderContent(state: ToolMessageState, expanded: Boolean, onToggle: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable { onToggle() },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(
+            if (expanded) CaIcons.caretDown else CaIcons.caretRight,
+            null,
+            Modifier.size(13.dp),
+            tint = Ca.colors.textTertiary,
+        )
+        Text("工具", color = Ca.colors.textTertiary, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold)
+        Text(state.name, color = Ca.colors.textPrimary, style = Ca.type.codeSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        if (state.running) {
+            Text("运行中", color = Ca.colors.accent, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold)
+        } else if (state.failed) {
+            Text("失败", color = Ca.colors.error, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold)
         }
-        if (expanded && (arguments.isNotBlank() || output.isNotBlank())) {
-            if (arguments.isNotBlank()) {
-                Text(arguments, color = Ca.colors.textSecondary, style = Ca.type.codeSmall)
-            }
-            if (output.isNotBlank()) {
-                Text(output, color = Ca.colors.textPrimary, style = Ca.type.codeSmall)
-            }
+    }
+}
+
+@Composable
+private fun ToolMessageDetails(message: AgentConversationItem, outputItem: AgentConversationItem?) {
+    Box(
+        Modifier.fillMaxWidth()
+            .background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.sm))
+            .padding(10.dp),
+    ) {
+        ToolMessageDetailsContent(toolMessageState(message, outputItem))
+    }
+}
+
+@Composable
+private fun ToolMessageDetailsContent(state: ToolMessageState) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (state.arguments.isNotBlank()) {
+            Text(state.arguments, color = Ca.colors.textSecondary, style = Ca.type.codeSmall)
+        }
+        if (state.output.isNotBlank()) {
+            Text(state.output, color = Ca.colors.textPrimary, style = Ca.type.codeSmall)
         }
     }
 }

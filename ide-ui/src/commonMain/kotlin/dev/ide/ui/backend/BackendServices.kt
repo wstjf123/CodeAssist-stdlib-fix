@@ -602,6 +602,7 @@ data class UiAgentRequest(
     val instructions: String = "",
     val input: List<UiAgentInputItem>,
     val tools: List<UiAgentTool> = emptyList(),
+    val promptCacheKey: String? = null,
 )
 
 data class UiAgentInputItem(
@@ -659,6 +660,7 @@ data class UiAgentTokenUsage(
     val inputTokens: Int = 0,
     val outputTokens: Int = 0,
     val totalTokens: Int = 0,
+    val cachedInputTokens: Int = 0,
 )
 
 data class UiAgentTool(

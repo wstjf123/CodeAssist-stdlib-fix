@@ -110,6 +110,7 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
         val root = JsonObject().apply {
             addProperty("model", request.config.model)
             if (request.instructions.isNotBlank()) addProperty("instructions", request.instructions)
+            request.promptCacheKey?.takeIf { it.isNotBlank() }?.let { addProperty("prompt_cache_key", it) }
             add("input", request.input.toJson())
             addProperty("stream", true)
             addProperty("tool_choice", "auto")
@@ -401,11 +402,13 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
         val input = usage.int("input_tokens") ?: 0
         val output = usage.int("output_tokens") ?: 0
         val total = usage.int("total_tokens") ?: input + output
+        val cached = usage.obj("input_tokens_details")?.int("cached_tokens") ?: 0
         if (input == 0 && output == 0 && total == 0) return null
         return UiAgentTokenUsage(
             inputTokens = input,
             outputTokens = output,
             totalTokens = total,
+            cachedInputTokens = cached,
         )
     }
 

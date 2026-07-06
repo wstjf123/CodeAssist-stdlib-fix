@@ -53,6 +53,7 @@ internal suspend fun runAgentLoop(
                 instructions = agentInstructions(),
                 input = compactAgentInput(messages),
                 tools = tools,
+                promptCacheKey = agentPromptCacheKey(state),
             ),
             onTextDelta = { delta ->
                 if (isUsefulAgentText(delta)) {
@@ -115,6 +116,9 @@ private fun agentInstructions(): String =
         "Once the requested content has been retrieved, answer from that content and avoid redundant reads. " +
         "When modifying files, use apply_patch with the Codex apply_patch format. " +
         "Patches may add, update, move, and delete files under the workspace."
+
+private fun agentPromptCacheKey(state: IdeUiState): String =
+    "codeassist:${state.activeAgentConversationId.ifBlank { "default" }}".take(64)
 
 private fun compactAgentInput(messages: List<AgentConversationItem>): List<UiAgentInputItem> {
     val input = ArrayList<UiAgentInputItem>()
@@ -376,6 +380,7 @@ private data class AgentToolFuture(val call: UiAgentToolCall, val output: Deferr
 
 private data class AgentToolContext(
     val rootPath: String,
+    val rootEntries: List<String>,
     val filePaths: List<String>,
     val activePath: String?,
     val activeText: String?,
@@ -397,7 +402,7 @@ private fun toolFailure(text: String): AgentToolResult =
 private fun agentTools(): List<UiAgentTool> = listOf(
     UiAgentTool(
         "list_workspace_files",
-        "List files in the current workspace. Returns absolute paths.",
+        "List only the immediate files and directories in the current workspace root. Returns absolute paths. Use glob for recursive file lookup.",
     ),
     UiAgentTool(
         "glob",
@@ -536,9 +541,11 @@ private suspend fun executeAgentToolCalls(
 
 private fun createAgentToolContext(state: IdeUiState): AgentToolContext {
     val active = state.active
-    val allFiles = collectFilePaths(state.backend.files.fileTree(TreeViewMode.AllFiles))
+    val fileTree = state.backend.files.fileTree(TreeViewMode.AllFiles)
+    val allFiles = collectFilePaths(fileTree)
     return AgentToolContext(
         rootPath = state.backend.project.rootPath,
+        rootEntries = collectWorkspaceRootEntries(fileTree),
         filePaths = allFiles,
         activePath = active?.path,
         activeText = active?.text,
@@ -589,7 +596,7 @@ private suspend fun executeAgentTool(state: IdeUiState, call: UiAgentToolCall): 
 private fun executeAgentToolUnchecked(context: AgentToolContext, call: UiAgentToolCall): AgentToolResult {
     return when (call.name) {
         "list_workspace_files" -> {
-            toolSuccess(context.filePaths.take(500).joinToString("\n"))
+            toolSuccess(if (context.rootEntries.isEmpty()) "工作区根目录为空" else context.rootEntries.joinToString("\n"))
         }
         "glob" -> {
             val pattern = call.stringArguments["pattern"] ?: return toolFailure("缺少 pattern")
@@ -643,7 +650,8 @@ private suspend fun executeAgentToolUnchecked(state: IdeUiState, call: UiAgentTo
     val active = state.active
     return when (call.name) {
         "list_workspace_files" -> {
-            toolSuccess(collectFilePaths(state.backend.files.fileTree(TreeViewMode.AllFiles)).take(500).joinToString("\n"))
+            val entries = collectWorkspaceRootEntries(state.backend.files.fileTree(TreeViewMode.AllFiles))
+            toolSuccess(if (entries.isEmpty()) "工作区根目录为空" else entries.joinToString("\n"))
         }
         "glob" -> {
             val pattern = call.stringArguments["pattern"] ?: return toolFailure("缺少 pattern")
@@ -1412,6 +1420,9 @@ private fun collectFilePaths(root: TreeNode): List<String> {
     walk(root)
     return out
 }
+
+private fun collectWorkspaceRootEntries(root: TreeNode): List<String> =
+    root.children.mapNotNull { child -> child.filePath ?: child.dirPath }.sorted()
 
 private fun appendDiagnostics(out: StringBuilder, diagnostics: List<UiDiagnostic>) {
     if (diagnostics.isEmpty()) return
