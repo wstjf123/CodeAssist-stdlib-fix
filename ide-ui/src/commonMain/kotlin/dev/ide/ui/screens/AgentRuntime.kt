@@ -6,6 +6,9 @@ import dev.ide.ui.ComposePreviewHost
 import dev.ide.ui.EditorViewMode
 import dev.ide.ui.IdeUiState
 import dev.ide.ui.OpenFile
+import dev.ide.ui.backend.BuildState
+import dev.ide.ui.backend.RunTaskOption
+import dev.ide.ui.backend.StepStatus
 import dev.ide.ui.backend.TreeNode
 import dev.ide.ui.backend.UiAgentContentItem
 import dev.ide.ui.backend.UiAgentConfig
@@ -16,10 +19,12 @@ import dev.ide.ui.backend.UiAgentTool
 import dev.ide.ui.backend.UiAgentToolCall
 import dev.ide.ui.backend.UiComposePreview
 import dev.ide.ui.backend.UiDiagnostic
+import dev.ide.ui.backend.UiSeverity
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 
 internal suspend fun runAgentLoop(
     state: IdeUiState,
@@ -366,6 +371,8 @@ private data class AgentToolContext(
     val activeText: String?,
     val diagnostics: List<UiDiagnostic>,
     val buildLog: List<String>,
+    val buildProgress: String,
+    val runTasks: String,
     val ideLogs: List<String>,
     val readFile: (String) -> String,
 )
@@ -401,6 +408,31 @@ private fun agentTools(): List<UiAgentTool> = listOf(
         "get_build_logs",
         "Return recent build logs.",
         """{"type":"object","properties":{},"additionalProperties":false}""",
+    ),
+    UiAgentTool(
+        "get_build_progress",
+        "Return current build status, elapsed time, task steps, diagnostic counts, and recent build log tail.",
+        """{"type":"object","properties":{},"additionalProperties":false}""",
+    ),
+    UiAgentTool(
+        "start_build",
+        "Start the IDE's default build using the same action as the build console Run button, then return current progress.",
+        """{"type":"object","properties":{},"additionalProperties":false}""",
+    ),
+    UiAgentTool(
+        "stop_build",
+        "Stop the current IDE build using the same action as the build console Stop button, then return current progress.",
+        """{"type":"object","properties":{},"additionalProperties":false}""",
+    ),
+    UiAgentTool(
+        "list_build_tasks",
+        "List build and run tasks available in the IDE Run picker.",
+        """{"type":"object","properties":{},"additionalProperties":false}""",
+    ),
+    UiAgentTool(
+        "run_build_task",
+        "Start a specific IDE build/run task by id from list_build_tasks, then return current progress.",
+        """{"type":"object","properties":{"id":{"type":"string"}},"required":["id"],"additionalProperties":false}""",
     ),
     UiAgentTool(
         "get_ide_logs",
@@ -451,6 +483,8 @@ private fun createAgentToolContext(state: IdeUiState): AgentToolContext {
         buildLog = state.backend.build.buildState.value.log
             .takeLast(160)
             .map { "${it.timeLabel} ${it.level}: ${it.message}" },
+        buildProgress = formatBuildProgress(state.backend.build.buildState.value),
+        runTasks = formatRunTasks(state.backend.build.runTasks()),
         ideLogs = state.backend.diagnostics.recentLogs()
             .takeLast(160)
             .map { "${it.timeLabel} ${it.level}/${it.tag}: ${it.message}" },
@@ -465,6 +499,8 @@ private fun supportsParallelToolExecution(call: UiAgentToolCall): Boolean =
         "get_current_file",
         "get_diagnostics",
         "get_build_logs",
+        "get_build_progress",
+        "list_build_tasks",
         "get_ide_logs" -> true
         else -> false
     }
@@ -514,6 +550,12 @@ private fun executeAgentToolUnchecked(context: AgentToolContext, call: UiAgentTo
             if (context.buildLog.isEmpty()) toolSuccess("no build logs")
             else toolSuccess(context.buildLog.joinToString("\n"))
         }
+        "get_build_progress" -> {
+            toolSuccess(context.buildProgress)
+        }
+        "list_build_tasks" -> {
+            toolSuccess(context.runTasks)
+        }
         "get_ide_logs" -> {
             if (context.ideLogs.isEmpty()) toolSuccess("no IDE logs")
             else toolSuccess(context.ideLogs.joinToString("\n"))
@@ -552,6 +594,33 @@ private suspend fun executeAgentToolUnchecked(state: IdeUiState, call: UiAgentTo
             val log = state.backend.build.buildState.value.log.takeLast(160)
             if (log.isEmpty()) toolSuccess("no build logs")
             else toolSuccess(log.joinToString("\n") { "${it.timeLabel} ${it.level}: ${it.message}" })
+        }
+        "get_build_progress" -> {
+            toolSuccess(formatBuildProgress(state.backend.build.buildState.value))
+        }
+        "start_build" -> {
+            state.consoleOpen = true
+            state.backend.build.runBuild()
+            delay(BUILD_ACTION_SETTLE_MS)
+            toolSuccess("build start requested\n\n${formatBuildProgress(state.backend.build.buildState.value)}")
+        }
+        "stop_build" -> {
+            state.consoleOpen = true
+            state.backend.build.stopBuild()
+            delay(BUILD_ACTION_SETTLE_MS)
+            toolSuccess("build stop requested\n\n${formatBuildProgress(state.backend.build.buildState.value)}")
+        }
+        "list_build_tasks" -> {
+            toolSuccess(formatRunTasks(state.backend.build.runTasks()))
+        }
+        "run_build_task" -> {
+            val id = call.stringArguments["id"] ?: return toolFailure("missing id")
+            val tasks = state.backend.build.runTasks()
+            val task = tasks.firstOrNull { it.id == id } ?: return toolFailure("unknown build task: $id")
+            state.consoleOpen = true
+            state.backend.build.runTask(task.id)
+            delay(BUILD_ACTION_SETTLE_MS)
+            toolSuccess("build task `${task.label}` requested\n\n${formatBuildProgress(state.backend.build.buildState.value)}")
         }
         "get_ide_logs" -> {
             val logs = state.backend.diagnostics.recentLogs().takeLast(160)
@@ -775,10 +844,63 @@ private fun appendDiagnostics(out: StringBuilder, diagnostics: List<UiDiagnostic
     }
 }
 
+private fun formatBuildProgress(state: BuildState): String = buildString {
+    val errors = state.diagnostics.count { it.severity == UiSeverity.Error }
+    val warnings = state.diagnostics.count { it.severity == UiSeverity.Warning }
+    append("status: ").append(state.status.name).append('\n')
+    if (state.moduleName.isNotBlank()) {
+        append("module: ").append(state.moduleName).append('\n')
+    }
+    append("elapsedMs: ").append(state.elapsedMs).append('\n')
+    append("steps: ").append(state.steps.count { it.status != StepStatus.Pending })
+        .append('/').append(state.steps.size).append('\n')
+    append("diagnostics: ").append(errors).append(" error(s), ").append(warnings).append(" warning(s)\n")
+    state.banner?.let { append("banner: ").append(it).append('\n') }
+    if (state.steps.isNotEmpty()) {
+        append('\n').append("## Steps\n")
+        state.steps.takeLast(40).forEach { step ->
+            append("- ").append(step.status.name).append(' ').append(step.name).append('\n')
+        }
+    }
+    if (state.diagnostics.isNotEmpty()) {
+        append('\n').append("## Diagnostics\n")
+        state.diagnostics.takeLast(20).forEach { d ->
+            append("- ").append(d.severity).append(' ')
+            d.file?.let {
+                append(it)
+                if (d.line > 0) append(':').append(d.line)
+                if (d.column > 0) append(':').append(d.column)
+                append(' ')
+            }
+            append(d.message).append('\n')
+        }
+    }
+    if (state.log.isNotEmpty()) {
+        append('\n').append("## Recent log\n")
+        state.log.takeLast(40).forEach { line ->
+            if (line.timeLabel.isNotBlank()) append(line.timeLabel).append(' ')
+            append(line.level).append(": ").append(line.message).append('\n')
+        }
+    }
+}
+
+private fun formatRunTasks(tasks: List<RunTaskOption>): String {
+    if (tasks.isEmpty()) return "no build tasks"
+    return buildString {
+        tasks.forEach { task ->
+            append("- id: ").append(task.id)
+            append("\n  label: ").append(task.label)
+            if (task.group.isNotBlank()) append("\n  group: ").append(task.group)
+            append('\n')
+        }
+    }
+}
+
 private const val AUTO_COMPACT_INPUT_TOKEN_THRESHOLD = 32_000
 private const val AUTO_COMPACT_TOTAL_TOKEN_THRESHOLD = 48_000
 private const val COMPACT_USER_MESSAGE_MAX_TOKENS = 20_000
 private const val PREVIEW_OPEN_TIMEOUT_MS = 5_000L
+private const val BUILD_ACTION_SETTLE_MS = 250L
 private const val COMPACT_SUMMARY_PREFIX =
     "Another language model started to solve this problem and produced a summary of its thinking process. " +
         "You also have access to the state of the tools that were used by that language model. " +
