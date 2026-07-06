@@ -141,7 +141,6 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
             LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 displayItems.forEach { item ->
                     val tool = item.isTool
@@ -156,18 +155,22 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
                             )
                         }
                         item(key = "${item.key}:details") {
-                            ToolMessageDetails(message = item.message, outputItem = item.output)
+                            Box(Modifier.padding(bottom = 8.dp)) {
+                                ToolMessageDetails(message = item.message, outputItem = item.output)
+                            }
                         }
                         stickyHeader {
                             Spacer(Modifier.height(0.dp))
                         }
                     } else {
                         item(key = item.key) {
-                            MessageBubble(
-                                item = item,
-                                expanded = false,
-                                onToggleTool = { expandedTools[item.key] = true },
-                            )
+                            Box(Modifier.padding(bottom = 8.dp)) {
+                                MessageBubble(
+                                    item = item,
+                                    expanded = false,
+                                    onToggleTool = { expandedTools[item.key] = true },
+                                )
+                            }
                         }
                     }
                 }
@@ -373,7 +376,15 @@ private fun ToolMessageHeader(
 ) {
     Box(
         Modifier.fillMaxWidth()
-            .background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.sm))
+            .background(
+                Ca.colors.surface2,
+                RoundedCornerShape(
+                    topStart = Ca.radius.sm,
+                    topEnd = Ca.radius.sm,
+                    bottomStart = 0.dp,
+                    bottomEnd = 0.dp,
+                ),
+            )
             .padding(10.dp),
     ) {
         ToolMessageHeaderContent(toolMessageState(message, outputItem), expanded, onToggle)
@@ -407,7 +418,15 @@ private fun ToolMessageHeaderContent(state: ToolMessageState, expanded: Boolean,
 private fun ToolMessageDetails(message: AgentConversationItem, outputItem: AgentConversationItem?) {
     Box(
         Modifier.fillMaxWidth()
-            .background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.sm))
+            .background(
+                Ca.colors.surface2,
+                RoundedCornerShape(
+                    topStart = 0.dp,
+                    topEnd = 0.dp,
+                    bottomStart = Ca.radius.sm,
+                    bottomEnd = Ca.radius.sm,
+                ),
+            )
             .padding(10.dp),
     ) {
         ToolMessageDetailsContent(toolMessageState(message, outputItem))
