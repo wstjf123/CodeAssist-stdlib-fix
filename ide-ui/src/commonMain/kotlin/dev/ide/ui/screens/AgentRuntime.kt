@@ -1,5 +1,6 @@
 package dev.ide.ui.screens
 
+import androidx.compose.ui.text.TextRange
 import dev.ide.ui.AgentConversationItem
 import dev.ide.ui.ComposePreviewHost
 import dev.ide.ui.EditorViewMode
@@ -109,6 +110,9 @@ internal fun appendAgentDelta(messages: MutableList<AgentConversationItem>, delt
 private fun agentInstructions(): String =
     "You are an AI coding agent embedded in CodeAssist IDE. " +
         "Use tools to inspect the workspace, diagnostics, logs, previews, and build state. " +
+        "When the user asks to read or inspect a named function, class, object, or symbol, use read_file with symbol when the path is known. " +
+        "If grep found the target file, immediately call read_file with that path and symbol instead of reading unrelated files. " +
+        "Once the requested content has been retrieved, answer from that content and avoid redundant reads. " +
         "When modifying files, use apply_patch with the Codex apply_patch format. " +
         "Patches may add, update, move, and delete files under the workspace."
 
@@ -418,7 +422,7 @@ private fun agentTools(): List<UiAgentTool> = listOf(
     ),
     UiAgentTool(
         "read_file",
-        "Read a workspace file or the current editor file. Supports path, startLine/endLine, offset/length, and symbol name for existing file-structure ranges.",
+        "Read one workspace file. Omit path only to read the current editor file. Use either symbol, startLine/endLine, or offset/length; symbol wins over line range, and line range wins over offset.",
         agentToolParameters(
             agentToolProperty("path"),
             agentToolProperty("startLine", "number"),
@@ -427,30 +431,6 @@ private fun agentTools(): List<UiAgentTool> = listOf(
             agentToolProperty("length", "number"),
             agentToolProperty("symbol"),
             agentToolProperty("includeLineNumbers", "boolean"),
-        ),
-    ),
-    UiAgentTool(
-        "read_workspace_file",
-        "Compatibility alias for read_file with a required path.",
-        agentToolParameters(
-            agentToolProperty("path"),
-            agentToolProperty("startLine", "number"),
-            agentToolProperty("endLine", "number"),
-            agentToolProperty("offset", "number"),
-            agentToolProperty("length", "number"),
-            agentToolProperty("symbol"),
-            required = listOf("path"),
-        ),
-    ),
-    UiAgentTool(
-        "get_current_file",
-        "Compatibility alias for read_file without a path; returns the current editor buffer.",
-        agentToolParameters(
-            agentToolProperty("startLine", "number"),
-            agentToolProperty("endLine", "number"),
-            agentToolProperty("offset", "number"),
-            agentToolProperty("length", "number"),
-            agentToolProperty("symbol"),
         ),
     ),
     UiAgentTool(
@@ -634,22 +614,6 @@ private fun executeAgentToolUnchecked(context: AgentToolContext, call: UiAgentTo
             )
             toolSuccess(if (matches.isEmpty()) "没有匹配项" else matches.joinToString("\n"))
         }
-        "read_workspace_file" -> {
-            val path = call.stringArguments["path"] ?: return toolFailure("缺少路径")
-            if (path !in context.filePaths && !path.startsWith(context.rootPath)) {
-                return toolFailure("路径不在工作区内")
-            }
-            toolSuccess(if (context.activePath == path) context.activeText.orEmpty() else context.readFile(path).take(20000))
-        }
-        "get_current_file" -> {
-            val path = context.activePath
-            val text = context.activeText
-            if (path == null || text == null) {
-                toolFailure("没有当前文件")
-            } else {
-                toolSuccess("path: $path\n```\n${text.take(20000)}\n```")
-            }
-        }
         "get_diagnostics" -> {
             if (context.diagnostics.isEmpty()) toolSuccess("没有诊断信息")
             else toolSuccess(buildString { appendDiagnostics(this, context.diagnostics) })
@@ -704,7 +668,7 @@ private suspend fun executeAgentToolUnchecked(state: IdeUiState, call: UiAgentTo
             )
             toolSuccess(if (matches.isEmpty()) "没有匹配项" else matches.joinToString("\n"))
         }
-        "read_file", "read_workspace_file", "get_current_file" -> {
+        "read_file" -> {
             readAgentFile(state, call)
         }
         "get_diagnostics" -> {
@@ -904,8 +868,7 @@ private fun applyAgentPatch(state: IdeUiState, patch: String): AgentPatchResult 
             is AgentPatchHunk.AddFile -> {
                 val path = resolveAgentPatchPath(rootPath, hunk.path)
                     ?: return fail("路径不在工作区内：${hunk.path}")
-                ensurePatchCanTouchOpenFile(state, path)?.let { return fail(it) }
-                if (!state.backend.files.writeFile(path, hunk.contents)) {
+                if (!applyPatchTextChange(state, path, hunk.contents)) {
                     return fail("Failed to write file $path")
                 }
                 filePaths += path
@@ -916,8 +879,7 @@ private fun applyAgentPatch(state: IdeUiState, patch: String): AgentPatchResult 
                 val path = resolveAgentPatchPath(rootPath, hunk.path)
                     ?: return fail("路径不在工作区内：${hunk.path}")
                 if (path !in filePaths) return fail("Failed to delete file $path")
-                ensurePatchCanTouchOpenFile(state, path)?.let { return fail(it) }
-                if (!state.backend.files.deletePath(path)) {
+                if (!deletePatchPath(state, path)) {
                     return fail("Failed to delete file $path")
                 }
                 filePaths -= path
@@ -928,13 +890,12 @@ private fun applyAgentPatch(state: IdeUiState, patch: String): AgentPatchResult 
                 val path = resolveAgentPatchPath(rootPath, hunk.path)
                     ?: return fail("路径不在工作区内：${hunk.path}")
                 if (path !in filePaths) return fail("Failed to read file to update $path")
-                ensurePatchCanTouchOpenFile(state, path)?.let { return fail(it) }
                 val oldText = state.openFiles.firstOrNull { normalizeWorkspacePath(it.path) == path }?.text
                     ?: state.backend.files.readFile(path)
                 val newText = deriveAgentPatchText(oldText, hunk.chunks)
                     ?: return fail("Failed to apply update hunk to $path")
                 if (hunk.movePath == null) {
-                    if (!state.backend.files.writeFile(path, newText)) {
+                    if (!applyPatchTextChange(state, path, newText)) {
                         return fail("Failed to write file $path")
                     }
                     changes += AgentAppliedChange.Update(path, newText)
@@ -942,14 +903,11 @@ private fun applyAgentPatch(state: IdeUiState, patch: String): AgentPatchResult 
                 } else {
                     val movePath = resolveAgentPatchPath(rootPath, hunk.movePath)
                         ?: return fail("路径不在工作区内：${hunk.movePath}")
-                    ensurePatchCanTouchOpenFile(state, movePath)?.let { return fail(it) }
-                    if (!state.backend.files.writeFile(movePath, newText)) {
+                    if (!applyPatchTextChange(state, movePath, newText)) {
                         return fail("Failed to write file $movePath")
                     }
                     filePaths += movePath
-                    if (!state.backend.files.deletePath(path)) {
-                        syncOpenFilesAfterPatch(state, listOf(AgentAppliedChange.Update(movePath, newText)))
-                        state.refreshTree()
+                    if (!deletePatchPath(state, path)) {
                         return fail("Failed to remove original $path")
                     }
                     filePaths -= path
@@ -1203,7 +1161,7 @@ private fun normalizePatchLine(line: String): String =
 
 private suspend fun readAgentFile(state: IdeUiState, call: UiAgentToolCall): AgentToolResult {
     val rootPath = normalizeWorkspacePath(state.backend.project.rootPath)
-    val requested = call.stringArguments["path"]
+    val requested = call.stringArguments["path"]?.cleanAgentPathArgument()
     val active = state.active
     val path = if (requested.isNullOrBlank()) {
         active?.path ?: return toolFailure("没有当前文件")
@@ -1217,6 +1175,12 @@ private suspend fun readAgentFile(state: IdeUiState, call: UiAgentToolCall): Age
     }
     val text = state.openFiles.firstOrNull { normalizeWorkspacePath(it.path) == normalizedPath }?.text
         ?: state.backend.files.readFile(normalizedPath)
+    val asksForNonEmptyRange = call.stringArguments["symbol"].orEmpty().isNotBlank() ||
+        call.stringArguments["startLine"]?.toIntOrNull()?.let { it > 1 } == true ||
+        call.stringArguments["endLine"]?.toIntOrNull()?.let { it > 1 } == true
+    if (text.isEmpty() && asksForNonEmptyRange) {
+        return toolFailure("读取文件为空或失败：$normalizedPath")
+    }
     val symbol = call.stringArguments["symbol"]?.takeIf { it.isNotBlank() }
     val range = if (symbol != null) {
         val structure = runCatching { state.backend.editor.fileStructure(normalizedPath, text) }.getOrDefault(emptyList())
@@ -1230,13 +1194,6 @@ private suspend fun readAgentFile(state: IdeUiState, call: UiAgentToolCall): Age
 }
 
 private fun requestedRange(text: String, call: UiAgentToolCall): IntRange {
-    val offset = call.stringArguments["offset"]?.toIntOrNull()
-    val length = call.stringArguments["length"]?.toIntOrNull()
-    if (offset != null) {
-        val start = offset.coerceIn(0, text.length)
-        val end = (start + (length ?: 20000).coerceAtLeast(0)).coerceIn(start, text.length)
-        return start until end
-    }
     val starts = lineStarts(text)
     val startLine = call.stringArguments["startLine"]?.toIntOrNull()?.coerceAtLeast(1)
     val endLine = call.stringArguments["endLine"]?.toIntOrNull()?.coerceAtLeast(1)
@@ -1244,6 +1201,13 @@ private fun requestedRange(text: String, call: UiAgentToolCall): IntRange {
         val first = (startLine ?: 1).coerceAtMost(starts.size)
         val last = (endLine ?: (first + 199)).coerceAtLeast(first).coerceAtMost(starts.size)
         return lineOffsetRange(text, starts, first, last)
+    }
+    val offset = call.stringArguments["offset"]?.toIntOrNull()
+    val length = call.stringArguments["length"]?.toIntOrNull()?.takeIf { it > 0 }
+    if (offset != null) {
+        val start = offset.coerceIn(0, text.length)
+        val end = (start + (length ?: 20000)).coerceIn(start, text.length)
+        return start until end
     }
     return 0 until text.length.coerceAtMost(20000)
 }
@@ -1359,11 +1323,14 @@ private fun globToRegex(pattern: String): Regex {
 
 private fun resolveAgentPatchPath(rootPath: String, path: String): String? {
     val normalizedRoot = normalizeWorkspacePath(rootPath).trimEnd('/')
-    val raw = path.trim().replace('\\', '/')
+    val raw = path.cleanAgentPathArgument()
     if (raw.isEmpty()) return null
     val resolved = if (raw.startsWith("/")) normalizeWorkspacePath(raw) else normalizeWorkspacePath("$normalizedRoot/$raw")
     return resolved.takeIf { it == normalizedRoot || it.startsWith("$normalizedRoot/") }
 }
+
+private fun String.cleanAgentPathArgument(): String =
+    trim().replace('\\', '/').filterNot { it == '\n' || it == '\r' || it == '\t' }
 
 private fun normalizeWorkspacePath(path: String): String {
     val absolute = path.replace('\\', '/')
@@ -1385,32 +1352,33 @@ private fun displayWorkspacePath(rootPath: String, path: String): String {
     return normalized.removePrefix("$root/").takeIf { it != normalized } ?: normalized
 }
 
-private fun ensurePatchCanTouchOpenFile(state: IdeUiState, path: String): String? {
-    val file = state.openFiles.firstOrNull { normalizeWorkspacePath(it.path) == path } ?: return null
-    return if (file.modified) "文件有未保存修改，拒绝覆盖：$path" else null
-}
-
 private fun syncOpenFilesAfterPatch(state: IdeUiState, changes: List<AgentAppliedChange>) {
     changes.forEach { change ->
         when (change) {
-            is AgentAppliedChange.Add -> updateOpenFileAfterPatch(state, change.path, change.text)
-            is AgentAppliedChange.Update -> updateOpenFileAfterPatch(state, change.path, change.text)
+            is AgentAppliedChange.Add -> Unit
+            is AgentAppliedChange.Update -> Unit
             is AgentAppliedChange.Delete -> closeOpenFileAfterPatch(state, change.path)
             is AgentAppliedChange.Move -> {
                 closeOpenFileAfterPatch(state, change.from)
-                updateOpenFileAfterPatch(state, change.path, change.text)
             }
         }
     }
     state.activeIndex = state.activeIndex.coerceAtMost(state.openFiles.lastIndex)
 }
 
-private fun updateOpenFileAfterPatch(state: IdeUiState, path: String, text: String) {
-    val index = state.openFiles.indexOfFirst { normalizeWorkspacePath(it.path) == path }
-    if (index < 0) return
-    val name = path.substringAfterLast('/').substringAfterLast('\\')
-    state.openFiles[index] = OpenFile(path, name, text)
-    state.backend.editor.updateDocument(path, text)
+private fun applyPatchTextChange(state: IdeUiState, path: String, text: String): Boolean {
+    val file = state.openFiles.firstOrNull { normalizeWorkspacePath(it.path) == path }
+    if (file != null) {
+        file.session.replaceRange(0, file.session.doc.length, text, TextRange(text.length))
+        state.backend.editor.updateDocument(file.path, file.text)
+        return true
+    }
+    return state.backend.files.writeFile(path, text)
+}
+
+private fun deletePatchPath(state: IdeUiState, path: String): Boolean {
+    closeOpenFileAfterPatch(state, path)
+    return state.backend.files.deletePath(path)
 }
 
 private fun closeOpenFileAfterPatch(state: IdeUiState, path: String) {
