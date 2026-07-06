@@ -208,7 +208,7 @@ private fun NarrowLayout(
     } else {
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                IconButtonCa(CaIcons.chevronLeft, "All settings", { openId = null })
+                IconButtonCa(CaIcons.chevronLeft, "全部设置", { openId = null })
                 Text(open.title, color = Ca.colors.textPrimary, style = Ca.type.headline, fontWeight = FontWeight.SemiBold)
             }
             PageContent(backend, open, values, codeFont, onSet, onAction, onStructuralChange, Modifier.weight(1f))

@@ -92,7 +92,7 @@ fun SdkManagerScreen(backend: IdeBackend, onBack: () -> Unit) {
         ) {
             IconButtonCa(CaIcons.chevronLeft, "返回", onBack, boxSize = iconBox)
             Text("SDK 管理器", style = Ca.type.title3, fontWeight = FontWeight.SemiBold, color = Ca.colors.textPrimary, modifier = Modifier.weight(1f))
-            IconButtonCa(CaIcons.refresh, "Refresh", { scope.launch { reload() } }, boxSize = iconBox)
+            IconButtonCa(CaIcons.refresh, "刷新", { scope.launch { reload() } }, boxSize = iconBox)
         }
         status?.let { Text(it, style = Ca.type.footnote, color = if (statusIsError) Ca.colors.error else Ca.colors.accent, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) }
 

@@ -111,7 +111,7 @@ private fun NewEntryPanel(
             .border(1.dp, Ca.colors.glassEdge, RoundedCornerShape(Ca.radius.xl))
             .padding(20.dp),
     ) {
-        Text(if (isFolder) "New folder" else "New file", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
+        Text(if (isFolder) "新建文件夹" else "新建文件", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(4.dp))
         val selPkg = req.packages.firstOrNull { it.dirPath == targetDir }?.packageName
         Text("位于 ${selPkg ?: req.dirLabel}", color = Ca.colors.textTertiary, style = Ca.type.caption2)
@@ -119,19 +119,19 @@ private fun NewEntryPanel(
 
         PackageChips(req.packages, targetDir, onSelect = { targetDir = it })
 
-        FieldLabel(if (isFolder) "Folder name" else "File name")
+        FieldLabel(if (isFolder) "文件夹名称" else "文件名")
         DialogField(
             value = name,
             onValueChange = { name = it },
-            placeholder = if (isFolder) "utils  ·  or  com/example/utils" else "Helper.kt  ·  or  res/raw/data.json",
+            placeholder = if (isFolder) "utils  ·  或  com/example/utils" else "Helper.kt  ·  或  res/raw/data.json",
             focusRequester = focus,
             onSubmit = ::submit,
             onCancel = onDismiss,
         )
         Spacer8()
         Text(
-            if (isFolder) "Use / to nest folders."
-            else "Use / for nested folders. .java/.kt scaffold a class; .xml a root element; anything else is empty.",
+            if (isFolder) "使用 / 创建嵌套文件夹。"
+            else "使用 / 创建嵌套文件夹。.java/.kt 会生成类模板，.xml 会生成根元素，其他类型为空文件。",
             color = Ca.colors.textTertiary,
             style = Ca.type.caption2,
         )
@@ -168,7 +168,7 @@ data class NewSourceRequest(
 @Composable
 private fun PackageChips(packages: List<PackageSegment>, selectedDir: String, onSelect: (String) -> Unit) {
     if (packages.size <= 1) return
-    FieldLabel("Package")
+    FieldLabel("包")
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         packages.forEach { seg ->
             SelectChip(seg.packageName, selected = seg.dirPath == selectedDir, onClick = { onSelect(seg.dirPath) })
@@ -179,17 +179,17 @@ private fun PackageChips(packages: List<PackageSegment>, selectedDir: String, on
 
 /** A kind offered in the typed-source dialog → the backend template it scaffolds. */
 private enum class SourceKind(val label: String, val template: UiNewFileTemplate) {
-    JClass("Class", UiNewFileTemplate.JavaClass),
-    JInterface("Interface", UiNewFileTemplate.JavaInterface),
-    JEnum("Enum", UiNewFileTemplate.JavaEnum),
-    JAbstract("Abstract Class", UiNewFileTemplate.JavaAbstractClass),
-    JAnnotation("Annotation", UiNewFileTemplate.JavaAnnotation),
-    KClass("Class", UiNewFileTemplate.KotlinClass),
-    KFile("File", UiNewFileTemplate.KotlinFile),
-    KInterface("Interface", UiNewFileTemplate.KotlinInterface),
-    KData("Data Class", UiNewFileTemplate.KotlinDataClass),
-    KEnum("Enum", UiNewFileTemplate.KotlinEnum),
-    KObject("Object", UiNewFileTemplate.KotlinObject),
+    JClass("类", UiNewFileTemplate.JavaClass),
+    JInterface("接口", UiNewFileTemplate.JavaInterface),
+    JEnum("枚举", UiNewFileTemplate.JavaEnum),
+    JAbstract("抽象类", UiNewFileTemplate.JavaAbstractClass),
+    JAnnotation("注解", UiNewFileTemplate.JavaAnnotation),
+    KClass("类", UiNewFileTemplate.KotlinClass),
+    KFile("文件", UiNewFileTemplate.KotlinFile),
+    KInterface("接口", UiNewFileTemplate.KotlinInterface),
+    KData("数据类", UiNewFileTemplate.KotlinDataClass),
+    KEnum("枚举", UiNewFileTemplate.KotlinEnum),
+    KObject("对象", UiNewFileTemplate.KotlinObject),
 }
 
 private fun kindsFor(lang: NewSourceLang): List<SourceKind> = when (lang) {
@@ -250,7 +250,7 @@ private fun NewSourcePanel(
             .padding(20.dp),
     ) {
         Text(
-            if (req.lang == NewSourceLang.Java) "New Java class" else "New Kotlin file",
+            if (req.lang == NewSourceLang.Java) "新建 Java 类" else "新建 Kotlin 文件",
             color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold,
         )
         Spacer(Modifier.height(4.dp))
@@ -260,13 +260,13 @@ private fun NewSourcePanel(
 
         PackageChips(req.packages, targetDir, onSelect = { targetDir = it })
 
-        FieldLabel("Kind")
+        FieldLabel("类型")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             kinds.forEach { k -> SelectChip(k.label, selected = k == kind, onClick = { kind = k }) }
         }
         Spacer12()
 
-        FieldLabel("Name")
+        FieldLabel("名称")
         DialogField(
             value = name,
             onValueChange = { name = it },
@@ -301,10 +301,10 @@ fun xmlTargetOf(node: TreeNode): NewXmlTarget? {
 
 /** The kinds of XML resource the dialog can scaffold; [folder] is the `res/<folder>/` it lives in. */
 private enum class XmlResKind(val label: String, val folder: String) {
-    Layout("Layout", "layout"),
-    Values("Values", "values"),
-    Drawable("Drawable", "drawable"),
-    Menu("Menu", "menu"),
+    Layout("布局", "layout"),
+    Values("值", "values"),
+    Drawable("可绘制资源", "drawable"),
+    Menu("菜单", "menu"),
     Xml("XML", "xml"),
 }
 
@@ -343,7 +343,7 @@ fun NewXmlFileDialog(
     }
 }
 
-private enum class XmlMode(val label: String) { File("Resource file"), Directory("Directory") }
+private enum class XmlMode(val label: String) { File("资源文件"), Directory("目录") }
 
 @Composable
 private fun NewXmlPanel(
@@ -390,7 +390,7 @@ private fun NewXmlPanel(
             .border(1.dp, Ca.colors.glassEdge, RoundedCornerShape(Ca.radius.xl))
             .padding(20.dp),
     ) {
-        val title = if (mode == XmlMode.Directory) "New resource directory" else "New ${kind.label.lowercase()} resource"
+        val title = if (mode == XmlMode.Directory) "新建资源目录" else "新建${kind.label}资源"
         Text(title, color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
         Spacer8()
 
@@ -408,7 +408,7 @@ private fun NewXmlPanel(
                 }
                 Spacer12()
             }
-            FieldLabel("Name")
+            FieldLabel("名称")
             DialogField(
                 value = name,
                 onValueChange = { name = it },
@@ -419,14 +419,14 @@ private fun NewXmlPanel(
             )
             if (kind == XmlResKind.Layout) {
                 Spacer12()
-                FieldLabel("Root element")
+                FieldLabel("根元素")
                 Spacer(Modifier.height(4.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     LAYOUT_ROOTS.forEach { r -> SelectChip(r, selected = r == root, onClick = { root = r }) }
                 }
             }
         } else {
-            FieldLabel("Directory name")
+            FieldLabel("目录名称")
             DialogField(
                 value = name,
                 onValueChange = { name = it },
@@ -497,18 +497,18 @@ data class AddSourceRootRequest(val moduleName: String, val sourceSets: List<Str
 private enum class RootPreset(val label: String, val dirName: String, val role: UiSourceRootRole) {
     Java("Java", "java", UiSourceRootRole.Source),
     Kotlin("Kotlin", "kotlin", UiSourceRootRole.Source),
-    Resources("Resources", "resources", UiSourceRootRole.Resource),
-    AndroidRes("Android res", "res", UiSourceRootRole.AndroidRes),
-    Assets("Assets", "assets", UiSourceRootRole.Assets),
+    Resources("资源", "resources", UiSourceRootRole.Resource),
+    AndroidRes("Android 资源", "res", UiSourceRootRole.AndroidRes),
+    Assets("资产", "assets", UiSourceRootRole.Assets),
     Aidl("AIDL", "aidl", UiSourceRootRole.Aidl),
-    Custom("Custom", "", UiSourceRootRole.Source),
+    Custom("自定义", "", UiSourceRootRole.Source),
 }
 
 private fun roleLabel(role: UiSourceRootRole): String = when (role) {
-    UiSourceRootRole.Source -> "Sources"
-    UiSourceRootRole.Resource -> "Resources"
-    UiSourceRootRole.AndroidRes -> "Android res"
-    UiSourceRootRole.Assets -> "Assets"
+    UiSourceRootRole.Source -> "源码"
+    UiSourceRootRole.Resource -> "资源"
+    UiSourceRootRole.AndroidRes -> "Android 资源"
+    UiSourceRootRole.Assets -> "资产"
     UiSourceRootRole.Aidl -> "AIDL"
 }
 
@@ -574,19 +574,19 @@ private fun AddSourceRootPanel(
         Spacer12()
 
         // Source-set selector: existing sets + a "New set…" toggle that reveals a name field.
-        FieldLabel("Source set")
+        FieldLabel("源码集")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             req.sourceSets.forEach { s ->
                 SelectChip(s, selected = !newSet && s == setName, onClick = { newSet = false; setName = s })
             }
-            SelectChip("New set…", selected = newSet, onClick = { newSet = true; setName = "" })
+            SelectChip("新建源码集…", selected = newSet, onClick = { newSet = true; setName = "" })
         }
         if (newSet) {
             Spacer8()
             DialogField(
                 value = setName,
                 onValueChange = { setName = it },
-                placeholder = "e.g. test  ·  debug",
+                placeholder = "例如 test  ·  debug",
                 onSubmit = ::submit,
                 onCancel = onDismiss,
             )
@@ -594,24 +594,24 @@ private fun AddSourceRootPanel(
         Spacer12()
 
         // Kind presets.
-        FieldLabel("Kind")
+        FieldLabel("类型")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             RootPreset.entries.forEach { p -> SelectChip(p.label, selected = p == preset, onClick = { preset = p }) }
         }
 
         if (isCustom) {
             Spacer12()
-            FieldLabel("Folder name")
+            FieldLabel("文件夹名称")
             DialogField(
                 value = customName,
                 onValueChange = { customName = it },
-                placeholder = "e.g. proto  ·  templates",
+                placeholder = "例如 proto  ·  templates",
                 focusRequester = focus,
                 onSubmit = ::submit,
                 onCancel = onDismiss,
             )
             Spacer8()
-            FieldLabel("Treat as")
+            FieldLabel("作为")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 UiSourceRootRole.entries.forEach { r ->
                     SelectChip(roleLabel(r), selected = r == customRole, onClick = { customRole = r })
@@ -620,8 +620,8 @@ private fun AddSourceRootPanel(
         }
         Spacer8()
         Text(
-            if (isCustom) "Created at src/$effectiveSet/${dirName.ifEmpty { "…" }}"
-            else "Created at src/$effectiveSet/${preset.dirName}",
+            if (isCustom) "将创建在 src/$effectiveSet/${dirName.ifEmpty { "…" }}"
+            else "将创建在 src/$effectiveSet/${preset.dirName}",
             color = Ca.colors.textTertiary,
             style = Ca.type.caption2,
         )

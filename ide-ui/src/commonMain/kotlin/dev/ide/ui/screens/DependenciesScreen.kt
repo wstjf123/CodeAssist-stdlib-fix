@@ -283,7 +283,7 @@ private fun DepPaneToolbar(
         Spacer(Modifier.weight(1f))
         // Force a fresh resolve of the declared deps — clears the reconcile marker so resolver changes
         // (e.g. new variant/constraint handling) actually re-apply to a project whose deps are unchanged.
-        IconButtonCa(CaIcons.refresh, "Re-resolve dependencies", onClick = { if (!resolving) onResolve() })
+        IconButtonCa(CaIcons.refresh, "重新解析依赖", onClick = { if (!resolving) onResolve() })
         IconButtonCa(CaIcons.pkg, "仓库", onClick = onRepos)
         PrimaryButton("添加", onClick = onAdd, icon = CaIcons.plus, iconOnly = compact)
     }
@@ -313,7 +313,7 @@ private fun RepositoriesContent(backend: IdeBackend, codeFont: FontFamily, modif
         }
         Spacer(Modifier.height(12.dp))
         // add a custom repository
-        RepoField("Name (optional)", name, codeFont) { name = it; error = null }
+        RepoField("名称（可选）", name, codeFont) { name = it; error = null }
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(Modifier.weight(1f)) { RepoField("https://repo.example.com/maven", url, codeFont) { url = it; error = null } }
@@ -337,7 +337,7 @@ private fun RepoRow(repo: dev.ide.ui.backend.UiRepository, onRemove: () -> Unit)
             Text(repo.name, color = Ca.colors.textPrimary, style = Ca.type.footnote, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(repo.url, color = Ca.colors.textTertiary, style = Ca.type.caption2, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (!repo.builtin) IconButtonCa(CaIcons.close, "Remove ${repo.name}", onClick = onRemove, boxSize = 28, iconSize = 16, tint = Ca.colors.textTertiary)
+        if (!repo.builtin) IconButtonCa(CaIcons.close, "移除 ${repo.name}", onClick = onRemove, boxSize = 28, iconSize = 16, tint = Ca.colors.textTertiary)
         else Text("内置", color = Ca.colors.textTertiary, style = Ca.type.caption2)
     }
 }
@@ -582,12 +582,12 @@ private fun DependencyRow(
         node.scope?.takeIf { it != "platform" }?.let { ScopeBadge(it) }
         // No "excludes N" summary chip here — excluded entries show as their own rows (with an "excluded"
         // pill) when the dependency is expanded.
-        if (unresolved) WithTooltip("Couldn't resolve — check the version/repository") { Icon(CaIcons.error, "Unresolved", Modifier.size(16.dp), tint = Ca.colors.error) }
+        if (unresolved) WithTooltip("无法解析，请检查版本或仓库") { Icon(CaIcons.error, "未解析", Modifier.size(16.dp), tint = Ca.colors.error) }
         conflict?.let { ConflictBadge(it) }
-        if (!node.compatible) Icon(CaIcons.warning, "Incompatible", Modifier.size(16.dp), tint = Ca.colors.error)
-        if (onEdit != null) IconButtonCa(CaIcons.gear, "Edit ${node.name}", onClick = onEdit, boxSize = 28, iconSize = 16, tint = if (node.exclusions.isNotEmpty()) Ca.colors.accent else Ca.colors.textTertiary)
-        if (onExclude != null) RowActionMenu("More actions for ${node.name}", "Exclude ${node.name}", CaIcons.close, onExclude)
-        if (onRemove != null) IconButtonCa(CaIcons.close, "Remove ${node.name}", onClick = onRemove, boxSize = 28, iconSize = 16, tint = Ca.colors.textTertiary)
+        if (!node.compatible) Icon(CaIcons.warning, "不兼容", Modifier.size(16.dp), tint = Ca.colors.error)
+        if (onEdit != null) IconButtonCa(CaIcons.gear, "编辑 ${node.name}", onClick = onEdit, boxSize = 28, iconSize = 16, tint = if (node.exclusions.isNotEmpty()) Ca.colors.accent else Ca.colors.textTertiary)
+        if (onExclude != null) RowActionMenu("${node.name} 的更多操作", "排除 ${node.name}", CaIcons.close, onExclude)
+        if (onRemove != null) IconButtonCa(CaIcons.close, "移除 ${node.name}", onClick = onRemove, boxSize = 28, iconSize = 16, tint = Ca.colors.textTertiary)
     }
 }
 
@@ -603,7 +603,7 @@ private fun TransitiveRow(node: UiDependencyNode, codeFont: FontFamily, depth: I
             DepSubtitle(node)
         }
         Text("传递依赖", color = Ca.colors.textTertiary, style = Ca.type.caption2)
-        if (onExclude != null) RowActionMenu("More actions for ${node.name}", "Exclude ${node.name}", CaIcons.close) { onExclude(node) }
+        if (onExclude != null) RowActionMenu("${node.name} 的更多操作", "排除 ${node.name}", CaIcons.close) { onExclude(node) }
     }
 }
 
@@ -620,8 +620,8 @@ private fun ExcludedRow(exclusion: String, codeFont: FontFamily, onRemoveExclusi
         Icon(CaIcons.close, null, Modifier.size(13.dp), tint = Ca.colors.textTertiary)
         Text(exclusion, color = Ca.colors.textTertiary, style = Ca.type.subhead.copy(fontFamily = codeFont),
             maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-        Chip("excluded", fill = Ca.colors.surface2, textColor = Ca.colors.textSecondary)
-        RowActionMenu("Options for excluded $exclusion", "Remove exclusion", CaIcons.plus, onRemoveExclusion)
+        Chip("已排除", fill = Ca.colors.surface2, textColor = Ca.colors.textSecondary)
+        RowActionMenu("已排除项 $exclusion 的选项", "移除排除项", CaIcons.plus, onRemoveExclusion)
     }
 }
 
@@ -841,8 +841,8 @@ private fun AddDependencyContent(
                     items(results, key = { it.coordinate }) { hit ->
                         AddResultRow(hit, codeFont, Modifier.animateItem()) { performAdd(hit.coordinate) }
                     }
-                    if (typed.length >= 2 && results.isEmpty() && !searching && !looksLikeCoordinate(typed)) item { EmptyRow("No results.") }
-                    if (typed.length < 2) item { EmptyRow("Type at least 2 characters to search, or a full group:name[:version].") }
+                    if (typed.length >= 2 && results.isEmpty() && !searching && !looksLikeCoordinate(typed)) item { EmptyRow("没有结果。") }
+                    if (typed.length < 2) item { EmptyRow("至少输入 2 个字符搜索，或输入完整 group:name[:version]。") }
                 }
             }
         }

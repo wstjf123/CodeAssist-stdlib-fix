@@ -116,7 +116,7 @@ fun EditorTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 10.dp),
         ) {
-            IconButtonCa(CaIcons.sidebar, "Toggle navigator", onToggleNav)
+            IconButtonCa(CaIcons.sidebar, "切换导航栏", onToggleNav)
             // The name takes the flexible middle and truncates — the right-hand cluster keeps its size.
             Text(
                 projectName, color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold,
@@ -152,17 +152,17 @@ fun EditorTopBar(
             } else {
                 // Edit actions (undo/redo/find) sit just before Run — disabled-tinted with no file open.
                 if (hasActiveFile) {
-                    IconButtonCa(CaIcons.undo, "Undo", onUndo, tint = if (canUndo) null else dim)
-                    IconButtonCa(CaIcons.redo, "Redo", onRedo, tint = if (canRedo) null else dim)
-                    IconButtonCa(CaIcons.search, "Find / replace", onFind)
-                    IconButtonCa(CaIcons.braces, "Reformat code", onReformat)
+                    IconButtonCa(CaIcons.undo, "撤销", onUndo, tint = if (canUndo) null else dim)
+                    IconButtonCa(CaIcons.redo, "重做", onRedo, tint = if (canRedo) null else dim)
+                    IconButtonCa(CaIcons.search, "查找/替换", onFind)
+                    IconButtonCa(CaIcons.braces, "格式化代码", onReformat)
                 }
-                IconButtonCa(CaIcons.command, "Command palette", onOpenPalette)
-                IconButtonCa(CaIcons.eye, "Toggle inlay hints", onToggleInlayHints, active = inlayHintsOn)
-                IconButtonCa(CaIcons.terminal, "Build console", onToggleConsole, active = consoleOpen)
-                IconButtonCa(CaIcons.sparkle, "AI Agent", onToggleAgent, active = agentOpen)
+                IconButtonCa(CaIcons.command, "命令面板", onOpenPalette)
+                IconButtonCa(CaIcons.eye, "切换内联提示", onToggleInlayHints, active = inlayHintsOn)
+                IconButtonCa(CaIcons.terminal, "构建控制台", onToggleConsole, active = consoleOpen)
+                IconButtonCa(CaIcons.sparkle, "AI 助手", onToggleAgent, active = agentOpen)
                 // Shown when the open file has @Preview composables — renders/checks them via the interpreter.
-                if (showPreview) IconButtonCa(CaIcons.image, "Compose preview", onPreview, active = previewBusy)
+                if (showPreview) IconButtonCa(CaIcons.image, "Compose 预览", onPreview, active = previewBusy)
                 PluginToolbarActions(pluginActions, dim, onPluginAction)
                 if (activeVariant != null) VariantChip(activeVariant, variants, onPickVariant, compact = false)
                 RunControl(runTasks, onPickTask, compact = false)
@@ -211,21 +211,21 @@ private fun EditorOverflowMenu(
 ) {
     var open by remember { mutableStateOf(false) }
     Box {
-        IconButtonCa(CaIcons.ellipsis, "More actions", { open = true })
+        IconButtonCa(CaIcons.ellipsis, "更多操作", { open = true })
         CaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             if (hasActiveFile) {
-                OverflowItem(CaIcons.undo, "Undo", enabled = canUndo) { open = false; onUndo() }
-                OverflowItem(CaIcons.redo, "Redo", enabled = canRedo) { open = false; onRedo() }
-                OverflowItem(CaIcons.search, "Find / replace") { open = false; onFind() }
-                OverflowItem(CaIcons.braces, "Reformat code") { open = false; onReformat() }
+                OverflowItem(CaIcons.undo, "撤销", enabled = canUndo) { open = false; onUndo() }
+                OverflowItem(CaIcons.redo, "重做", enabled = canRedo) { open = false; onRedo() }
+                OverflowItem(CaIcons.search, "查找/替换") { open = false; onFind() }
+                OverflowItem(CaIcons.braces, "格式化代码") { open = false; onReformat() }
             }
-            OverflowItem(CaIcons.command, "Command palette") { open = false; onOpenPalette() }
+            OverflowItem(CaIcons.command, "命令面板") { open = false; onOpenPalette() }
             OverflowItem(
-                CaIcons.eye, if (inlayHintsOn) "Hide inlay hints" else "Show inlay hints", active = inlayHintsOn,
+                CaIcons.eye, if (inlayHintsOn) "隐藏内联提示" else "显示内联提示", active = inlayHintsOn,
             ) { open = false; onToggleInlayHints() }
-            OverflowItem(CaIcons.terminal, "Build console", active = consoleOpen) { open = false; onToggleConsole() }
-            OverflowItem(CaIcons.sparkle, "AI Agent", active = agentOpen) { open = false; onToggleAgent() }
-            if (showPreview) OverflowItem(CaIcons.image, "Compose preview") { open = false; onPreview() }
+            OverflowItem(CaIcons.terminal, "构建控制台", active = consoleOpen) { open = false; onToggleConsole() }
+            OverflowItem(CaIcons.sparkle, "AI 助手", active = agentOpen) { open = false; onToggleAgent() }
+            if (showPreview) OverflowItem(CaIcons.image, "Compose 预览") { open = false; onPreview() }
         }
     }
 }
@@ -548,7 +548,7 @@ fun IndexStatusChip(status: IndexUiStatus, compact: Boolean = false, onClick: ((
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             CircularProgressIndicator(Modifier.size(13.dp), color = Ca.colors.accent, strokeWidth = 2.dp)
-            val label = if (status.fraction in 0.0..1.0) "Indexing… ${(status.fraction * 100).toInt()}%" else "Indexing…"
+            val label = if (status.fraction in 0.0..1.0) "索引中… ${(status.fraction * 100).toInt()}%" else "索引中…"
             Text(label, color = Ca.colors.accent, style = Ca.type.caption, fontWeight = FontWeight.Medium)
         }
     } else {

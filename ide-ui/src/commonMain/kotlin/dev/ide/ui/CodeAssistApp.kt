@@ -116,7 +116,11 @@ fun CodeAssistApp(
 
     // The active project changes (create/open) bump the epoch; re-key per-project state on it.
     val epoch by backend.projects.projectEpoch.collectAsState()
-    val state = remember(backend, epoch) { IdeUiState(backend, composePreviewHost) }
+    val state = remember(backend, epoch) {
+        IdeUiState(backend, composePreviewHost) {
+            settings = backend.settings.settings()
+        }
+    }
 
     // Reopen the tabs from the last session with this project; if there were none, land on a sensible first
     // file so entering the editor shows real code. Then persist tab changes (debounced) so they reopen next

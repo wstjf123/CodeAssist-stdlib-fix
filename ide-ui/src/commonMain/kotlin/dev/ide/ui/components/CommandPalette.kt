@@ -204,7 +204,7 @@ fun CommandPalette(
         if (entries.isEmpty()) {
             Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 22.dp)) {
                 Text(
-                    if (q.isEmpty() && filter != PaletteFilter.All) "Type to search ${filter.label.lowercase()}…"
+                    if (q.isEmpty() && filter != PaletteFilter.All) "输入以搜索 ${filter.label.lowercase()}…"
                     else "没有匹配项",
                     color = Ca.colors.textTertiary, style = Ca.type.subhead,
                 )

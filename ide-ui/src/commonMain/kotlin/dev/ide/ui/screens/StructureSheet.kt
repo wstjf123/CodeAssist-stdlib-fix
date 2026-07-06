@@ -82,7 +82,7 @@ internal fun StructureSheet(state: IdeUiState, active: OpenFile) {
         Spacer(Modifier.size(6.dp))
         if (shown.isEmpty()) {
             Text(
-                if (symbols.isEmpty()) "No symbols in this file" else "没有匹配项",
+                if (symbols.isEmpty()) "此文件中没有符号" else "没有匹配项",
                 color = Ca.colors.textTertiary,
                 style = Ca.type.body,
                 modifier = Modifier.padding(16.dp),

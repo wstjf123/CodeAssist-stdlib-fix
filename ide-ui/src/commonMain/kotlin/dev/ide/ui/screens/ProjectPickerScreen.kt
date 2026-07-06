@@ -145,7 +145,7 @@ fun ProjectPickerScreen(
                 }
                 if (onBackup != null) BackupButton(onBackup, compact = narrow)
                 if (onOpenHub != null) {
-                    IconButtonCa(CaIcons.gear, "Settings & tools", onOpenHub)
+                    IconButtonCa(CaIcons.gear, "设置与工具", onOpenHub)
                 }
             }
             Spacer(Modifier.size(12.dp))
@@ -496,7 +496,7 @@ private fun ProjectCard(
                     .clickable(deleteInteraction, indication = null, onClick = onDelete),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(CaIcons.close, "Delete project", Modifier.size(18.dp), tint = Ca.colors.textTertiary)
+                Icon(CaIcons.close, "删除项目", Modifier.size(18.dp), tint = Ca.colors.textTertiary)
             }
         }
         Icon(CaIcons.chevronRight, null, Modifier.size(20.dp), tint = Ca.colors.textTertiary)

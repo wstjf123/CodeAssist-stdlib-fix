@@ -86,7 +86,7 @@ private fun ErrorCard(err: UiError, onDismiss: () -> Unit) {
         }
         Spacer(Modifier.height(12.dp))
         Text(
-            err.message.ifBlank { "An unexpected error occurred. The app has kept running." },
+            err.message.ifBlank { "发生了意外错误，应用仍在运行。" },
             color = Ca.colors.textSecondary,
             style = Ca.type.subhead,
         )
@@ -94,7 +94,7 @@ private fun ErrorCard(err: UiError, onDismiss: () -> Unit) {
         if (err.detail.isNotBlank()) {
             Spacer(Modifier.height(12.dp))
             Text(
-                if (expanded) "Hide details" else "Show details",
+                if (expanded) "隐藏详情" else "显示详情",
                 color = Ca.colors.accent,
                 style = Ca.type.caption,
                 modifier = Modifier

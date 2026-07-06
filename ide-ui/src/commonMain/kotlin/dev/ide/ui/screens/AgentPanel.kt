@@ -105,7 +105,7 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Icon(CaIcons.sparkle, null, Modifier.size(18.dp), tint = Ca.colors.accent)
             Column(Modifier.weight(1f)) {
-                Text("AI Agent", color = Ca.colors.textPrimary, style = Ca.type.headline, fontWeight = FontWeight.SemiBold)
+                Text("AI 助手", color = Ca.colors.textPrimary, style = Ca.type.headline, fontWeight = FontWeight.SemiBold)
                 Text(
                     if (state.agentConfig.configured) "${state.agentConfig.model} · ${state.agentConfig.reasoningEffort}" else "未配置",
                     color = Ca.colors.textTertiary,
@@ -114,22 +114,22 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            IconButtonCa(CaIcons.plus, "New conversation", { state.createAgentConversation() }, boxSize = 30, iconSize = 16)
-            IconButtonCa(CaIcons.docText, "Conversation history", { state.agentHistoryOpen = true }, boxSize = 30, iconSize = 16)
-            IconButtonCa(CaIcons.gear, "Agent settings", { state.agentConfigOpen = true }, boxSize = 30, iconSize = 16)
-            IconButtonCa(CaIcons.close, "Close Agent", { state.agentOpen = false }, boxSize = 30, iconSize = 16)
+            IconButtonCa(CaIcons.plus, "新建对话", { state.createAgentConversation() }, boxSize = 30, iconSize = 16)
+            IconButtonCa(CaIcons.docText, "对话历史", { state.agentHistoryOpen = true }, boxSize = 30, iconSize = 16)
+            IconButtonCa(CaIcons.gear, "助手设置", { state.agentConfigOpen = true }, boxSize = 30, iconSize = 16)
+            IconButtonCa(CaIcons.close, "关闭助手", { state.agentOpen = false }, boxSize = 30, iconSize = 16)
         }
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             active?.let { Chip(it.name, fill = Ca.colors.surface2, textColor = Ca.colors.textSecondary) }
-            Chip("tools", fill = Ca.colors.surface2, textColor = Ca.colors.textSecondary)
+            Chip("工具", fill = Ca.colors.surface2, textColor = Ca.colors.textSecondary)
         }
 
         Box(Modifier.fillMaxWidth().height(1.dp).background(Ca.colors.separator))
 
         if (displayItems.isEmpty()) {
             Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("描述要处理的问题。Agent 会按需读取文件、诊断和日志，并在需要时修改当前编辑器。", color = Ca.colors.textTertiary, style = Ca.type.caption)
+                Text("描述要处理的问题。助手会按需读取文件、诊断和日志，并在需要时修改当前编辑器。", color = Ca.colors.textTertiary, style = Ca.type.caption)
                 Spacer(Modifier.weight(1f))
             }
         } else {
@@ -181,7 +181,7 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
                         messages += AgentConversationItem(
                             "message",
                             "assistant",
-                            if (state.agentJob?.isCancelled == true) "已停止。" else "请求失败：${e.message ?: "unknown error"}",
+                            if (state.agentJob?.isCancelled == true) "已停止。" else "请求失败：${e.message ?: "未知错误"}",
                         )
                     } finally {
                         state.agentSending = false
@@ -283,7 +283,7 @@ private fun TextMessageBubble(message: AgentConversationItem) {
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
-                if (agent) "Agent" else "You",
+                if (agent) "助手" else "你",
                 color = if (agent) Ca.colors.textTertiary else Ca.colors.accent,
                 style = Ca.type.caption2,
                 fontWeight = FontWeight.SemiBold,
@@ -296,7 +296,7 @@ private fun TextMessageBubble(message: AgentConversationItem) {
 @Composable
 private fun ToolMessageBubble(message: AgentConversationItem, outputItem: AgentConversationItem?) {
     var expanded by remember(message) { mutableStateOf(false) }
-    val name = message.name ?: "tool"
+    val name = message.name ?: "工具"
     val output = outputItem?.text ?: message.text
     val arguments = message.argumentsJson.orEmpty()
     val running = message.type == "function_call" && outputItem == null
@@ -318,12 +318,12 @@ private fun ToolMessageBubble(message: AgentConversationItem, outputItem: AgentC
                 Modifier.size(13.dp),
                 tint = Ca.colors.textTertiary,
             )
-            Text("Tool", color = Ca.colors.textTertiary, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold)
+            Text("工具", color = Ca.colors.textTertiary, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold)
             Text(name, color = Ca.colors.textPrimary, style = Ca.type.codeSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             if (running) {
-                Text("running", color = Ca.colors.accent, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold)
+                Text("运行中", color = Ca.colors.accent, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold)
             } else if (failed) {
-                Text("failed", color = Ca.colors.error, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold)
+                Text("失败", color = Ca.colors.error, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold)
             }
         }
         if (expanded && (arguments.isNotBlank() || output.isNotBlank())) {
@@ -343,7 +343,7 @@ private fun AgentHistorySheet(state: IdeUiState, modifier: Modifier = Modifier) 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Icon(CaIcons.docText, null, Modifier.size(18.dp), tint = Ca.colors.accent)
             Text("对话历史", color = Ca.colors.textPrimary, style = Ca.type.headline, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            IconButtonCa(CaIcons.plus, "New conversation", {
+            IconButtonCa(CaIcons.plus, "新建对话", {
                 state.createAgentConversation()
                 state.agentHistoryOpen = false
             }, boxSize = 30, iconSize = 16)
@@ -396,7 +396,7 @@ private fun AgentConversationRow(
                 maxLines = 1,
             )
         }
-        IconButtonCa(CaIcons.close, "Delete conversation", onDelete, boxSize = 28, iconSize = 14)
+        IconButtonCa(CaIcons.close, "删除对话", onDelete, boxSize = 28, iconSize = 14)
     }
 }
 
@@ -459,7 +459,7 @@ private fun Composer(
             ) {
                 Icon(
                     if (sending) CaIcons.stop else CaIcons.arrowUp,
-                    if (sending) "Stop" else "Send",
+                    if (sending) "停止" else "发送",
                     Modifier.size(if (sending) 20.dp else 13.dp),
                     tint = when {
                         sending -> Ca.colors.error
@@ -484,14 +484,14 @@ private fun AgentConfigSheet(initial: AgentConfig, onSave: (AgentConfig) -> Unit
     Column(modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Icon(CaIcons.sparkle, null, Modifier.size(18.dp), tint = Ca.colors.accent)
-            Text("配置 AI Agent", color = Ca.colors.textPrimary, style = Ca.type.headline, fontWeight = FontWeight.SemiBold)
+            Text("配置 AI 助手", color = Ca.colors.textPrimary, style = Ca.type.headline, fontWeight = FontWeight.SemiBold)
         }
-        ConfigTextField("Base URL", baseUrl, { baseUrl = it }, "http://127.0.0.1:3021/v1")
-        ConfigTextField("API Key", apiKey, { apiKey = it }, "sk-...", secret = !showKey)
+        ConfigTextField("接口地址", baseUrl, { baseUrl = it }, "http://127.0.0.1:3021/v1")
+        ConfigTextField("API 密钥", apiKey, { apiKey = it }, "sk-...", secret = !showKey)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            DialogButton(if (showKey) "隐藏 Key" else "显示 Key", primary = false, enabled = true, onClick = { showKey = !showKey })
+            DialogButton(if (showKey) "隐藏密钥" else "显示密钥", primary = false, enabled = true, onClick = { showKey = !showKey })
         }
-        ConfigTextField("Model", model, { model = it }, "gpt-5.5")
+        ConfigTextField("模型", model, { model = it }, "gpt-5.5")
         FieldLabel("思考等级")
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf("low", "medium", "high").forEach { option ->

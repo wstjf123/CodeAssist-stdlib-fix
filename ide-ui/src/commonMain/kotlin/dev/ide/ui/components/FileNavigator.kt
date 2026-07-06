@@ -324,27 +324,27 @@ private fun HeaderOverflowMenu(
     Box {
         IconButtonCa(
             CaIcons.ellipsis,
-            "More actions",
+            "更多操作",
             onClick = { open = true },
             boxSize = 34,
             iconSize = 18
         )
         CaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            FileActionItem(CaIcons.plus, "New file") { open = false; onNewFile() }
-            FileActionItem(CaIcons.folder, "New folder") { open = false; onNewFolder() }
-            FileActionItem(CaIcons.chevronDown, "Expand all") { open = false; onExpandAll() }
-            FileActionItem(CaIcons.chevronUp, "Collapse all") { open = false; onCollapseAll() }
+            FileActionItem(CaIcons.plus, "新建文件") { open = false; onNewFile() }
+            FileActionItem(CaIcons.folder, "新建文件夹") { open = false; onNewFolder() }
+            FileActionItem(CaIcons.chevronDown, "全部展开") { open = false; onExpandAll() }
+            FileActionItem(CaIcons.chevronUp, "全部折叠") { open = false; onCollapseAll() }
             Box(
                 Modifier.fillMaxWidth().height(1.dp).padding(vertical = 4.dp)
                     .background(Ca.colors.separator)
             )
-            MenuSectionLabel("Sort by")
-            CheckableMenuItem("Name", checked = sort == TreeSort.Name) {
+            MenuSectionLabel("排序")
+            CheckableMenuItem("名称", checked = sort == TreeSort.Name) {
                 open = false; onSort(
                 TreeSort.Name
             )
             }
-            CheckableMenuItem("Type", checked = sort == TreeSort.Type) {
+            CheckableMenuItem("类型", checked = sort == TreeSort.Type) {
                 open = false; onSort(
                 TreeSort.Type
             )
@@ -556,7 +556,7 @@ private fun TreeRow(
                 node.filePath != null && canShare && (hovered || isActive) ->
                     IconButtonCa(
                         CaIcons.share,
-                        "Share ${node.name}",
+                        "分享 ${node.name}",
                         onClick = { onShare(node) },
                         boxSize = 22,
                         iconSize = 14
@@ -617,20 +617,20 @@ private fun TreeRow(
             }
             if (canImportHere) {
                 val importDir: String = targetDir
-                FileActionItem(CaIcons.download, "Import from file manager") {
+                FileActionItem(CaIcons.download, "从文件管理器导入") {
                     menuOpen = false; ctx.onImportInto(importDir)
                 }
             }
-            if (canExportHere) FileActionItem(CaIcons.save, "Export…") {
+            if (canExportHere) FileActionItem(CaIcons.save, "导出…") {
                 menuOpen = false; ctx.onExport(node)
             }
-            if (canRevealHere) FileActionItem(CaIcons.share, "Reveal in file manager") {
+            if (canRevealHere) FileActionItem(CaIcons.share, "在文件管理器中显示") {
                 menuOpen = false; ctx.onReveal(node)
             }
             if (canContext) {
-                FileActionItem(CaIcons.docText, "Rename") { menuOpen = false; ctx.onRename(node) }
-                FileActionItem(CaIcons.arrowRight, "Move") { menuOpen = false; ctx.onMove(node) }
-                FileActionItem(CaIcons.copy, "Copy") { menuOpen = false; ctx.onCopy(node) }
+                FileActionItem(CaIcons.docText, "重命名") { menuOpen = false; ctx.onRename(node) }
+                FileActionItem(CaIcons.arrowRight, "移动") { menuOpen = false; ctx.onMove(node) }
+                FileActionItem(CaIcons.copy, "复制") { menuOpen = false; ctx.onCopy(node) }
                 FileActionItem(CaIcons.close, "删除", danger = true) {
                     menuOpen = false; ctx.onDelete(node)
                 }
@@ -757,7 +757,7 @@ private fun NewActionItems(
             segs
         )
         }
-        FileActionItem(CaIcons.code, "Kotlin File") {
+        FileActionItem(CaIcons.code, "Kotlin 文件") {
             close(); onNewSource(
             targetDir,
             NewSourceLang.Kotlin,
@@ -767,11 +767,11 @@ private fun NewActionItems(
     }
     if (canNewResource) FileActionItem(
         CaIcons.image,
-        "Resource File"
+        "资源文件"
     ) { close(); onNewResource(node) }
     if (targetDir != null) {
-        FileActionItem(CaIcons.plus, "File") { close(); onNewFile(targetDir, segs) }
-        FileActionItem(CaIcons.folder, "Directory") { close(); onNewFolder(targetDir, segs) }
+        FileActionItem(CaIcons.plus, "文件") { close(); onNewFile(targetDir, segs) }
+        FileActionItem(CaIcons.folder, "目录") { close(); onNewFolder(targetDir, segs) }
     }
 }
 
@@ -854,7 +854,7 @@ private fun SegmentedPathLabel(
                             .padding(horizontal = 2.dp),
                     )
                     CaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                        MenuSectionLabel("New in ${seg.packageName}")
+                        MenuSectionLabel("在 ${seg.packageName} 中新建")
                         NewActionItems(
                             node,
                             seg.dirPath,

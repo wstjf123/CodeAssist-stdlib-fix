@@ -99,13 +99,13 @@ fun LogsScreen(
             Text("日志", color = Ca.colors.textPrimary, style = Ca.type.headline, fontWeight = FontWeight.SemiBold)
             Text("${shown.size}", color = Ca.colors.textTertiary, style = Ca.type.footnote, modifier = Modifier.padding(start = 4.dp))
             Box(Modifier.weight(1f))
-            HeaderAction(if (paused) CaIcons.play else CaIcons.stop, if (paused) "Resume live tail" else "Pause live tail", paused) { paused = !paused }
-            HeaderAction(CaIcons.refresh, "Refresh") { all = backend.diagnostics.recentLogs() }
-            HeaderAction(CaIcons.copy, "Copy all") {
+            HeaderAction(if (paused) CaIcons.play else CaIcons.stop, if (paused) "恢复实时跟随" else "暂停实时跟随", paused) { paused = !paused }
+            HeaderAction(CaIcons.refresh, "刷新") { all = backend.diagnostics.recentLogs() }
+            HeaderAction(CaIcons.copy, "全部复制") {
                 clipboard.setText(AnnotatedString(shown.joinToString("\n\n") { renderForCopy(it) }))
             }
             if (fileActions.canShare) {
-                HeaderAction(CaIcons.share, "Share") {
+                HeaderAction(CaIcons.share, "分享") {
                     scope.launch { backend.diagnostics.exportLogs()?.let { fileActions.share(it) } }
                 }
             }

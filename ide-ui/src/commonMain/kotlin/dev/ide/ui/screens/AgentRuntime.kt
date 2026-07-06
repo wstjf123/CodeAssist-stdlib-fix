@@ -17,8 +17,10 @@ import dev.ide.ui.backend.UiAgentRequest
 import dev.ide.ui.backend.UiAgentTokenUsage
 import dev.ide.ui.backend.UiAgentTool
 import dev.ide.ui.backend.UiAgentToolCall
+import dev.ide.ui.backend.UiAccent
 import dev.ide.ui.backend.UiComposePreview
 import dev.ide.ui.backend.UiDiagnostic
+import dev.ide.ui.backend.UiSettings
 import dev.ide.ui.backend.UiSeverity
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -373,6 +375,7 @@ private data class AgentToolContext(
     val buildLog: List<String>,
     val buildProgress: String,
     val runTasks: String,
+    val appTheme: String,
     val ideLogs: List<String>,
     val readFile: (String) -> String,
 )
@@ -435,6 +438,21 @@ private fun agentTools(): List<UiAgentTool> = listOf(
         """{"type":"object","properties":{"id":{"type":"string"}},"required":["id"],"additionalProperties":false}""",
     ),
     UiAgentTool(
+        "get_app_theme",
+        "Return the current app theme mode and accent.",
+        """{"type":"object","properties":{},"additionalProperties":false}""",
+    ),
+    UiAgentTool(
+        "set_app_theme",
+        "Change the IDE app theme live using existing settings. themeMode accepts light, dark, or system. accent optionally accepts violet, teal, or orange.",
+        """{"type":"object","properties":{"themeMode":{"type":"string","description":"light, dark, or system"},"accent":{"type":"string","description":"violet, teal, or orange"}},"additionalProperties":false}""",
+    ),
+    UiAgentTool(
+        "toggle_app_theme",
+        "Toggle the IDE app theme between explicit light and dark using the existing theme setting.",
+        """{"type":"object","properties":{},"additionalProperties":false}""",
+    ),
+    UiAgentTool(
         "get_ide_logs",
         "Return recent IDE logs.",
         """{"type":"object","properties":{},"additionalProperties":false}""",
@@ -485,6 +503,7 @@ private fun createAgentToolContext(state: IdeUiState): AgentToolContext {
             .map { "${it.timeLabel} ${it.level}: ${it.message}" },
         buildProgress = formatBuildProgress(state.backend.build.buildState.value),
         runTasks = formatRunTasks(state.backend.build.runTasks()),
+        appTheme = formatAppTheme(state.backend.settings.settings()),
         ideLogs = state.backend.diagnostics.recentLogs()
             .takeLast(160)
             .map { "${it.timeLabel} ${it.level}/${it.tag}: ${it.message}" },
@@ -501,6 +520,7 @@ private fun supportsParallelToolExecution(call: UiAgentToolCall): Boolean =
         "get_build_logs",
         "get_build_progress",
         "list_build_tasks",
+        "get_app_theme",
         "get_ide_logs" -> true
         else -> false
     }
@@ -555,6 +575,9 @@ private fun executeAgentToolUnchecked(context: AgentToolContext, call: UiAgentTo
         }
         "list_build_tasks" -> {
             toolSuccess(context.runTasks)
+        }
+        "get_app_theme" -> {
+            toolSuccess(context.appTheme)
         }
         "get_ide_logs" -> {
             if (context.ideLogs.isEmpty()) toolSuccess("no IDE logs")
@@ -621,6 +644,21 @@ private suspend fun executeAgentToolUnchecked(state: IdeUiState, call: UiAgentTo
             state.backend.build.runTask(task.id)
             delay(BUILD_ACTION_SETTLE_MS)
             toolSuccess("build task `${task.label}` requested\n\n${formatBuildProgress(state.backend.build.buildState.value)}")
+        }
+        "get_app_theme" -> {
+            toolSuccess(formatAppTheme(state.backend.settings.settings()))
+        }
+        "set_app_theme" -> {
+            val mode = call.stringArguments["themeMode"]?.takeIf { it.isNotBlank() }
+            val accent = call.stringArguments["accent"]?.takeIf { it.isNotBlank() }
+            applyAppThemeSettings(state, mode, accent)?.let { return toolFailure(it) }
+            toolSuccess("theme updated\n\n${formatAppTheme(state.backend.settings.settings())}")
+        }
+        "toggle_app_theme" -> {
+            val current = state.backend.settings.settings().themeMode
+            val next = if (current == "dark") "light" else "dark"
+            applyAppThemeSettings(state, next, null)?.let { return toolFailure(it) }
+            toolSuccess("theme toggled\n\n${formatAppTheme(state.backend.settings.settings())}")
         }
         "get_ide_logs" -> {
             val logs = state.backend.diagnostics.recentLogs().takeLast(160)
@@ -896,11 +934,37 @@ private fun formatRunTasks(tasks: List<RunTaskOption>): String {
     }
 }
 
+private fun formatAppTheme(settings: UiSettings): String = buildString {
+    append("themeMode: ").append(settings.themeMode).append('\n')
+    append("accent: ").append(themeAccentValue(settings.accent)).append('\n')
+}
+
+private fun applyAppThemeSettings(state: IdeUiState, themeMode: String?, accent: String?): String? {
+    val mode = themeMode?.lowercase()
+    val accentValue = accent?.lowercase()
+    if (mode == null && accentValue == null) return "missing themeMode or accent"
+    if (mode != null && mode !in THEME_MODES) return "invalid themeMode: $themeMode"
+    if (accentValue != null && accentValue !in THEME_ACCENTS) return "invalid accent: $accent"
+    mode?.let { state.backend.settings.setSetting("appearance", "themeMode", it) }
+    accentValue?.let { state.backend.settings.setSetting("appearance", "accent", it) }
+    state.notifySettingsChanged()
+    return null
+}
+
+private fun themeAccentValue(accent: UiAccent): String =
+    when (accent) {
+        UiAccent.Teal -> "teal"
+        UiAccent.Orange -> "orange"
+        else -> "violet"
+    }
+
 private const val AUTO_COMPACT_INPUT_TOKEN_THRESHOLD = 32_000
 private const val AUTO_COMPACT_TOTAL_TOKEN_THRESHOLD = 48_000
 private const val COMPACT_USER_MESSAGE_MAX_TOKENS = 20_000
 private const val PREVIEW_OPEN_TIMEOUT_MS = 5_000L
 private const val BUILD_ACTION_SETTLE_MS = 250L
+private val THEME_MODES = setOf("light", "dark", "system")
+private val THEME_ACCENTS = setOf("violet", "teal", "orange")
 private const val COMPACT_SUMMARY_PREFIX =
     "Another language model started to solve this problem and produced a summary of its thinking process. " +
         "You also have access to the state of the tools that were used by that language model. " +

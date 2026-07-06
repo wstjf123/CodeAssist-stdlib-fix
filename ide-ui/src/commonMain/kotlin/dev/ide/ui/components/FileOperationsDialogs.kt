@@ -103,21 +103,21 @@ private fun RenamePanel(node: TreeNode, onDismiss: () -> Unit, onConfirm: (Strin
     val valid = name.isNotBlank() && name != current && '/' !in name && '\\' !in name
     fun submit() { if (valid) { onConfirm(name.trim()); onDismiss() } }
 
-    DialogCard("Rename '${node.name}'") {
-        FieldLabel("New name")
+    DialogCard("重命名 '${node.name}'") {
+        FieldLabel("新名称")
         DialogField(value = name, onValueChange = { name = it }, placeholder = node.name, focusRequester = focus, onSubmit = ::submit, onCancel = onDismiss)
         Spacer12()
-        ButtonRow(onDismiss, "Rename", valid, ::submit)
+        ButtonRow(onDismiss, "重命名", valid, ::submit)
     }
 }
 
 @Composable
 private fun DeletePanel(node: TreeNode, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     val isDir = node.kind != NodeKind.File
-    DialogCard(if (isDir) "Delete '${node.name}' and its contents?" else "Delete '${node.name}'?") {
+    DialogCard(if (isDir) "删除 '${node.name}' 及其中内容？" else "删除 '${node.name}'？") {
         Text(
-            if (isDir) "This permanently removes the folder and everything inside it. This can't be undone."
-            else "This permanently removes the file. This can't be undone.",
+            if (isDir) "这会永久删除此文件夹及其中所有内容，无法撤销。"
+            else "这会永久删除此文件，无法撤销。",
             color = Ca.colors.textSecondary, style = Ca.type.footnote,
         )
         Spacer12()
@@ -175,7 +175,7 @@ private fun DirectoryBrowserPanel(
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
-    val verb = if (kind == FileOpKind.Move) "Move" else "Copy"
+    val verb = if (kind == FileOpKind.Move) "移动" else "复制"
     val srcPath = node.fileOpPath()
     val srcLeaf = srcPath?.let(::leafName)
     val start = remember(node) {
@@ -190,7 +190,7 @@ private fun DirectoryBrowserPanel(
     val blocked = (srcPath != null && (cur == srcPath || isUnder(cur, srcPath))) ||
         (srcLeaf != null && srcLeaf in names)
 
-    DialogCard("$verb '${node.name}' to…") {
+    DialogCard("$verb '${node.name}' 到…") {
         // Breadcrumb pills.
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -241,7 +241,7 @@ private fun DirectoryBrowserPanel(
             }
         }
         Spacer12()
-        ButtonRow(onDismiss, "$verb here", !blocked) { onConfirm(cur); onDismiss() }
+        ButtonRow(onDismiss, "$verb 到这里", !blocked) { onConfirm(cur); onDismiss() }
     }
 }
 

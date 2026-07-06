@@ -215,7 +215,7 @@ private fun ModuleListItem(module: UiModuleRef, onOpen: () -> Unit, onRemove: ()
             Text(module.name, color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(module.typeDisplay, color = Ca.colors.textTertiary, style = Ca.type.caption2, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        IconButtonCa(CaIcons.close, "Remove ${module.name}", onClick = onRemove, boxSize = 30, iconSize = 16, tint = Ca.colors.textTertiary)
+        IconButtonCa(CaIcons.close, "移除 ${module.name}", onClick = onRemove, boxSize = 30, iconSize = 16, tint = Ca.colors.textTertiary)
         Icon(CaIcons.chevronRight, null, Modifier.size(16.dp), tint = Ca.colors.textTertiary)
     }
 }
@@ -563,7 +563,7 @@ private fun NewModuleDialog(
                 Spacer(Modifier.height(12.dp))
                 LazyColumn(Modifier.fillMaxWidth().heightIn(max = 440.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     item("name") {
-                        LabeledField("Name") {
+                        LabeledField("名称") {
                             Box(Modifier.fillMaxWidth().background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.control))
                                 .border(1.dp, Ca.colors.hairline, RoundedCornerShape(Ca.radius.control)).padding(horizontal = 12.dp, vertical = 10.dp)) {
                                 if (name.isEmpty()) Text("例如 feature、core", color = Ca.colors.textTertiary, style = Ca.type.footnote)
@@ -574,7 +574,7 @@ private fun NewModuleDialog(
                         }
                     }
                     item("type") {
-                        LabeledField("Type") {
+                        LabeledField("类型") {
                             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 types.forEachIndexed { i, t -> LevelChip(t.displayName, i == typeIdx) { typeIdx = i } }
                             }
@@ -651,9 +651,9 @@ private fun ConfigForm(
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         // ---- General ----
         item("general") {
-            SectionCard("General") {
-                MetaRow("Type") { Chip(config.typeDisplay, fill = Ca.colors.accentSoft, textColor = Ca.colors.accent) }
-                MetaRow("Output") {
+            SectionCard("常规") {
+                MetaRow("类型") { Chip(config.typeDisplay, fill = Ca.colors.accentSoft, textColor = Ca.colors.accent) }
+                MetaRow("输出") {
                     Text(shortenPath(config.outputDir, projectRoot), color = Ca.colors.textTertiary,
                         style = Ca.type.caption.copy(fontFamily = codeFont), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
@@ -672,7 +672,7 @@ private fun ConfigForm(
 
         // ---- Source sets (add / remove typed roots) ----
         item("sourceSets") {
-            SectionCard("Source sets", action = {
+            SectionCard("源码集", action = {
                 IconButtonCa(CaIcons.plus, "添加源码根目录", onClick = onAddSourceRoot, boxSize = 26, iconSize = 16, active = true)
             }) {
                 if (config.sourceSets.isEmpty()) {
@@ -845,7 +845,7 @@ private fun SourceSetRow(ss: UiSourceSetInfo, codeFont: FontFamily, projectRoot:
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(shortenPath(r, projectRoot), color = Ca.colors.textTertiary, style = Ca.type.caption2.copy(fontFamily = codeFont),
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                IconButtonCa(CaIcons.close, "Remove ${shortenPath(r, projectRoot)}", onClick = { onRemoveRoot(r) }, boxSize = 22, iconSize = 12)
+                IconButtonCa(CaIcons.close, "移除 ${shortenPath(r, projectRoot)}", onClick = { onRemoveRoot(r) }, boxSize = 22, iconSize = 12)
             }
         }
     }

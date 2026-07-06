@@ -98,7 +98,7 @@ fun StorageAccessCard(path: String?, onOpenInFiles: (() -> Unit)?, modifier: Mod
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            Icon(if (copied) CaIcons.check else CaIcons.copy, "Copy path", Modifier.size(15.dp), tint = Ca.colors.textTertiary)
+            Icon(if (copied) CaIcons.check else CaIcons.copy, "复制路径", Modifier.size(15.dp), tint = Ca.colors.textTertiary)
         }
         if (onOpenInFiles != null) {
             val openInteraction = remember { MutableInteractionSource() }

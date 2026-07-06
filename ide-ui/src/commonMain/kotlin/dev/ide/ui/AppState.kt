@@ -129,7 +129,11 @@ class OpenFile(val path: String, val name: String, initial: String) {
  * and the overlay/pane toggles. Editor text lives per [OpenFile]; edits are pushed to the backend's
  * document overlay so cross-file analysis stays live.
  */
-class IdeUiState(val backend: IdeBackend, val composePreviewHost: ComposePreviewHost? = null) {
+class IdeUiState(
+    val backend: IdeBackend,
+    val composePreviewHost: ComposePreviewHost? = null,
+    private val onSettingsChanged: () -> Unit = {},
+) {
     /** Which shape the file tree takes — curated Project view vs the raw All-Files view (IntelliJ-style). */
     var treeMode by mutableStateOf(TreeViewMode.Project)
         private set
@@ -168,6 +172,10 @@ class IdeUiState(val backend: IdeBackend, val composePreviewHost: ComposePreview
             }
             return createAgentConversation()
         }
+
+    fun notifySettingsChanged() {
+        onSettingsChanged()
+    }
     val agentMessages: SnapshotStateList<AgentConversationItem>
         get() = activeAgentConversation.items
     var paletteOpen by mutableStateOf(false)

@@ -96,8 +96,8 @@ fun KeystoreManagerScreen(
                 Text("签名密钥库", style = Ca.type.subhead, fontWeight = FontWeight.SemiBold, color = Ca.colors.textPrimary)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Create or import the keystores you sign release builds with. They're stored once and shared " +
-                        "across projects; assign one to a build type in a module's Signing tab.",
+                    "创建或导入用于签名 release 构建的密钥库。密钥库只需保存一次，可在项目间共享；" +
+                        "可在模块的签名页分配给具体构建类型。",
                     style = Ca.type.footnote, color = Ca.colors.textSecondary,
                 )
                 Spacer(Modifier.height(12.dp))
@@ -126,13 +126,13 @@ fun KeystoreManagerScreen(
             when {
                 loading -> Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) { CircularProgressIndicator(color = Ca.colors.accent) }
                 keystores.isEmpty() -> Text(
-                    "No keystores yet. Create or import one to sign release builds.",
+                    "还没有密钥库。请创建或导入一个，用于签名 release 构建。",
                     style = Ca.type.footnote, color = Ca.colors.textTertiary, modifier = Modifier.padding(4.dp),
                 )
                 else -> keystores.forEach { ks ->
                     KeystoreCard(ks) {
                         if (backend.signing.deleteKeystore(ks.id)) {
-                            status = "Deleted ${ks.name}"; statusError = false
+                            status = "已删除 ${ks.name}"; statusError = false
                             scope.launch { keystores = runCatching { backend.signing.keystores() }.getOrDefault(emptyList()) }
                         }
                     }
@@ -156,14 +156,14 @@ fun KeystoreCreateScreen(backend: IdeBackend, onBack: () -> Unit, onDone: () -> 
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    FormScaffold("New Keystore", onBack) {
-        KsField("Name", name) { name = it }
-        KsField("Key alias", alias) { alias = it }
-        KsField("Password (≥ 6 chars; protects the store and key)", password, password = true) { password = it }
-        KsField("Full name (CN)", cn) { cn = it }
-        KsField("Organization (optional)", org) { org = it }
-        KsField("Country code (optional)", country) { country = it }
-        KsField("Validity (years)", validity, number = true) { validity = it.filter(Char::isDigit) }
+    FormScaffold("新建密钥库", onBack) {
+        KsField("名称", name) { name = it }
+        KsField("密钥别名", alias) { alias = it }
+        KsField("密码（至少 6 个字符，用于保护库和密钥）", password, password = true) { password = it }
+        KsField("姓名（CN）", cn) { cn = it }
+        KsField("组织（可选）", org) { org = it }
+        KsField("国家代码（可选）", country) { country = it }
+        KsField("有效期（年）", validity, number = true) { validity = it.filter(Char::isDigit) }
         error?.let { Spacer(Modifier.height(6.dp)); Text(it, style = Ca.type.footnote, color = Ca.colors.error) }
         Spacer(Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -199,13 +199,13 @@ fun KeystoreImportScreen(backend: IdeBackend, path: String, onBack: () -> Unit, 
     var busy by remember(path) { mutableStateOf(false) }
     var error by remember(path) { mutableStateOf<String?>(null) }
 
-    FormScaffold("Import Keystore", onBack) {
+    FormScaffold("导入密钥库", onBack) {
         Text(path, style = Ca.type.caption2, color = Ca.colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(8.dp))
-        KsField("Name", name) { name = it }
-        KsField("Keystore password", password, password = true) { password = it }
-        KsField("Key alias (blank = first)", alias) { alias = it }
-        KsField("Key password (blank = store password)", keyPass, password = true) { keyPass = it }
+        KsField("名称", name) { name = it }
+        KsField("密钥库密码", password, password = true) { password = it }
+        KsField("密钥别名（留空使用第一个）", alias) { alias = it }
+        KsField("密钥密码（留空使用库密码）", keyPass, password = true) { keyPass = it }
         error?.let { Spacer(Modifier.height(6.dp)); Text(it, style = Ca.type.footnote, color = Ca.colors.error) }
         Spacer(Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -230,9 +230,9 @@ private fun KeystoreCard(ks: UiKeystore, onDelete: () -> Unit) {
             Icon(CaIcons.key, null, Modifier.size(20.dp), tint = Ca.colors.accent)
             Column(Modifier.weight(1f)) {
                 Text(ks.name, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold, color = Ca.colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("${ks.fileName} · key: ${ks.keyAlias}", style = Ca.type.caption2, color = Ca.colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${ks.fileName} · 密钥：${ks.keyAlias}", style = Ca.type.caption2, color = Ca.colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            IconButtonCa(CaIcons.close, "Delete ${ks.name}", onDelete, boxSize = 30, iconSize = 15, tint = Ca.colors.textTertiary)
+            IconButtonCa(CaIcons.close, "删除 ${ks.name}", onDelete, boxSize = 30, iconSize = 15, tint = Ca.colors.textTertiary)
         }
         val subject = ks.certSubject
         if (subject != null) {
@@ -240,7 +240,7 @@ private fun KeystoreCard(ks: UiKeystore, onDelete: () -> Unit) {
             Text(subject, style = Ca.type.caption2, color = Ca.colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             val parts = buildList {
                 ks.sha256?.let { add("SHA-256 " + it.replace(":", "").take(16) + "…") }
-                ks.validUntilEpochMs?.let { add("expires ~" + approxYear(it)) }
+                ks.validUntilEpochMs?.let { add("约 " + approxYear(it) + " 到期") }
             }
             if (parts.isNotEmpty()) Text(parts.joinToString("   "), style = Ca.type.caption2, color = Ca.colors.textTertiary)
         } else {

@@ -146,10 +146,10 @@ fun SearchScreen(
         Box(Modifier.weight(1f).fillMaxWidth()) {
             val q = query.trim()
             when {
-                q.length < 2 -> Hint("Type at least 2 characters to search.")
-                tab == SearchTab.Symbols && indexing && symbols.isEmpty() -> Hint("Indexing… symbols appear as the index builds.")
-                tab == SearchTab.Symbols -> SymbolList(symbols, codeFont, navigable = true, onOpenAt = onOpenAt, empty = "No symbols found.", searching = searching)
-                tab == SearchTab.Members -> SymbolList(members, codeFont, navigable = false, onOpenAt = onOpenAt, empty = "No members found.", searching = searching)
+                q.length < 2 -> Hint("至少输入 2 个字符进行搜索。")
+                tab == SearchTab.Symbols && indexing && symbols.isEmpty() -> Hint("正在索引…符号会在索引构建时出现。")
+                tab == SearchTab.Symbols -> SymbolList(symbols, codeFont, navigable = true, onOpenAt = onOpenAt, empty = "未找到符号。", searching = searching)
+                tab == SearchTab.Members -> SymbolList(members, codeFont, navigable = false, onOpenAt = onOpenAt, empty = "未找到成员。", searching = searching)
                 tab == SearchTab.Text -> TextMatchList(matches, codeFont, onOpenAt, searching)
             }
         }

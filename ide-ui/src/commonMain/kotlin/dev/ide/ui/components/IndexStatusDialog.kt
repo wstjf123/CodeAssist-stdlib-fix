@@ -77,18 +77,18 @@ private fun Header(status: IndexUiStatus, onDismiss: () -> Unit) {
         )
         Column(Modifier.weight(1f)) {
             Text(
-                if (status.building) "Indexing" else "Index",
+                if (status.building) "正在索引" else "索引",
                 color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold,
             )
             val sub = when {
                 status.building && status.phase.isNotEmpty() -> status.phase
-                status.building -> "Working…"
-                else -> "Up to date"
+                status.building -> "处理中…"
+                else -> "已是最新"
             }
             Text(sub, color = Ca.colors.textTertiary, style = Ca.type.caption)
         }
         Icon(
-            CaIcons.close, "Close", tint = Ca.colors.textTertiary,
+            CaIcons.close, "关闭", tint = Ca.colors.textTertiary,
             modifier = Modifier
                 .clip(RoundedCornerShape(Ca.radius.sm))
                 .clickable(onClick = onDismiss)
@@ -115,12 +115,12 @@ private fun BuildingBody(status: IndexUiStatus) {
     }
     if (status.total > 0) {
         Spacer(Modifier.height(8.dp))
-        val noun = if (status.phase == "Project source") "files" else "artifacts"
+        val noun = if (status.phase == "Project source") "个文件" else "个工件"
         Text("${status.processed} / ${status.total} $noun", color = Ca.colors.textTertiary, style = Ca.type.caption)
     }
     if (status.items.isNotEmpty()) {
         Spacer(Modifier.height(14.dp))
-        val header = if (status.phase == "Project source") "CURRENT FILE" else "ARTIFACTS"
+        val header = if (status.phase == "Project source") "当前文件" else "工件"
         Text(header, color = Ca.colors.textTertiary, style = Ca.type.caption2, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(6.dp))
         val listState = rememberLazyListState()
@@ -139,7 +139,7 @@ private fun IdleBody() {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Icon(CaIcons.check, null, Modifier.size(15.dp), tint = Ca.colors.success)
         Text(
-            "All symbol & completion indexes are up to date.",
+            "符号和补全索引已是最新。",
             color = Ca.colors.textSecondary, style = Ca.type.footnote,
         )
     }

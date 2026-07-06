@@ -149,7 +149,7 @@ private fun StoreHeader(onOpenHub: (() -> Unit)?) {
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
         }
-        if (onOpenHub != null) IconButtonCa(CaIcons.gear, "Settings & tools", onOpenHub)
+        if (onOpenHub != null) IconButtonCa(CaIcons.gear, "设置与工具", onOpenHub)
     }
 }
 

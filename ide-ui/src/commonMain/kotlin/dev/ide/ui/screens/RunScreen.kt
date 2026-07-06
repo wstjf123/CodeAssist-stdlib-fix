@@ -132,25 +132,25 @@ private fun RunTopBar(console: RunConsoleUi?, buildFailed: Boolean, onBack: () -
         if (console != null) RunStatusPill(console, buildFailed)
         if (console != null && console.transcript.isNotEmpty()) {
             IconButtonCa(
-                CaIcons.copy, "Copy output",
+                CaIcons.copy, "复制输出",
                 onClick = { clipboard.setText(AnnotatedString(console.transcript.joinToString("") { it.text })) },
                 boxSize = iconBox, iconSize = 16, tint = Ca.colors.textSecondary,
             )
         }
-        if (running) IconButtonCa(CaIcons.stop, "Stop", onStop, boxSize = iconBox, iconSize = 16, tint = Ca.colors.error)
-        else IconButtonCa(CaIcons.play, "Run again", onRerun, boxSize = iconBox, iconSize = 16, tint = Ca.colors.run)
+        if (running) IconButtonCa(CaIcons.stop, "停止", onStop, boxSize = iconBox, iconSize = 16, tint = Ca.colors.error)
+        else IconButtonCa(CaIcons.play, "再次运行", onRerun, boxSize = iconBox, iconSize = 16, tint = Ca.colors.run)
     }
 }
 
 @Composable
 private fun RunStatusPill(console: RunConsoleUi, buildFailed: Boolean) {
     val (text, color) = when (console.phase) {
-        RunPhase.Building -> "Building…" to Ca.colors.accent
-        RunPhase.Running -> "Running" to Ca.colors.run
+        RunPhase.Building -> "构建中…" to Ca.colors.accent
+        RunPhase.Running -> "运行中" to Ca.colors.run
         RunPhase.Finished -> when (val c = console.exitCode) {
-            0 -> "Exit 0" to Ca.colors.run
-            null -> if (buildFailed) "Failed" to Ca.colors.error else "Stopped" to Ca.colors.textSecondary
-            else -> "Exit $c" to Ca.colors.error
+            0 -> "退出 0" to Ca.colors.run
+            null -> if (buildFailed) "失败" to Ca.colors.error else "已停止" to Ca.colors.textSecondary
+            else -> "退出 $c" to Ca.colors.error
         }
     }
     Chip(text, fill = color.copy(alpha = 0.16f), textColor = color)
@@ -172,7 +172,7 @@ private fun BuildPhaseStrip(console: RunConsoleUi, build: BuildState, onOpen: (B
                 CircularProgressIndicator(Modifier.size(14.dp), color = Ca.colors.accent, strokeWidth = 2.dp)
                 val done = build.steps.count { it.status.name == "Done" || it.status.name == "UpToDate" }
                 Text(
-                    "Building ${console.moduleName}…" + if (build.steps.isNotEmpty()) "  $done/${build.steps.size}" else "",
+                    "正在构建 ${console.moduleName}…" + if (build.steps.isNotEmpty()) "  $done/${build.steps.size}" else "",
                     color = Ca.colors.textSecondary, style = Ca.type.footnote,
                 )
             }
@@ -228,7 +228,7 @@ private fun Transcript(console: RunConsoleUi, modifier: Modifier) {
     ) {
         if (console.transcript.isEmpty()) {
             Text(
-                if (console.phase == RunPhase.Building) "Building…" else "(no output)",
+                if (console.phase == RunPhase.Building) "构建中…" else "（无输出）",
                 color = Ca.colors.textTertiary, style = Ca.type.codeSmall,
             )
         } else {
@@ -258,7 +258,7 @@ fun RunningIndicator(backend: IdeBackend, onClick: () -> Unit, modifier: Modifie
     ) {
         CircularProgressIndicator(Modifier.size(14.dp), color = Ca.colors.accent, strokeWidth = 2.dp)
         Text(
-            (if (console.phase == RunPhase.Building) "Building " else "Running ") + console.moduleName,
+            (if (console.phase == RunPhase.Building) "正在构建 " else "正在运行 ") + console.moduleName,
             color = Ca.colors.textPrimary, style = Ca.type.footnote, fontWeight = FontWeight.Medium,
         )
         Icon(CaIcons.chevronRight, null, Modifier.size(14.dp), tint = Ca.colors.textTertiary)
@@ -302,7 +302,7 @@ private fun InputBar(onSend: (String) -> Unit, onEof: () -> Unit, modifier: Modi
                 },
             )
         }
-        IconButtonCa(CaIcons.arrowRight, "Send", { submit() }, boxSize = 38, iconSize = 18, tint = Ca.colors.accent)
-        IconButtonCa(CaIcons.close, "End input (EOF)", onEof, boxSize = 38, iconSize = 16, tint = Ca.colors.textTertiary)
+        IconButtonCa(CaIcons.arrowRight, "发送", { submit() }, boxSize = 38, iconSize = 18, tint = Ca.colors.accent)
+        IconButtonCa(CaIcons.close, "结束输入（EOF）", onEof, boxSize = 38, iconSize = 16, tint = Ca.colors.textTertiary)
     }
 }

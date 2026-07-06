@@ -64,9 +64,9 @@ internal fun EditorSymbolBar(
         // Fixed line-action group: comment toggle, move line up/down, duplicate — the editor ops that are
         // otherwise keyboard-only, surfaced for touch.
         SymbolKey("//", onClick = onComment)
-        IconKey(CaIcons.chevronUp, "Move line up", onClick = onMoveLineUp)
-        IconKey(CaIcons.chevronDown, "Move line down", onClick = onMoveLineDown)
-        IconKey(CaIcons.copy, "Duplicate line", onClick = onDuplicateLine)
+        IconKey(CaIcons.chevronUp, "上移行", onClick = onMoveLineUp)
+        IconKey(CaIcons.chevronDown, "下移行", onClick = onMoveLineDown)
+        IconKey(CaIcons.copy, "复制行", onClick = onDuplicateLine)
         // Jump to the next diagnostic — shown only while the file has any (otherwise it's noise).
         if (showDiagnosticJump) IconKey(CaIcons.warning, "Next problem", onClick = onNextDiagnostic)
         Box(Modifier.width(1.dp).fillMaxHeight().background(Ca.colors.separator))

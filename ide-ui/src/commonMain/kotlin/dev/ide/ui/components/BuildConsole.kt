@@ -213,7 +213,7 @@ private fun Header(
         if (copyProvide != null) CopyButton(copyLabel, copyProvide)
         if (running) IconButtonCa(
             CaIcons.stop,
-            "Stop",
+            "停止",
             onStop,
             boxSize = 28,
             iconSize = 16,
@@ -227,7 +227,7 @@ private fun Header(
             iconSize = 16,
             tint = Ca.colors.run
         )
-        IconButtonCa(CaIcons.chevronDown, "Collapse", onCollapse, boxSize = 28, iconSize = 16)
+        IconButtonCa(CaIcons.chevronDown, "收起", onCollapse, boxSize = 28, iconSize = 16)
     }
 }
 
@@ -298,7 +298,7 @@ private fun CopyButton(label: String, provide: () -> String) {
     }
     IconButtonCa(
         if (copied) CaIcons.check else CaIcons.copy,
-        if (copied) "Copied" else "Copy $label",
+        if (copied) "已复制" else "复制 $label",
         onClick = {
             scope.launch { clipboard.setText(AnnotatedString(provide())) }
             copied = true
@@ -702,7 +702,7 @@ private fun LogTab(log: List<BuildLogLine>, running: Boolean) {
         ) {
             if (filtered.isEmpty()) {
                 Text(
-                    if (log.isEmpty()) "Press Run to build & run this module." else "No log lines match.",
+                    if (log.isEmpty()) "点击运行以构建并运行此模块。" else "没有匹配的日志行。",
                     color = Ca.colors.textTertiary, style = Ca.type.codeSmall,
                 )
             } else if (grouped) {
@@ -821,7 +821,7 @@ private fun LogGroupHeader(task: String, count: Int, expanded: Boolean, onToggle
             tint = Ca.colors.textTertiary
         )
         Text(
-            task.ifEmpty { "General" },
+            task.ifEmpty { "常规" },
             color = Ca.colors.textSecondary,
             style = Ca.type.codeSmall,
             fontWeight = FontWeight.Medium,
@@ -1051,7 +1051,7 @@ private fun IndexingSection(status: IndexUiStatus) {
         ) {
             Icon(CaIcons.layers, null, Modifier.size(15.dp), tint = Ca.colors.accent)
             Text(
-                status.message.ifEmpty { "Indexing…" },
+                status.message.ifEmpty { "索引中…" },
                 color = Ca.colors.textSecondary,
                 style = Ca.type.footnote
             )
