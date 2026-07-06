@@ -784,7 +784,7 @@ private fun applyAgentPatch(currentPath: String, currentText: String, patch: Str
         val match = findPatchMatch(text, hunk.oldText, searchFrom)
             ?: findPatchMatch(text, hunk.oldText, 0)
             ?: return AgentPatchResult(false, currentText, "hunk ${index + 1} did not match current file")
-        text = text.replaceRange(match.first, match.second, hunk.newText)
+        text = text.replaceRange(match.first, match.last + 1, hunk.newText)
         searchFrom = match.first + hunk.newText.length
         applied++
     }
