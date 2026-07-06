@@ -775,7 +775,7 @@ private fun CodeEditorContent(
         val text = editorSession.doc.text
         scope.launch {
             val result = runCatching { backend.editor.rename(path, text, r.offset, r.newName) }
-                .getOrElse { dev.ide.ui.backend.UiRenameResult(false, it.message ?: "Rename failed") }
+                .getOrElse { dev.ide.ui.backend.UiRenameResult(false, it.message ?: "重命名失败") }
             renameBusy = false
             if (result.success) { rename = null; onRenamed(result.newPath) }
             else renameError = result.message

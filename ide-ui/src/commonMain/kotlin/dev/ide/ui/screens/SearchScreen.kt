@@ -52,8 +52,8 @@ import dev.ide.ui.theme.Motion
 import kotlinx.coroutines.delay
 
 private enum class SearchTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    Symbols("Symbols", CaIcons.code),
-    Members("Members", CaIcons.layers),
+    Symbols("符号", CaIcons.code),
+    Members("成员", CaIcons.layers),
     Text("文本", CaIcons.docText),
 }
 
@@ -107,7 +107,7 @@ fun SearchScreen(
                 Icon(CaIcons.search, null, Modifier.size(18.dp), tint = Ca.colors.accent)
                 Box(Modifier.weight(1f)) {
                     if (query.isEmpty()) {
-                        val hint = if (tab == SearchTab.Text) "Find in files…" else "Search ${tab.label.lowercase()}…"
+                        val hint = if (tab == SearchTab.Text) "在文件中查找…" else "搜索${tab.label}…"
                         Text(hint, color = Ca.colors.textTertiary, style = Ca.type.subhead)
                     }
                     BasicTextField(
@@ -134,8 +134,8 @@ fun SearchScreen(
                 Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                OptionToggle("Aa", "Case sensitive", options.caseSensitive) { options = options.copy(caseSensitive = it) }
-                OptionToggle("\\b", "Whole word", options.wholeWord) { options = options.copy(wholeWord = it) }
+                OptionToggle("Aa", "区分大小写", options.caseSensitive) { options = options.copy(caseSensitive = it) }
+                OptionToggle("\\b", "全字匹配", options.wholeWord) { options = options.copy(wholeWord = it) }
                 OptionToggle(".*", "Regex", options.regex) { options = options.copy(regex = it) }
             }
         }
@@ -193,7 +193,7 @@ private fun SymbolList(
 
 @Composable
 private fun TextMatchList(matches: List<UiTextMatch>, codeFont: FontFamily, onOpenAt: (String, Int) -> Unit, searching: Boolean) {
-    if (matches.isEmpty()) { if (!searching) Hint("No matches in project files."); return }
+    if (matches.isEmpty()) { if (!searching) Hint("项目文件中没有匹配项。"); return }
     val accent = Ca.colors.accent
     val grouped = remember(matches) { matches.groupBy { it.filePath } }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 6.dp)) {

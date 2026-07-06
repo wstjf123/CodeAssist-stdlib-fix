@@ -277,7 +277,7 @@ internal class BuildService(private val ctx: EngineContext) : Disposable {
             val head = out.removeFirst()
             out.addFirst(head.copy(text = head.text.takeLast(CONSOLE_TRANSCRIPT_MAX)))
         }
-        out.addFirst(ConsoleChunk("…(earlier output truncated)…\n", ConsoleChunkKind.SYSTEM))
+        out.addFirst(ConsoleChunk("…（较早输出已截断）…\n", ConsoleChunkKind.SYSTEM))
         return out.toList()
     }
 
@@ -322,7 +322,7 @@ internal class BuildService(private val ctx: EngineContext) : Disposable {
                 ) else it
             }
             if (_runConsole.value?.id == sessionId) appendConsoleChunk(
-                ConsoleChunkKind.SYSTEM, "\nProcess finished with exit code $code\n"
+                ConsoleChunkKind.SYSTEM, "\n进程已结束，退出码 $code\n"
             )
         }
     }
@@ -502,13 +502,13 @@ internal class BuildService(private val ctx: EngineContext) : Disposable {
                         launch(
                             module.name, buildSystem.createDexRunGraph(
                                 project, module, mainClass, minApi, backend, runner, programIo = io
-                            ), "> Run (dex) $mainClass", onComplete = ::finalizeRunConsole
+                            ), "> 运行 (dex) $mainClass", onComplete = ::finalizeRunConsole
                         )
                     } else {
                         launch(
                             module.name,
                             buildSystem.createRunGraph(project, module, mainClass, programIo = io, instanceMain = target.instance),
-                            "> Run $mainClass",
+                            "> 运行 $mainClass",
                             onComplete = ::finalizeRunConsole
                         )
                     }
@@ -531,7 +531,7 @@ internal class BuildService(private val ctx: EngineContext) : Disposable {
                     launch(
                         module.name,
                         graph,
-                        "> assemble $variant · ${module.name}",
+                        "> 组装 $variant · ${module.name}",
                         firstBuildDexBanner(module)
                     )
                 }
@@ -554,9 +554,9 @@ internal class BuildService(private val ctx: EngineContext) : Disposable {
                     launch(
                         module.name,
                         graph,
-                        "> bundle $variant (.aab) · ${module.name}",
+                        "> 打包 $variant (.aab) · ${module.name}",
                         firstBuildDexBanner(module)
-                    ) { log -> log("Signed bundle: $aab") }
+                    ) { log -> log("已签名 bundle: $aab") }
                 }
 
                 id.startsWith("androidRun:") -> {
@@ -581,7 +581,7 @@ internal class BuildService(private val ctx: EngineContext) : Disposable {
                     launch(
                         module.name,
                         graph,
-                        "> Run $variant · ${module.name}",
+                        "> 运行 $variant · ${module.name}",
                         firstBuildDexBanner(module)
                     ) { log -> installer.installAndLaunch(apk, pkg, log) }
                 }

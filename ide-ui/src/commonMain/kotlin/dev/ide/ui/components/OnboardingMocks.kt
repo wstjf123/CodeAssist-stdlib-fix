@@ -526,9 +526,9 @@ internal fun BuildConsoleMock() {
             DoneCircle(18)
             Text(
                 buildAnnotatedString {
-                    append("Installed ")
+                    append("已安装 ")
                     withStyle(SpanStyle(fontFamily = Ca.type.codeFamily, color = Ca.colors.textSecondary)) { append("app-debug.apk") }
-                    append(" on Pixel 8")
+                    append(" 到 Pixel 8")
                 },
                 color = Ca.colors.textPrimary,
                 fontFamily = Ca.type.uiFamily,
@@ -582,9 +582,9 @@ internal fun CommandPaletteMock() {
                 }
             }
             Box(Modifier.fillMaxWidth().height(1.dp).background(Ca.colors.separator))
-            PaletteGroupHeader("RUN")
-            PaletteRowMock(CaIcons.play, "Run app", "app", "⌘R", selected = true)
-            PaletteGroupHeader("GO TO")
+            PaletteGroupHeader("运行")
+            PaletteRowMock(CaIcons.play, "运行应用", "app", "⌘R", selected = true)
+            PaletteGroupHeader("跳转")
             PaletteRowMock(CaIcons.file, "NoteRepository.java", "app/data", null)
             PaletteRowMock(CaIcons.code, "isPinned()", "symbol", null)
         }

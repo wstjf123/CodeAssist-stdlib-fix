@@ -64,10 +64,10 @@ fun SettingsHubScreen(
                     .padding(horizontal = 16.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                HubRow(CaIcons.gear, "设置", "Appearance, editor, completion & analysis", onOpenGlobalSettings)
-                HubRow(CaIcons.braces, "代码样式", "Per-language formatting profiles & live preview", onOpenCodeStyle)
-                HubRow(CaIcons.pkg, "SDK 管理器", "Download Android SDK & JDK sources", onOpenSdkManager)
-                HubRow(CaIcons.key, "密钥库管理器", "Create, import & manage signing keystores", onOpenKeystoreManager)
+                HubRow(CaIcons.gear, "设置", "外观、编辑器、补全与分析", onOpenGlobalSettings)
+                HubRow(CaIcons.braces, "代码样式", "按语言配置格式化样式并实时预览", onOpenCodeStyle)
+                HubRow(CaIcons.pkg, "SDK 管理器", "下载 Android SDK 和 JDK 源码", onOpenSdkManager)
+                HubRow(CaIcons.key, "密钥库管理器", "创建、导入并管理签名密钥库", onOpenKeystoreManager)
             }
         }
     }

@@ -73,7 +73,7 @@ fun SdkManagerScreen(backend: IdeBackend, onBack: () -> Unit) {
         val result = runCatching { backend.sdk.sdkPackages() }
         packages = result.getOrDefault(emptyList())
         statusIsError = result.isFailure
-        if (result.isFailure) status = result.exceptionOrNull()?.message ?: "Could not load packages."
+        if (result.isFailure) status = result.exceptionOrNull()?.message ?: "无法加载包列表。"
         loading = false
     }
     LaunchedEffect(Unit) { reload() }
@@ -102,9 +102,8 @@ fun SdkManagerScreen(backend: IdeBackend, onBack: () -> Unit) {
                 Text("源码与文档", style = Ca.type.subhead, fontWeight = FontWeight.SemiBold, color = Ca.colors.textPrimary)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Download SDK platform sources and JDK sources so the editor can show javadoc, parameter " +
-                        "names, and go-to-source into the SDK. Downloads continue in the background, so you can " +
-                        "leave this screen and keep working.",
+                    "下载 SDK 平台源码和 JDK 源码后，编辑器可以显示 javadoc、参数名，并跳转到 SDK 源码。" +
+                        "下载会在后台继续运行，你可以离开此页面继续工作。",
                     style = Ca.type.footnote, color = Ca.colors.textSecondary,
                 )
             }
@@ -112,7 +111,7 @@ fun SdkManagerScreen(backend: IdeBackend, onBack: () -> Unit) {
             // Active / recent downloads queue.
             if (progress.downloads.isNotEmpty()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    SectionHeader("Downloads", small = true)
+                    SectionHeader("下载", small = true)
                     Spacer(Modifier.weight(1f))
                     if (progress.downloads.any { it.status == "DONE" || it.status == "FAILED" }) {
                         PillButton("清除已完成", null, accent = false) { backend.sdk.clearSdkDownloads() }
@@ -135,7 +134,7 @@ fun SdkManagerScreen(backend: IdeBackend, onBack: () -> Unit) {
                 }
                 Spacer(Modifier.height(8.dp))
                 if (jdk?.srcZip != null) {
-                    StatusTag(CaIcons.check, "Sources available — android.* and java.* docs are on.", Ca.colors.run)
+                    StatusTag(CaIcons.check, "源码可用，已启用 android.* 和 java.* 文档。", Ca.colors.run)
                 } else {
                     Text("未找到 JDK 源码。请下载包含源码的 JDK：", style = Ca.type.footnote, color = Ca.colors.textSecondary)
                     Spacer(Modifier.height(10.dp))
@@ -144,7 +143,7 @@ fun SdkManagerScreen(backend: IdeBackend, onBack: () -> Unit) {
                         for (feature in listOf(17, 21)) {
                             val downloading = "jdk-$feature" in activeIds
                             PillButton(
-                                if (downloading) "JDK $feature…" else "JDK $feature sources",
+                                if (downloading) "JDK $feature…" else "JDK $feature 源码",
                                 if (downloading) null else CaIcons.download,
                                 accent = true, enabled = !downloading,
                             ) { scope.launch { status = backend.sdk.downloadJdkSources(feature) } }
@@ -154,7 +153,7 @@ fun SdkManagerScreen(backend: IdeBackend, onBack: () -> Unit) {
             }
 
             // Android platform sources (the documentation payload). Build tooling is bundled, never downloaded.
-            SectionHeader("Android SDK sources")
+            SectionHeader("Android SDK 源码")
             if (loading && packages.isEmpty()) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = Ca.colors.accent)
@@ -209,11 +208,11 @@ private fun DownloadRow(d: UiSdkDownload, onCancel: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text(d.label, style = Ca.type.body, color = Ca.colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 val sub = when (d.status) {
-                    "DONE" -> "Installed"
-                    "FAILED" -> d.detail.ifEmpty { "Failed" }
-                    "DOWNLOADING" -> "Downloading${if (d.detail.isNotEmpty()) " · ${d.detail}" else ""}"
-                    "EXTRACTING" -> "Extracting…"
-                    "INSTALLING" -> "Installing…"
+                    "DONE" -> "已安装"
+                    "FAILED" -> d.detail.ifEmpty { "失败" }
+                    "DOWNLOADING" -> "正在下载${if (d.detail.isNotEmpty()) " · ${d.detail}" else ""}"
+                    "EXTRACTING" -> "正在解压…"
+                    "INSTALLING" -> "正在安装…"
                     else -> d.status
                 }
                 Text(
@@ -258,7 +257,7 @@ private fun PackageRow(p: UiSdkPackage, downloading: Boolean, onInstall: () -> U
                 CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Ca.colors.accent)
                 IconButtonCa(CaIcons.stop, "取消", onCancel, boxSize = if (isMobilePlatform) 40 else 32, iconSize = 18)
             }
-            p.installed -> StatusTag(CaIcons.check, "Installed", Ca.colors.run)
+            p.installed -> StatusTag(CaIcons.check, "已安装", Ca.colors.run)
             p.incomplete -> PillButton("继续", CaIcons.refresh, accent = true, enabled = p.installable, onClick = onInstall)
             else -> PillButton("安装", CaIcons.download, accent = true, enabled = p.installable, onClick = onInstall)
         }

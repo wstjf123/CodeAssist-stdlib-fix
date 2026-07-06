@@ -152,7 +152,7 @@ fun FileNavigator(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    "$moduleCount ${if (moduleCount == 1) "module" else "modules"}",
+                    "$moduleCount 个模块",
                     color = Ca.colors.textTertiary,
                     style = Ca.type.caption2
                 )
@@ -166,7 +166,7 @@ fun FileNavigator(
             )
             if (canImport) IconButtonCa(
                 CaIcons.download,
-                "Import files",
+                "导入文件",
                 onClick = onImport,
                 boxSize = 34,
                 iconSize = 18
@@ -267,8 +267,8 @@ private class FileRowActions(
 
 /** The label shown in the scope dropdown for a view mode. */
 private fun TreeViewMode.label(): String = when (this) {
-    TreeViewMode.Project -> "Project"
-    TreeViewMode.AllFiles -> "All files"
+    TreeViewMode.Project -> "项目"
+    TreeViewMode.AllFiles -> "所有文件"
 }
 
 /** IntelliJ-style scope chooser: a small button showing the current view, opening a menu to switch. */
@@ -297,7 +297,7 @@ private fun ScopeDropdown(
             )
             Icon(
                 CaIcons.chevronDown,
-                "Change view",
+                "切换视图",
                 Modifier.size(15.dp),
                 tint = Ca.colors.textTertiary
             )
@@ -527,14 +527,14 @@ private fun TreeRow(
                     ) {
                         IconButtonCa(
                             CaIcons.gear,
-                            "Settings of ${node.name}",
+                            "${node.name} 的设置",
                             onClick = { onConfigureModule(node) },
                             boxSize = 22,
                             iconSize = 14
                         )
                         IconButtonCa(
                             CaIcons.layers,
-                            "Dependencies of ${node.name}",
+                            "${node.name} 的依赖",
                             onClick = { onViewDependencies(node) },
                             boxSize = 22,
                             iconSize = 14
@@ -575,7 +575,7 @@ private fun TreeRow(
             if ((canContext || canRevealHere) && hovered)
                 IconButtonCa(
                     CaIcons.ellipsis,
-                    "Actions for ${node.name}",
+                    "${node.name} 的操作",
                     onClick = { menuOpen = true },
                     boxSize = 22,
                     iconSize = 14
@@ -586,10 +586,10 @@ private fun TreeRow(
             onDismissRequest = { menuOpen = false },
         ) {
             if (canModuleMenu) {
-                FileActionItem(CaIcons.gear, "Module settings") {
+                FileActionItem(CaIcons.gear, "模块设置") {
                     menuOpen = false; onConfigureModule(node)
                 }
-                FileActionItem(CaIcons.layers, "Dependencies") {
+                FileActionItem(CaIcons.layers, "依赖") {
                     menuOpen = false; onViewDependencies(node)
                 }
                 FileActionItem(CaIcons.plus, "添加源码根目录") {
@@ -750,7 +750,7 @@ private fun NewActionItems(
     // plain folder / res context.
     val segs = node.packageSegments
     if (isSourceContext && targetDir != null) {
-        FileActionItem(CaIcons.code, "Java Class") {
+        FileActionItem(CaIcons.code, "Java 类") {
             close(); onNewSource(
             targetDir,
             NewSourceLang.Java,

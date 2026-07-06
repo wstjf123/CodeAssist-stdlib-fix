@@ -240,7 +240,7 @@ internal object GradleImport {
     fun markCompatibilityMode(root: Path) {
         val file = markerFile(root)
         Files.createDirectories(file.parent)
-        file.writeText("Imported from a Gradle project. Some features and builds may not be fully supported.\n")
+        file.writeText("从 Gradle 项目导入。部分功能和构建可能无法完全支持。\n")
     }
 
     /** True if the project at [root] was imported from Gradle. */

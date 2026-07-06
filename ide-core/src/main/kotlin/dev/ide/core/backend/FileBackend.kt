@@ -440,9 +440,9 @@ internal class FileBackend(private val ctx: BackendContext) : FileService {
         // A binary or very large file (an APK/jar/dex, etc.) isn't decodable text — don't read megabytes into
         // the editor. Show a short placeholder pointing at Export instead (the file itself is untouched).
         if (binary || size > MAX_TEXT_BYTES) {
-            val kind = if (binary) "binary" else "large"
-            "${p.fileName} — $kind file (${humanSize(size)}).\n\n" +
-                "Not shown in the text editor. Long-press it ▸ Export to save it out, or open it in your file manager."
+            val kind = if (binary) "二进制" else "大型"
+            "${p.fileName} — $kind 文件 (${humanSize(size)}).\n\n" +
+                "未在文本编辑器中显示。长按它并选择“导出”可保存到外部，或在文件管理器中打开。"
         } else p.readText()
     }.getOrDefault("")
 

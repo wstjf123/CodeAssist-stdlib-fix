@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -139,6 +141,7 @@ fun Modifier.entrancePop(): Modifier {
 
 /** Square icon button (≥44dp tap target); accent-soft fill + accent tint when [active]. */
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun IconButtonCa(
     icon: ImageVector,
     contentDescription: String,
@@ -148,9 +151,18 @@ fun IconButtonCa(
     iconSize: Int = 20,
     boxSize: Int = 34,
     tint: Color? = null,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val resolvedTint = tint ?: if (active) Ca.colors.accent else Ca.colors.textSecondary
+    val clickModifier = if (onLongClick == null) {
+        Modifier.clickable(interaction, indication = null, onClick = onClick)
+    } else {
+        Modifier.combinedClickable(
+            onClick = onClick,
+            onLongClick = onLongClick,
+        )
+    }
     Box(
         modifier
             .size(boxSize.dp)
@@ -159,7 +171,7 @@ fun IconButtonCa(
                 if (active) Ca.colors.accentSoft else Color.Transparent,
                 RoundedCornerShape(Ca.radius.sm),
             )
-            .clickable(interaction, indication = null, onClick = onClick),
+            .then(clickModifier),
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, contentDescription, Modifier.size(iconSize.dp), tint = resolvedTint)

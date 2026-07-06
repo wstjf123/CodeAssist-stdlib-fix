@@ -248,10 +248,10 @@ private fun MiniCount(icon: ImageVector, count: Int, color: Color) {
 @Composable
 private fun StatusPill(status: RunStatus) {
     val (text, color) = when (status) {
-        RunStatus.Idle -> "Idle" to Ca.colors.textSecondary
-        RunStatus.Running -> "Running…" to Ca.colors.accent
+        RunStatus.Idle -> "空闲" to Ca.colors.textSecondary
+        RunStatus.Running -> "运行中…" to Ca.colors.accent
         RunStatus.Succeeded -> "成功" to Ca.colors.run
-        RunStatus.Failed -> "Failed" to Ca.colors.error
+        RunStatus.Failed -> "失败" to Ca.colors.error
     }
     Chip(text, fill = color.copy(alpha = 0.16f), textColor = color)
 }
@@ -390,7 +390,7 @@ private fun RunningStrip(steps: List<BuildStepUi>) {
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                current?.let(::shortTask) ?: "Working…",
+                current?.let(::shortTask) ?: "处理中…",
                 color = Ca.colors.textSecondary, style = Ca.type.caption,
                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
             )
@@ -430,14 +430,14 @@ private fun ConsoleTabs(
             horizontalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             TabItem(
-                "Problems",
+                "问题",
                 builtInActive && tab == BuildTab.Problems,
                 badge = (errors + warnings).takeIf { it > 0 }?.toString(),
                 badgeColor = if (errors > 0) Ca.colors.error else Ca.colors.warning
             ) { onSelect(BuildTab.Problems) }
-            TabItem("Log", builtInActive && tab == BuildTab.Log) { onSelect(BuildTab.Log) }
+            TabItem("日志", builtInActive && tab == BuildTab.Log) { onSelect(BuildTab.Log) }
             TabItem(
-                "Steps",
+                "步骤",
                 builtInActive && tab == BuildTab.Steps,
                 badge = stepsTotal.takeIf { it > 0 }?.let { "$stepsDone/$it" },
                 badgeColor = Ca.colors.textTertiary
@@ -520,20 +520,20 @@ private fun ProblemsTab(diagnostics: List<BuildDiagnosticUi>, onOpen: (BuildDiag
             Modifier.fillMaxWidth().padding(vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            ConsoleChip("All ${diagnostics.size}", filter == ProblemFilter.All) {
+            ConsoleChip("全部 ${diagnostics.size}", filter == ProblemFilter.All) {
                 filter = ProblemFilter.All
             }
-            if (errors > 0) ConsoleChip("Errors $errors", filter == ProblemFilter.Errors) {
+            if (errors > 0) ConsoleChip("错误 $errors", filter == ProblemFilter.Errors) {
                 filter = ProblemFilter.Errors
             }
             if (warnings > 0) ConsoleChip(
-                "Warnings $warnings",
+                "警告 $warnings",
                 filter == ProblemFilter.Warnings
             ) { filter = ProblemFilter.Warnings }
         }
         if (shown.isEmpty()) {
             EmptyState(
-                if (diagnostics.isEmpty()) "No problems." else "No problems match this filter.",
+                if (diagnostics.isEmpty()) "没有问题。" else "没有匹配此筛选条件的问题。",
                 Modifier.weight(1f).fillMaxWidth()
             )
         } else {
@@ -683,7 +683,7 @@ private fun LogTab(log: List<BuildLogLine>, running: Boolean) {
         ) {
             SearchField(query, { query = it }, Modifier.weight(1f))
             IconButtonCa(
-                CaIcons.layers, if (grouped) "Ungroup" else "Group by task",
+                CaIcons.layers, if (grouped) "取消分组" else "按任务分组",
                 onClick = { grouped = !grouped }, boxSize = 30, iconSize = 16,
                 tint = if (grouped) Ca.colors.accent else Ca.colors.textSecondary,
             )
@@ -728,8 +728,8 @@ private fun LogTab(log: List<BuildLogLine>, running: Boolean) {
 
 private enum class LogLevelFilter(val label: String, val keep: (UiLogLevel) -> Boolean) {
     All("全部", { true }),
-    Warnings("Warnings", { it == UiLogLevel.Warn || it == UiLogLevel.Error }),
-    Errors("Errors", { it == UiLogLevel.Error }),
+    Warnings("警告", { it == UiLogLevel.Warn || it == UiLogLevel.Error }),
+    Errors("错误", { it == UiLogLevel.Error }),
 }
 
 private sealed interface LogDisplay {
@@ -922,7 +922,7 @@ private fun shortTask(task: String): String = task.substringAfterLast(':').ifEmp
 @Composable
 private fun StepsTab(steps: List<BuildStepUi>) {
     if (steps.isEmpty()) {
-        EmptyState("No build steps yet.", Modifier.fillMaxSize())
+        EmptyState("还没有构建步骤。", Modifier.fillMaxSize())
         return
     }
     SelectionContainer(Modifier.fillMaxSize()) {
@@ -1133,7 +1133,7 @@ private fun SearchField(
         Icon(CaIcons.search, null, Modifier.size(14.dp), tint = Ca.colors.accent)
         Box(Modifier.weight(1f)) {
             if (value.isEmpty()) Text(
-                "Filter log…",
+                "筛选日志…",
                 color = Ca.colors.textTertiary,
                 style = Ca.type.footnote
             )

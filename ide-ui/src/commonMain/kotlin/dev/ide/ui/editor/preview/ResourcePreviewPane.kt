@@ -73,7 +73,7 @@ fun ResourcePreviewPane(path: String, text: String, backend: IdeBackend, modifie
             PreviewKind.DRAWABLE -> DrawablePreview(path, text, backend)
             PreviewKind.COLOR -> ColorPreview(path, text, backend)
             PreviewKind.BITMAP -> BitmapPreview(path, backend)
-            null -> EmptyPreview("No preview available for this file")
+            null -> EmptyPreview("此文件没有可用预览")
         }
     }
 }
@@ -89,7 +89,7 @@ private fun DrawablePreview(path: String, text: String, backend: IdeBackend) {
     val d = drawable
     when {
         !loaded -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {}
-        d == null -> EmptyPreview("Couldn't render this drawable")
+        d == null -> EmptyPreview("无法渲染此 drawable")
         d is UiDrawable.Bitmap && d.filePath != null -> BitmapPreview(d.filePath, backend)
         else -> Column(
             Modifier.fillMaxSize().padding(Ca.spacing.s5),
@@ -108,7 +108,7 @@ private fun DrawablePreview(path: String, text: String, backend: IdeBackend) {
             }
             if (d is UiDrawable.Unsupported) {
                 Box(Modifier.padding(top = Ca.spacing.s3)) {
-                    Caption("Unsupported: <${d.rootTag}> — ${d.message}")
+                    Caption("不支持: <${d.rootTag}> — ${d.message}")
                 }
             }
         }
@@ -120,7 +120,7 @@ private fun ColorPreview(path: String, text: String, backend: IdeBackend) {
     var colors by remember(path) { mutableStateOf<List<UiColorEntry>>(emptyList()) }
     LaunchedEffect(path, text) { colors = runCatching { backend.preview.colorResources(path, text) }.getOrDefault(emptyList()) }
     if (colors.isEmpty()) {
-        EmptyPreview("No colors declared in this file")
+        EmptyPreview("此文件未声明颜色")
         return
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Ca.spacing.s5), verticalArrangement = Arrangement.spacedBy(Ca.spacing.s3)) {
@@ -138,7 +138,7 @@ private fun ColorPreview(path: String, text: String, backend: IdeBackend) {
                 Column {
                     androidx.compose.material3.Text(c.name, color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.Medium)
                     androidx.compose.material3.Text(
-                        c.rawValue.ifEmpty { "—" } + if (c.argb == null) "  (unresolved)" else "",
+                        c.rawValue.ifEmpty { "—" } + if (c.argb == null) "  (未解析)" else "",
                         color = Ca.colors.textSecondary, style = Ca.type.caption,
                     )
                 }
@@ -158,7 +158,7 @@ private fun BitmapPreview(path: String, backend: IdeBackend) {
     val img = image
     when {
         !loaded -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {}
-        img == null -> EmptyPreview("Couldn't decode this image")
+        img == null -> EmptyPreview("无法解码此图片")
         else -> Column(
             Modifier.fillMaxSize().padding(Ca.spacing.s5),
             horizontalAlignment = Alignment.CenterHorizontally,

@@ -88,7 +88,7 @@ internal class ProjectBackend(private val ctx: BackendContext) : ProjectService 
             }.getOrElse { e ->
                 // Surface the failure (console + the critical-error dialog) instead of swallowing it, so a
                 // broken project doesn't silently strand the caller — the picker stays put on a false return.
-                log.error("Couldn't open the project at $rootPath", e)
+                log.error("无法打开项目 $rootPath", e)
                 false
             }
         }

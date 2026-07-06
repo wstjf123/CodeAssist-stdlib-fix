@@ -60,7 +60,7 @@ internal class SigningService(private val ctx: EngineContext) {
         )
         val facet = module.facets.get(AndroidFacet.KEY) ?: return UiConfigResult(
             false,
-            "'$moduleName' is not an Android module."
+            "'$moduleName' 不是 Android 模块。"
         )
         val project =
             ctx.projectOf(module) ?: return UiConfigResult(false, "没有项目拥有模块 '$moduleName'。")
@@ -68,7 +68,7 @@ internal class SigningService(private val ctx: EngineContext) {
             return UiConfigResult(false, "未知密钥库 '$keystoreId'。")
         }
         if (facet.buildTypes.none { it.name == buildType }) return UiConfigResult(
-            false, "No build type '$buildType'."
+            false, "没有构建类型 '$buildType'。"
         )
         val newTypes =
             facet.buildTypes.map { if (it.name == buildType) it.copy(signingConfig = keystoreId) else it }
@@ -82,7 +82,7 @@ internal class SigningService(private val ctx: EngineContext) {
             return UiConfigResult(false, "更新失败：${e.message}")
         }
         ctx.store.save()
-        val target = keystoreId?.let { ctx.keystoreRegistry.get(it)?.name } ?: "debug (default)"
+        val target = keystoreId?.let { ctx.keystoreRegistry.get(it)?.name } ?: "debug（默认）"
         return UiConfigResult(true, "$buildType → $target")
     }
 }

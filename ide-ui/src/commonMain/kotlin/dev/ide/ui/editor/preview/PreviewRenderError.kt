@@ -38,7 +38,7 @@ fun PreviewRenderError(error: Throwable, modifier: Modifier = Modifier) {
             tint = Ca.colors.error,
         )
         Text(
-            "Preview failed to render",
+            "预览渲染失败",
             color = Ca.colors.error,
             style = Ca.type.body,
             fontWeight = FontWeight.SemiBold,

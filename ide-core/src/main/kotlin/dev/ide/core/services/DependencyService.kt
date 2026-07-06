@@ -162,7 +162,7 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
     /** Fallback reason when no resolve has run yet this session (e.g. just opened a project with a missing
      *  closure). Still actionable: the user can Retry once the network is back. */
     private val DEFAULT_UNRESOLVED_REASON =
-        "Not resolved. Check your internet connection, then tap Retry."
+        "尚未解析。请检查网络连接，然后点击重试。"
 
     /** Modules carrying at least one Maven-coordinate library dependency — the reconcilable set. */
     private fun mavenDepModules(): List<Module> = ctx.modules().filter { m ->
@@ -493,9 +493,9 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
         depsScope.launch {
             _depsState.value = DepsResolveState(
                 resolving = true,
-                message = "Resolving project dependencies…",
+                message = "正在解析项目依赖…",
                 fraction = 0.0,
-                log = listOf("Resolving project dependencies…")
+                log = listOf("正在解析项目依赖…")
             )
             var changedAny = false
             var allComplete = true
@@ -504,7 +504,7 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
                 moduleNames.forEachIndexed { i, name ->
                     val module = ctx.modules().firstOrNull { it.name == name } ?: return@forEachIndexed
                     _depsState.update {
-                        val m = "Resolving dependencies for $name  (${i + 1}/${moduleNames.size})"
+                        val m = "正在解析 $name 的依赖（${i + 1}/${moduleNames.size}）"
                         it.copy(
                             message = m,
                             fraction = i.toDouble() / moduleNames.size,
@@ -537,8 +537,8 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
                     it.copy(
                         resolving = false,
                         fraction = 1.0,
-                        message = "Dependencies resolved",
-                        log = appendDepsLog(it.log, "Dependencies resolved"),
+                        message = "依赖已解析",
+                        log = appendDepsLog(it.log, "依赖已解析"),
                         unresolved = computeUnresolved(),
                     )
                 }
@@ -564,9 +564,9 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
         }
         _depsState.value = DepsResolveState(
             resolving = true,
-            message = "Resolving project dependencies…",
+            message = "正在解析项目依赖…",
             fraction = 0.0,
-            log = listOf("Retrying dependency resolution…"),
+            log = listOf("正在重试依赖解析…"),
         )
         var changedAny = false
         var allComplete = true
@@ -574,7 +574,7 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
         try {
             mods.forEachIndexed { i, m ->
                 _depsState.update {
-                    val msg = "Resolving dependencies for ${m.name}  (${i + 1}/${mods.size})"
+                    val msg = "正在解析 ${m.name} 的依赖（${i + 1}/${mods.size}）"
                     it.copy(
                         message = msg,
                         fraction = i.toDouble() / mods.size,
@@ -600,8 +600,8 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
                 it.copy(
                     resolving = false,
                     fraction = 1.0,
-                    message = "Dependencies resolved",
-                    log = appendDepsLog(it.log, "Dependencies resolved"),
+                    message = "依赖已解析",
+                    log = appendDepsLog(it.log, "依赖已解析"),
                     unresolved = computeUnresolved(),
                 )
             }
@@ -645,7 +645,7 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
         )
 
     private fun aarReason(module: Module): String =
-        "Android archives (.aar) need an Android module; '${module.name}' is a ${module.type.displayName.lowercase()}"
+        "Android archive (.aar) 需要 Android 模块；'${module.name}' 是 ${module.type.displayName.lowercase()}"
 
     private fun parseCoordinate(name: String): Coordinate? =
         name.split(":").takeIf { it.size >= 3 }?.let { Coordinate(it[0], it[1], it[2]) }
@@ -726,7 +726,7 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
 
         val result = if (externalCoords.isEmpty()) null else {
             _depsState.value =
-                DepsResolveState(resolving = true, message = "Resolving ${module.name}…")
+                DepsResolveState(resolving = true, message = "正在解析 ${module.name}…")
             runCatching {
                 depsResolver.resolve(
                     externalCoords,
@@ -908,8 +908,8 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
         // shared with the deferred template-dependency loop ([startPendingDependencyResolution]).
         _depsState.value = DepsResolveState(
             resolving = true,
-            message = "Resolving $coordinate…",
-            log = listOf("Resolving $coordinate…")
+            message = "正在解析 $coordinate…",
+            log = listOf("正在解析 $coordinate…")
         )
         return try {
             resolveAndAttach(
@@ -943,13 +943,13 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
             false, "没有模块 '$moduleName'。"
         )
         val coord = parseInputCoordinate(coordinate) ?: return UiAddResult(
-            false, "Invalid coordinate — expected group:name[:version]."
+            false, "坐标无效，应为 group:name[:version]。"
         )
         val versionless = coord.version.isBlank()
         val platforms = declaredPlatforms(module)
         if (versionless && platforms.isEmpty()) return UiAddResult(
             false,
-            "$coordinate has no version — import a platform (BOM) first, or give an explicit version."
+            "$coordinate 没有版本：请先导入平台 (BOM)，或显式指定版本。"
         )
         if (module.dependencies.any { it is LibraryDependency && it.library.name == coordinate && it.variant == variant }) return UiAddResult(
             false, "$coordinate 已是 '$moduleName' 的依赖。"
@@ -972,11 +972,11 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
             result.resolved.firstOrNull { it.coordinate.group == coord.group && it.coordinate.name == coord.name }
                 ?: return UiAddResult(
                     false,
-                    if (versionless) "No imported platform provides a version for ${coord.group}:${coord.name}."
+                    if (versionless) "没有已导入的平台为 ${coord.group}:${coord.name} 提供版本。"
                     else "在已配置仓库中找不到 $coordinate。"
                 )
         if (primary.kind == ArtifactKind.AAR && !acceptsAar(module)) return UiAddResult(
-            false, "$coordinate is an Android library (.aar) — ${aarReason(module)}."
+            false, "$coordinate 是 Android 库 (.aar)：${aarReason(module)}。"
         )
 
         // Persist with the resolved, concrete coordinate — a versionless declaration is pinned to the
@@ -999,14 +999,14 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
             commit()
         }
         val updated = ctx.modules().firstOrNull { it.name == moduleName } ?: return UiAddResult(
-            false, "Module '$moduleName' disappeared during resolution."
+            false, "模块 '$moduleName' 在解析过程中消失。"
         )
         val asm = assembleModuleClasspath(updated, progress, finalize)
         // A fresh marker is now stale (the declared set changed) — let the next open re-verify cheaply.
         runCatching { java.nio.file.Files.deleteIfExists(reconcileMarker) }
 
         val transitiveCount = result.resolved.size - 1
-        val suffix = if (transitiveCount > 0) " (+$transitiveCount transitive)" else ""
+        val suffix = if (transitiveCount > 0) "（另有 $transitiveCount 个传递依赖）" else ""
         // A non-empty `unresolved` means part of the graph failed to download (surfaced, not silently dropped):
         // the classpath is incomplete — warn so the user re-resolves instead of hitting "unresolved type" later.
         if (asm.unresolved.isNotEmpty()) {
@@ -1031,7 +1031,7 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
             false, "没有模块 '$moduleName'。"
         )
         val bom = parseCoordinate(coordinate) ?: return UiAddResult(
-            false, "A platform BOM needs a version — expected group:name:version."
+            false, "平台 BOM 必须包含版本，应为 group:name:version。"
         )
         if (module.dependencies.any { it is PlatformDependency && it.bom == bom && it.variant == variant }) return UiAddResult(
             false, "$coordinate 已是 '$moduleName' 的平台依赖。"
@@ -1039,8 +1039,8 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
 
         _depsState.value = DepsResolveState(
             resolving = true,
-            message = "Importing BOM $coordinate…",
-            log = listOf("Importing BOM $coordinate…")
+            message = "正在导入 BOM $coordinate…",
+            log = listOf("正在导入 BOM $coordinate…")
         )
         val result = try {
             depsResolver.resolve(
@@ -1086,7 +1086,7 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
             "没有模块 '$moduleName'。"
         )
         if (!acceptsAar(module)) return UiAddResult(
-            false, "Firebase libraries are Android (.aar) — ${aarReason(module)}."
+            false, "Firebase 库是 Android 库 (.aar)：${aarReason(module)}。"
         )
 
         // The Firebase BoM aligns every firebase-* artifact's version; versionless artifacts resolve against it.
@@ -1099,7 +1099,7 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
         val (added, notes, failed) = addEach(
             moduleName, artifacts.map { if (':' in it) it else "com.google.firebase:$it" })
         val reminder = if (hasGoogleServicesJson(module)) emptyList()
-        else listOf("add google-services.json to '$moduleName' (Firebase console → Project settings) to finish setup")
+        else listOf("请将 google-services.json 添加到 '$moduleName'（Firebase 控制台 → 项目设置）以完成配置")
         return UiAddResult(!failed, "Firebase — " + (notes + reminder).joinToString("; "), added)
     }
 
@@ -1111,7 +1111,7 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
             "没有模块 '$moduleName'。"
         )
         if (!acceptsAar(module)) return UiAddResult(
-            false, "Play Services libraries are Android (.aar) — ${aarReason(module)}."
+            false, "Play Services 库是 Android 库 (.aar)：${aarReason(module)}。"
         )
         val (added, notes, failed) = addEach(moduleName, coordinates)
         return UiAddResult(!failed, "Play Services — " + notes.joinToString("; "), added)
@@ -1196,7 +1196,7 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
         )
         val entry = module.dependencies.filterIsInstance<LibraryDependency>()
             .firstOrNull { it.library.name == coordinate } ?: return UiAddResult(
-            false, "$coordinate is not a library dependency of '$moduleName'."
+            false, "$coordinate 不是 '$moduleName' 的库依赖。"
         )
         val parsed = exclusions.mapNotNull(Exclusion::parse)
         if (parsed == entry.exclusions) return UiAddResult(true, "排除项没有变化。")
@@ -1212,8 +1212,8 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
         }
         _depsState.value = DepsResolveState(
             resolving = true,
-            message = "Updating exclusions for $coordinate…",
-            log = listOf("Updating exclusions for $coordinate…"),
+            message = "正在更新 $coordinate 的排除项…",
+            log = listOf("正在更新 $coordinate 的排除项…"),
         )
         return try {
             val updated = ctx.modules().firstOrNull { it.name == moduleName } ?: return UiAddResult(
@@ -1266,14 +1266,14 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
         val module = ctx.modules().firstOrNull { it.name == moduleName }
             ?: return UiAddResult(false, "没有模块 '$moduleName'。")
         val target = parseInputCoordinate(coordinate)
-            ?: return UiAddResult(false, "$coordinate is not a Maven coordinate.")
+            ?: return UiAddResult(false, "$coordinate 不是 Maven 坐标。")
         // Match on group:name: the resolved coordinate shown in the tree can be a newest-wins bump of the
         // version actually persisted in module.toml.
         val entry = module.dependencies.filterIsInstance<LibraryDependency>().firstOrNull {
             parseCoordinate(it.library.name)?.let { c -> c.group == target.group && c.name == target.name } == true
-        } ?: return UiAddResult(false, "$coordinate is not a declared library dependency of '$moduleName'.")
+        } ?: return UiAddResult(false, "$coordinate 不是 '$moduleName' 中已声明的库依赖。")
         val declared = parseCoordinate(entry.library.name)
-            ?: return UiAddResult(false, "$coordinate is not a versioned Maven coordinate.")
+            ?: return UiAddResult(false, "$coordinate 不是带版本的 Maven 坐标。")
 
         val newVersion = version.trim().ifBlank { declared.version }
         val newCoord = Coordinate(declared.group, declared.name, newVersion)
@@ -1291,8 +1291,8 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
         val project = ctx.projectOf(module) ?: return UiAddResult(false, "没有项目拥有模块 '$moduleName'。")
         _depsState.value = DepsResolveState(
             resolving = true,
-            message = "Updating ${declared.name}…",
-            log = listOf("Updating ${declared.name}…"),
+            message = "正在更新 ${declared.name}…",
+            log = listOf("正在更新 ${declared.name}…"),
         )
         return try {
             // Validate a new version resolves before mutating the model, so a bad version can't break the
@@ -1386,10 +1386,10 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
         val low = src.toString().lowercase()
         val isAar = low.endsWith(".aar")
         if (!isAar && !low.endsWith(".jar")) return UiAddResult(
-            false, "Only .jar and .aar files can be added as a local library."
+            false, "只有 .jar 和 .aar 文件可以作为本地库添加。"
         )
         if (isAar && !acceptsAar(module)) return UiAddResult(
-            false, "${src.fileName} is an Android library (.aar) — ${aarReason(module)}."
+            false, "${src.fileName} 是 Android 库 (.aar)：${aarReason(module)}。"
         )
 
         val libName = src.fileName.toString()
@@ -1520,7 +1520,7 @@ internal class DependencyService(private val ctx: EngineContext) : Disposable {
             false, "没有模块 '$moduleName'。"
         )
         if (targetModule == moduleName) return UiAddResult(
-            false, "A module can't depend on itself."
+            false, "模块不能依赖自身。"
         )
         val project =
             ctx.projectOf(module) ?: return UiAddResult(false, "没有项目拥有模块 '$moduleName'。")

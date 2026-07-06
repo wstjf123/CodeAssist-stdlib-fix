@@ -29,7 +29,7 @@ interface ComposePreviewHost {
     suspend fun awaitPreviewVisible(path: String, preview: UiComposePreview, timeoutMillis: Long): Boolean = false
 
     suspend fun capturePreview(path: String, preview: UiComposePreview, text: String, dark: Boolean): ComposePreviewCaptureResult =
-        ComposePreviewCaptureResult(false, "Compose preview capture is not available")
+        ComposePreviewCaptureResult(false, "Compose 预览截图不可用")
 }
 
 data class ComposePreviewCaptureResult(

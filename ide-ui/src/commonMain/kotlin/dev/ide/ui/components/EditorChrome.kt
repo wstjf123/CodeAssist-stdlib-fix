@@ -90,6 +90,7 @@ fun EditorTopBar(
     canUndo: Boolean = false,
     canRedo: Boolean = false,
     onUndo: () -> Unit = {},
+    onUndoAll: () -> Unit = {},
     onRedo: () -> Unit = {},
     onFind: () -> Unit = {},
     onReformat: () -> Unit = {},
@@ -137,6 +138,7 @@ fun EditorTopBar(
                     canUndo = canUndo,
                     canRedo = canRedo,
                     onUndo = onUndo,
+                    onUndoAll = onUndoAll,
                     onRedo = onRedo,
                     onFind = onFind,
                     onReformat = onReformat,
@@ -152,7 +154,7 @@ fun EditorTopBar(
             } else {
                 // Edit actions (undo/redo/find) sit just before Run — disabled-tinted with no file open.
                 if (hasActiveFile) {
-                    IconButtonCa(CaIcons.undo, "撤销", onUndo, tint = if (canUndo) null else dim)
+                    IconButtonCa(CaIcons.undo, "撤销；长按全部撤销", onUndo, tint = if (canUndo) null else dim, onLongClick = onUndoAll)
                     IconButtonCa(CaIcons.redo, "重做", onRedo, tint = if (canRedo) null else dim)
                     IconButtonCa(CaIcons.search, "查找/替换", onFind)
                     IconButtonCa(CaIcons.braces, "格式化代码", onReformat)
@@ -197,6 +199,7 @@ private fun EditorOverflowMenu(
     canUndo: Boolean,
     canRedo: Boolean,
     onUndo: () -> Unit,
+    onUndoAll: () -> Unit,
     onRedo: () -> Unit,
     onFind: () -> Unit,
     onReformat: () -> Unit,
@@ -215,6 +218,7 @@ private fun EditorOverflowMenu(
         CaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             if (hasActiveFile) {
                 OverflowItem(CaIcons.undo, "撤销", enabled = canUndo) { open = false; onUndo() }
+                OverflowItem(CaIcons.undo, "全部撤销", enabled = canUndo) { open = false; onUndoAll() }
                 OverflowItem(CaIcons.redo, "重做", enabled = canRedo) { open = false; onRedo() }
                 OverflowItem(CaIcons.search, "查找/替换") { open = false; onFind() }
                 OverflowItem(CaIcons.braces, "格式化代码") { open = false; onReformat() }
@@ -275,7 +279,7 @@ fun DepsProgressBar(state: DepsResolveState, onRetry: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(CaIcons.pkg, null, Modifier.size(14.dp), tint = Ca.colors.accent)
                 Text(
-                    state.message.ifBlank { "Resolving dependencies…" }, color = Ca.colors.textSecondary,
+                    state.message.ifBlank { "正在解析依赖…" }, color = Ca.colors.textSecondary,
                     style = Ca.type.footnote, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f).padding(bottom = 4.dp),
                 )
@@ -283,7 +287,7 @@ fun DepsProgressBar(state: DepsResolveState, onRetry: () -> Unit) {
                 if (state.log.isNotEmpty()) {
                     IconButtonCa(
                         if (expanded) CaIcons.caretDown else CaIcons.caretRight,
-                        if (expanded) "Hide resolution details" else "Show resolution details",
+                        if (expanded) "隐藏解析详情" else "显示解析详情",
                         { expanded = !expanded }, boxSize = 24, iconSize = 14,
                     )
                 }
@@ -335,7 +339,7 @@ private fun UnresolvedDepsBanner(state: DepsResolveState, onRetry: () -> Unit) {
                 Icon(CaIcons.error, null, Modifier.size(16.dp), tint = Ca.colors.error)
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "$n ${if (n == 1) "dependency" else "dependencies"} couldn't be resolved",
+                        "$n 个依赖无法解析",
                         color = Ca.colors.error, style = Ca.type.footnote, fontWeight = FontWeight.SemiBold,
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
@@ -355,7 +359,7 @@ private fun UnresolvedDepsBanner(state: DepsResolveState, onRetry: () -> Unit) {
                 }
                 IconButtonCa(
                     if (expanded) CaIcons.caretDown else CaIcons.caretRight,
-                    if (expanded) "Hide unresolved dependencies" else "Show unresolved dependencies",
+                    if (expanded) "隐藏未解析依赖" else "显示未解析依赖",
                     { expanded = !expanded }, boxSize = 24, iconSize = 14,
                 )
             }
@@ -508,7 +512,7 @@ private fun VariantChip(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
-            Icon(CaIcons.layers, "Build variant", Modifier.size(15.dp), tint = Ca.colors.textSecondary)
+            Icon(CaIcons.layers, "构建变体", Modifier.size(15.dp), tint = Ca.colors.textSecondary)
             if (!compact) Text(label, color = Ca.colors.textSecondary, style = Ca.type.footnote, fontWeight = FontWeight.Medium)
             Icon(CaIcons.caretDown, null, Modifier.size(12.dp), tint = Ca.colors.textTertiary)
         }
@@ -618,7 +622,7 @@ fun TabsStrip(
                     Modifier.padding(start = 8.dp).size(16.dp).clickable { onClose(file) },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(CaIcons.close, "Close", Modifier.size(12.dp), tint = Ca.colors.textTertiary)
+                    Icon(CaIcons.close, "关闭", Modifier.size(12.dp), tint = Ca.colors.textTertiary)
                 }
             }
         }

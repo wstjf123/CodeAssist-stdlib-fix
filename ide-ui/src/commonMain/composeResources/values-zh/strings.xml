@@ -59,7 +59,7 @@
     <string name="support_chip_no_ads">无广告</string>
     <string name="support_chip_open_source">开源</string>
     <string name="support_sponsor">赞助</string>
-    <string name="support_star">在 GitHub 点 Star</string>
+    <string name="support_star">点 Star</string>
     <string name="no_project_yet">目前还没有项目——创建一个项目即可开始。</string>
     <string name="your_projects">你的项目</string>
     <plurals name="modules">

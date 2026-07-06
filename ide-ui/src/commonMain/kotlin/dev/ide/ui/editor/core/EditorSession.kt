@@ -414,6 +414,14 @@ class EditorSession(
         return true
     }
 
+    /** Revert every available undo step. Returns how many steps were undone. */
+    fun undoAll(): Int {
+        if (currentGroup != null || undoStack.isEmpty()) return 0
+        var count = 0
+        while (undo()) count++
+        return count
+    }
+
     /** Re-apply the most recently undone step. Returns false if there's nothing to redo. */
     fun redo(): Boolean {
         if (currentGroup != null || redoStack.isEmpty()) return false

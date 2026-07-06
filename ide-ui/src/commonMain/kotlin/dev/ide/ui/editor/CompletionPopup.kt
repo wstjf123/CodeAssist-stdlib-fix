@@ -115,7 +115,7 @@ private fun CompletionListPanel(
     ) {
         if (items.isEmpty()) {
             Text(
-                "No suggestions",
+                "没有建议",
                 style = Ca.type.codeSmall,
                 color = Ca.colors.textTertiary,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),

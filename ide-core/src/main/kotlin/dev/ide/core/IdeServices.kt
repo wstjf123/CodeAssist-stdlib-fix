@@ -1835,7 +1835,7 @@ class IdeServices private constructor(
         val vf = store.vfs.fileFor(file)
         analyzer.incrementalParser.parseFull(EditorDocument(vf, docVersion.incrementAndGet(), text))
         if (analyzer.hasSyntaxErrors(vf)) return PreviewRunResult(
-            false, "the file has syntax errors — fix them to preview"
+            false, "文件存在语法错误，请修复后再预览"
         )
         val model = previewModelFor(module, vf, analyzer)
         val program = model?.program ?: emptyMap()
@@ -1844,12 +1844,12 @@ class IdeServices private constructor(
         )
         if (!entry.isComplete) {
             val why = entry.diagnostics.joinToString("; ") { it.reason }
-                .ifBlank { "unsupported constructs" }
+                .ifBlank { "不支持的语法结构" }
             return PreviewRunResult(false, "无法预览 `$functionName`：$why")
         }
         composePreviewRunner?.let { return it.render(entry, program) }
         return PreviewRunResult(
-            true, "`$functionName` is interpretable — on-device rendering coming soon"
+            true, "`$functionName` 可解释执行，设备端渲染即将可用"
         )
     }
 
@@ -1860,7 +1860,7 @@ class IdeServices private constructor(
         file: Path, text: String, functionName: String, arity: Int = 0
     ): List<String> = try {
         analyzeComposePreview(file, text, functionName, arity).diagnostics
-            .ifEmpty { listOf("`$functionName` lowered with no diagnostics — it may render; if not, the failure is in the render path") }
+            .ifEmpty { listOf("`$functionName` 已完成 lowering 且没有诊断；它可能可以渲染，如果仍失败则问题在渲染路径") }
     } catch (t: Throwable) {
         // NEVER return empty on a failure path — a bare "can't be interpreted" with no reason is useless.
         listOf("分析失败：${t::class.java.simpleName}: ${t.message ?: "无消息"}")
@@ -1876,11 +1876,11 @@ class IdeServices private constructor(
     private fun analyzeComposePreview(
         file: Path, text: String, functionName: String, arity: Int,
     ): ComposePreviewAnalysis {
-        val module = moduleForEditableFile(file) ?: return ComposePreviewAnalysis(null, listOf("no module owns this file"))
+        val module = moduleForEditableFile(file) ?: return ComposePreviewAnalysis(null, listOf("此文件不属于任何模块"))
         updateDocument(file, text)
         val analyzer = analyzerFor(
             module, KotlinLanguageBackend.LANGUAGE_ID
-        ) as? dev.ide.lang.kotlin.KotlinSourceAnalyzer ?: return ComposePreviewAnalysis(null, listOf("not a Kotlin file"))
+        ) as? dev.ide.lang.kotlin.KotlinSourceAnalyzer ?: return ComposePreviewAnalysis(null, listOf("不是 Kotlin 文件"))
         val key = ComposePreviewAnalysisKey(
             module.id.value,
             file.toAbsolutePath().normalize().toString(),
@@ -1912,15 +1912,15 @@ class IdeServices private constructor(
         // builds a garbage program that crashes the real Compose runtime in a phase nothing can catch. Don't
         // render it; the editor's diagnostics already flag the errors and the preview shows a "fix errors" state.
         if (analyzer.hasSyntaxErrors(vf)) {
-            return ComposePreviewAnalysis(null, listOf("the file has syntax errors — fix them to preview"))
+            return ComposePreviewAnalysis(null, listOf("文件存在语法错误，请修复后再预览"))
         }
         // Cross-file AND cross-module: the program + classes include every project-source type/top-level
         // function the preview transitively reaches in OTHER files — same module or a dependency module — so a
         // `data class`/helper declared elsewhere is constructible/callable rather than crashing the render with
         // a missing class.
-        val module = moduleForEditableFile(file) ?: return ComposePreviewAnalysis(null, listOf("no module owns this file"))
+        val module = moduleForEditableFile(file) ?: return ComposePreviewAnalysis(null, listOf("此文件不属于任何模块"))
         val model = KotlinPerf.span("model") { previewModelFor(module, vf, analyzer) }
-            ?: return ComposePreviewAnalysis(null, listOf("preview model could not be built"))
+            ?: return ComposePreviewAnalysis(null, listOf("无法构建预览模型"))
         val program = model.program
         val entry = previewEntry(program, functionName, arity)
             ?: return ComposePreviewAnalysis(
@@ -1930,7 +1930,7 @@ class IdeServices private constructor(
         if (!entry.isComplete) {
             return ComposePreviewAnalysis(
                 null,
-                previewDiagnosticMessages(entry.diagnostics, text).ifEmpty { listOf("unsupported constructs") },
+                previewDiagnosticMessages(entry.diagnostics, text).ifEmpty { listOf("不支持的语法结构") },
             )
         }
         // Every source type the preview can actually REACH must lower cleanly too (a malformed `data class` it
@@ -1946,7 +1946,7 @@ class IdeServices private constructor(
                 .distinct()
             return ComposePreviewAnalysis(
                 null,
-                reasons.ifEmpty { listOf("Source class `${brokenClass.simpleName}` is not fully interpretable") },
+                reasons.ifEmpty { listOf("源码类 `${brokenClass.simpleName}` 无法完全解释执行") },
             )
         }
         val parameter = KotlinPerf.span("parameter") { resolvePreviewParameter(analyzer, vf, functionName, arity, classes) }
@@ -2126,7 +2126,7 @@ class IdeServices private constructor(
     suspend fun rename(file: Path, text: String, offset: Int, newName: String): RenameOutcome {
         val name = newName.trim()
         if (!isValidJavaIdentifier(name)) return RenameOutcome(
-            false, "'$newName' is not a valid Java identifier."
+            false, "'$newName' 不是有效的 Java 标识符。"
         )
         if (analysisDisabled(file)) return RenameOutcome(false, "Java 分析不可用。")
         val module = moduleForFile(file) ?: return RenameOutcome(
@@ -2179,7 +2179,7 @@ class IdeServices private constructor(
             return RenameOutcome(false, "Java 分析不可用。")
         }
         if (editsByPath.isEmpty()) return RenameOutcome(
-            false, "No occurrences of '${target.oldName}' found."
+            false, "未找到 '${target.oldName}' 的引用。"
         )
 
         // Apply each file's edits descending (offsets stay valid), writing disk + the live overlay together.
@@ -2374,10 +2374,10 @@ class IdeServices private constructor(
     suspend fun renameFile(target: Path, newName: String): RenameOutcome {
         val name = newName.trim()
         if (name.isEmpty() || name.contains('/') || name.contains('\\')) return RenameOutcome(
-            false, "'$newName' is not a valid name."
+            false, "'$newName' 不是有效名称。"
         )
         val abs = normPath(target)
-        if (!Files.exists(abs)) return RenameOutcome(false, "'${abs.fileName}' no longer exists.")
+        if (!Files.exists(abs)) return RenameOutcome(false, "'${abs.fileName}' 已不存在。")
         val parent = abs.parent ?: return RenameOutcome(false, "无法重命名工作区根目录。")
 
         // Java class-aware path: when the file actually declares a top-level type matching its name, rename the
@@ -2394,7 +2394,7 @@ class IdeServices private constructor(
 
         val dest = parent.resolve(name)
         if (dest == abs) return RenameOutcome(false, "新名称与当前名称相同。")
-        if (Files.exists(dest)) return RenameOutcome(false, "'$name' already exists here.")
+        if (Files.exists(dest)) return RenameOutcome(false, "此处已存在 '$name'。")
         return runCatching {
             Files.move(abs, dest)
             rekeyOverlays(abs, dest)
@@ -2930,7 +2930,7 @@ class IdeServices private constructor(
         val resourcesAp = linked?.resourcesAp
             ?: dev.ide.android.support.AndroidBuildSystem.resourcesApPath(module, variant).takeIf { Files.exists(it) }
             ?: return ownedPreview(module, repo, fingerprint, themeName, title, text, request,
-                "Real-view resources unavailable (${linked?.error ?: "build the project once"}) — showing owned rendering")
+                "真实 View 资源不可用（${linked?.error ?: "请先构建一次项目"}），正在显示内置渲染")
         // The R.jar: prefer the relink's (ids match the relinked arsc AND it covers every lib package); fall
         // back to the build's if the relink didn't produce one (e.g. it used the build's compiled-flats base).
         val rJar = linked?.rJar?.takeIf { Files.exists(it) }
@@ -2965,7 +2965,7 @@ class IdeServices private constructor(
         val png = result?.pngBytes
         if (nativeImage == null && png == null) {
             return ownedPreview(module, repo, fingerprint, themeName, title, text, request,
-                "Real-view render unavailable (${result?.error ?: "no result"}) — showing owned rendering")
+                "真实 View 渲染不可用（${result?.error ?: "没有结果"}），正在显示内置渲染")
         }
         val resources = dev.ide.preview.impl.ProjectPreviewResources(
             repo, request.density, request.density, night = request.night, themeName = themeName
@@ -3100,9 +3100,9 @@ class IdeServices private constructor(
         module: Module, repo: dev.ide.android.support.resources.ResourceRepository
     ): dev.ide.preview.impl.CustomViewFactory? {
         val runtime = customViewRuntime
-            ?: return failingCustomViewFactory("no custom-view preview runtime on this platform")
+            ?: return failingCustomViewFactory("此平台没有自定义 View 预览运行时")
         val androidJar = previewAndroidJar()
-            ?: return failingCustomViewFactory("no android.jar available for the preview compile")
+            ?: return failingCustomViewFactory("预览编译缺少 android.jar")
         return runCatching {
             val work = store.rootPath.resolve(".platform/caches/preview/${module.id.value}")
             val srcDir = work.resolve("src");
@@ -3155,7 +3155,7 @@ class IdeServices private constructor(
                 bootClasspath = listOf(androidJar) + (androidTools?.desugarStubs ?: emptyList()),
             )
             if (!result.success) {
-                return@runCatching failingCustomViewFactory("preview compile failed:\n${formatCompileErrors(result)}")
+                return@runCatching failingCustomViewFactory("预览编译失败:\n${formatCompileErrors(result)}")
             }
 
             // Instrument every compiled .class in place (reparent View bases, redirect obtainStyledAttributes).
@@ -3177,13 +3177,13 @@ class IdeServices private constructor(
                 }
             }
             runtime.createFactory(outDir, deps, styled)
-                ?: failingCustomViewFactory("the custom-view runtime returned no factory")
+                ?: failingCustomViewFactory("自定义 View 运行时未返回 factory")
         }.getOrElse { t ->
             // Surface the reason (incl. a CustomViewPreviewException thrown by createFactory, e.g. a dex
             // failure) through a factory that fails every create() with it, rather than a silent null →
             // generic "no preview runtime" message in the preview pane.
             failingCustomViewFactory(
-                t.message ?: "preview setup failed (${t.javaClass.simpleName})"
+                t.message ?: "预览设置失败（${t.javaClass.simpleName}）"
             )
         }
     }
@@ -3201,10 +3201,10 @@ class IdeServices private constructor(
                 val loc = name?.let { n -> d.line?.let { "$n:$it" } ?: n }
                 if (loc != null) "$loc  ${d.message}" else d.message
             }
-            return if (errs.size > cap) "$shown\n…and ${errs.size - cap} more" else shown
+            return if (errs.size > cap) "$shown\n…还有 ${errs.size - cap} 条" else shown
         }
         // Fallback when nothing parsed (an unusual compiler message shape): the raw lines, sans the path noise.
-        return result.messages.take(3).joinToString("\n").ifBlank { "(no diagnostics)" }
+        return result.messages.take(3).joinToString("\n").ifBlank { "（没有诊断信息）" }
     }
 
     /** A [CustomViewFactory] whose every [create] fails with [reason], so the preview pane shows it. */
@@ -3946,7 +3946,7 @@ class IdeServices private constructor(
             val (platform, store) = openStore(root, env)
             store.replaceSdks(listOf(sdk))
             val template = ProjectTemplateRegistry(platform.extensions).byId(TemplateId(templateId))
-                ?: error("Unknown project template '$templateId'")
+                ?: error("未知项目模板 '$templateId'")
             val templateArgs = TemplateArgs(args)
             template.generate(ScaffoldImpl(store, languageLevel), templateArgs)
             store.save()

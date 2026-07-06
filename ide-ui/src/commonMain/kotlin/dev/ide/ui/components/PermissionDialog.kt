@@ -60,7 +60,7 @@ private fun PermissionCard(req: UiPermissionRequest, answer: (UiPermissionDecisi
         Text(title, color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(6.dp))
         Text(
-            "The running program wants to $verb:",
+            "正在运行的程序想要$verb：",
             color = Ca.colors.textSecondary, style = Ca.type.footnote,
         )
         Spacer(Modifier.height(2.dp))
@@ -106,10 +106,10 @@ private fun PermButton(label: String, kind: PermKind, onClick: () -> Unit) {
 
 /** Title + verb for a guard-category id (matches GuardCategory.name().lowercase()). */
 private fun labelFor(category: String): Pair<String, String> = when (category) {
-    "network" -> "Allow network access?" to "connect to the network"
-    "file_read" -> "Allow reading a file?" to "read the file"
-    "file_write" -> "Allow writing a file?" to "write the file"
-    "reflection" -> "Allow reflection?" to "use reflection on"
-    "exec" -> "Allow running a process?" to "run the process"
-    else -> "Allow this action?" to "perform"
+    "network" -> "允许访问网络？" to "连接网络"
+    "file_read" -> "允许读取文件？" to "读取文件"
+    "file_write" -> "允许写入文件？" to "写入文件"
+    "reflection" -> "允许使用反射？" to "对目标使用反射"
+    "exec" -> "允许运行进程？" to "运行进程"
+    else -> "允许此操作？" to "执行操作"
 }

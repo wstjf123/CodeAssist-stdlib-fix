@@ -529,7 +529,7 @@ private fun executeAgentTool(context: AgentToolContext, call: UiAgentToolCall): 
     return runCatching {
         executeAgentToolUnchecked(context, call)
     }.getOrElse {
-        toolFailure("tool failed: ${it.message ?: "unknown error"}")
+        toolFailure("工具执行失败：${it.message ?: "未知错误"}")
     }
 }
 
@@ -537,7 +537,7 @@ private suspend fun executeAgentTool(state: IdeUiState, call: UiAgentToolCall): 
     return runCatching {
         executeAgentToolUnchecked(state, call)
     }.getOrElse {
-        toolFailure("tool failed: ${it.message ?: "unknown error"}")
+        toolFailure("工具执行失败：${it.message ?: "未知错误"}")
     }
 }
 
@@ -547,9 +547,9 @@ private fun executeAgentToolUnchecked(context: AgentToolContext, call: UiAgentTo
             toolSuccess(context.filePaths.take(500).joinToString("\n"))
         }
         "read_workspace_file" -> {
-            val path = call.stringArguments["path"] ?: return toolFailure("missing path")
+            val path = call.stringArguments["path"] ?: return toolFailure("缺少路径")
             if (path !in context.filePaths && !path.startsWith(context.rootPath)) {
-                return toolFailure("path is outside workspace")
+                return toolFailure("路径不在工作区内")
             }
             toolSuccess(if (context.activePath == path) context.activeText.orEmpty() else context.readFile(path).take(20000))
         }
@@ -557,17 +557,17 @@ private fun executeAgentToolUnchecked(context: AgentToolContext, call: UiAgentTo
             val path = context.activePath
             val text = context.activeText
             if (path == null || text == null) {
-                toolFailure("no current file")
+                toolFailure("没有当前文件")
             } else {
                 toolSuccess("path: $path\n```\n${text.take(20000)}\n```")
             }
         }
         "get_diagnostics" -> {
-            if (context.diagnostics.isEmpty()) toolSuccess("no diagnostics")
+            if (context.diagnostics.isEmpty()) toolSuccess("没有诊断信息")
             else toolSuccess(buildString { appendDiagnostics(this, context.diagnostics) })
         }
         "get_build_logs" -> {
-            if (context.buildLog.isEmpty()) toolSuccess("no build logs")
+            if (context.buildLog.isEmpty()) toolSuccess("没有构建日志")
             else toolSuccess(context.buildLog.joinToString("\n"))
         }
         "get_build_progress" -> {
@@ -580,10 +580,10 @@ private fun executeAgentToolUnchecked(context: AgentToolContext, call: UiAgentTo
             toolSuccess(context.appTheme)
         }
         "get_ide_logs" -> {
-            if (context.ideLogs.isEmpty()) toolSuccess("no IDE logs")
+            if (context.ideLogs.isEmpty()) toolSuccess("没有 IDE 日志")
             else toolSuccess(context.ideLogs.joinToString("\n"))
         }
-        else -> toolFailure("unknown tool: ${call.name}")
+        else -> toolFailure("未知工具：${call.name}")
     }
 }
 
@@ -594,28 +594,28 @@ private suspend fun executeAgentToolUnchecked(state: IdeUiState, call: UiAgentTo
             toolSuccess(collectFilePaths(state.tree).take(500).joinToString("\n"))
         }
         "read_workspace_file" -> {
-            val path = call.stringArguments["path"] ?: return toolFailure("missing path")
+            val path = call.stringArguments["path"] ?: return toolFailure("缺少路径")
             val known = collectFilePaths(state.tree).toSet()
             if (path !in known && !path.startsWith(state.backend.project.rootPath)) {
-                return toolFailure("path is outside workspace")
+                return toolFailure("路径不在工作区内")
             }
             toolSuccess(if (active?.path == path) active.text else state.backend.files.readFile(path).take(20000))
         }
         "get_current_file" -> {
             if (active == null) {
-                toolFailure("no current file")
+                toolFailure("没有当前文件")
             } else {
                 toolSuccess("path: ${active.path}\n```\n${active.text.take(20000)}\n```")
             }
         }
         "get_diagnostics" -> {
             val diagnostics = active?.session?.diagnostics.orEmpty()
-            if (diagnostics.isEmpty()) toolSuccess("no diagnostics")
+            if (diagnostics.isEmpty()) toolSuccess("没有诊断信息")
             else toolSuccess(buildString { appendDiagnostics(this, diagnostics) })
         }
         "get_build_logs" -> {
             val log = state.backend.build.buildState.value.log.takeLast(160)
-            if (log.isEmpty()) toolSuccess("no build logs")
+            if (log.isEmpty()) toolSuccess("没有构建日志")
             else toolSuccess(log.joinToString("\n") { "${it.timeLabel} ${it.level}: ${it.message}" })
         }
         "get_build_progress" -> {
@@ -625,25 +625,25 @@ private suspend fun executeAgentToolUnchecked(state: IdeUiState, call: UiAgentTo
             state.consoleOpen = true
             state.backend.build.runBuild()
             delay(BUILD_ACTION_SETTLE_MS)
-            toolSuccess("build start requested\n\n${formatBuildProgress(state.backend.build.buildState.value)}")
+            toolSuccess("已请求开始构建\n\n${formatBuildProgress(state.backend.build.buildState.value)}")
         }
         "stop_build" -> {
             state.consoleOpen = true
             state.backend.build.stopBuild()
             delay(BUILD_ACTION_SETTLE_MS)
-            toolSuccess("build stop requested\n\n${formatBuildProgress(state.backend.build.buildState.value)}")
+            toolSuccess("已请求停止构建\n\n${formatBuildProgress(state.backend.build.buildState.value)}")
         }
         "list_build_tasks" -> {
             toolSuccess(formatRunTasks(state.backend.build.runTasks()))
         }
         "run_build_task" -> {
-            val id = call.stringArguments["id"] ?: return toolFailure("missing id")
+            val id = call.stringArguments["id"] ?: return toolFailure("缺少 id")
             val tasks = state.backend.build.runTasks()
-            val task = tasks.firstOrNull { it.id == id } ?: return toolFailure("unknown build task: $id")
+            val task = tasks.firstOrNull { it.id == id } ?: return toolFailure("未知构建任务：$id")
             state.consoleOpen = true
             state.backend.build.runTask(task.id)
             delay(BUILD_ACTION_SETTLE_MS)
-            toolSuccess("build task `${task.label}` requested\n\n${formatBuildProgress(state.backend.build.buildState.value)}")
+            toolSuccess("已请求构建任务 `${task.label}`\n\n${formatBuildProgress(state.backend.build.buildState.value)}")
         }
         "get_app_theme" -> {
             toolSuccess(formatAppTheme(state.backend.settings.settings()))
@@ -652,53 +652,53 @@ private suspend fun executeAgentToolUnchecked(state: IdeUiState, call: UiAgentTo
             val mode = call.stringArguments["themeMode"]?.takeIf { it.isNotBlank() }
             val accent = call.stringArguments["accent"]?.takeIf { it.isNotBlank() }
             applyAppThemeSettings(state, mode, accent)?.let { return toolFailure(it) }
-            toolSuccess("theme updated\n\n${formatAppTheme(state.backend.settings.settings())}")
+            toolSuccess("主题已更新\n\n${formatAppTheme(state.backend.settings.settings())}")
         }
         "toggle_app_theme" -> {
             val current = state.backend.settings.settings().themeMode
             val next = if (current == "dark") "light" else "dark"
             applyAppThemeSettings(state, next, null)?.let { return toolFailure(it) }
-            toolSuccess("theme toggled\n\n${formatAppTheme(state.backend.settings.settings())}")
+            toolSuccess("主题已切换\n\n${formatAppTheme(state.backend.settings.settings())}")
         }
         "get_ide_logs" -> {
             val logs = state.backend.diagnostics.recentLogs().takeLast(160)
-            if (logs.isEmpty()) toolSuccess("no IDE logs")
+            if (logs.isEmpty()) toolSuccess("没有 IDE 日志")
             else toolSuccess(logs.joinToString("\n") { "${it.timeLabel} ${it.level}/${it.tag}: ${it.message}" })
         }
         "apply_patch" -> {
-            val patch = call.stringArguments["patch"] ?: return toolFailure("missing patch")
-            val file = active ?: return toolFailure("no current file")
+            val patch = call.stringArguments["patch"] ?: return toolFailure("缺少 patch")
+            val file = active ?: return toolFailure("没有当前文件")
             val result = applyAgentPatch(file.path, file.text, patch)
             if (!result.ok) return toolFailure(result.message)
             if (result.text == file.text) {
-                return toolSuccess("patch applied to ${file.path}: ${result.message}")
+                return toolSuccess("patch 已应用到 ${file.path}: ${result.message}")
             }
             val session = file.session
             session.replaceRange(0, session.doc.length, result.text, TextRange(result.text.length))
-            toolSuccess("applied patch to ${file.path}: ${result.message}")
+            toolSuccess("已应用 patch 到 ${file.path}: ${result.message}")
         }
         "open_compose_preview" -> {
-            val file = active ?: return toolFailure("no current file")
-            val host = state.composePreviewHost ?: return toolFailure("Compose preview is not available")
+            val file = active ?: return toolFailure("没有当前文件")
+            val host = state.composePreviewHost ?: return toolFailure("Compose 预览不可用")
             val previews = state.backend.preview.composePreviews(file.path, file.text)
             val target = selectComposePreview(previews, call.stringArguments["previewName"], file.previewTarget)
-                ?: return toolFailure("no Compose @Preview found in ${file.path}")
+                ?: return toolFailure("${file.path} 中没有找到 Compose @Preview")
             val visible = openComposePreviewUi(host, file, target, call.stringArguments["mode"] ?: "preview")
             val label = target.label.ifBlank { target.functionName }
             if (!visible) {
-                return toolFailure("opened Compose preview `$label`, but it did not become visible before timeout")
+                return toolFailure("已打开 Compose 预览 `$label`，但超时前未显示")
             }
-            toolSuccess("opened Compose preview `$label` in ${file.viewMode.name.lowercase()} mode")
+            toolSuccess("已在 ${file.viewMode.name.lowercase()} 模式打开 Compose 预览 `$label`")
         }
         "capture_compose_preview" -> {
-            val file = active ?: return toolFailure("no current file")
-            val host = state.composePreviewHost ?: return toolFailure("Compose preview capture is not available")
+            val file = active ?: return toolFailure("没有当前文件")
+            val host = state.composePreviewHost ?: return toolFailure("Compose 预览截图不可用")
             val previews = state.backend.preview.composePreviews(file.path, file.text)
             val target = selectComposePreview(previews, call.stringArguments["previewName"], file.previewTarget)
-                ?: return toolFailure("no Compose @Preview found in ${file.path}")
+                ?: return toolFailure("${file.path} 中没有找到 Compose @Preview")
             if (!openComposePreviewUi(host, file, target, call.stringArguments["mode"])) {
                 val label = target.label.ifBlank { target.functionName }
-                return toolFailure("opened Compose preview `$label`, but it did not become visible before timeout")
+                return toolFailure("已打开 Compose 预览 `$label`，但超时前未显示")
             }
             val dark = call.stringArguments["dark"]?.equals("true", ignoreCase = true) ?: (target.config.nightMode == true)
             val capture = host.capturePreview(file.path, target, file.text, dark)
@@ -706,7 +706,7 @@ private suspend fun executeAgentToolUnchecked(state: IdeUiState, call: UiAgentTo
                 return toolFailure(capture.message)
             }
             val label = target.label.ifBlank { target.functionName }
-            val text = "Captured Compose preview `$label` (${capture.widthPx}x${capture.heightPx}px)."
+            val text = "已截取 Compose 预览 `$label` (${capture.widthPx}x${capture.heightPx}px)。"
             toolSuccess(
                 text,
                 listOf(
@@ -715,7 +715,7 @@ private suspend fun executeAgentToolUnchecked(state: IdeUiState, call: UiAgentTo
                 )
             )
         }
-        else -> toolFailure("unknown tool: ${call.name}")
+        else -> toolFailure("未知工具：${call.name}")
     }
 }
 
@@ -765,14 +765,14 @@ private fun applyAgentPatch(currentPath: String, currentText: String, patch: Str
     parsed.hunks.forEachIndexed { index, hunk ->
         val match = findPatchMatch(text, hunk.oldText, searchFrom)
             ?: findPatchMatch(text, hunk.oldText, 0)
-            ?: return AgentPatchResult(false, currentText, "hunk ${index + 1} did not match current file")
+            ?: return AgentPatchResult(false, currentText, "第 ${index + 1} 个 hunk 与当前文件不匹配")
         text = text.replaceRange(match.first, match.last + 1, hunk.newText)
         searchFrom = match.first + hunk.newText.length
         applied++
     }
-    if (applied == 0) return AgentPatchResult(false, currentText, "patch contained no hunks")
-    if (text == currentText) return AgentPatchResult(true, text, "no text changed")
-    return AgentPatchResult(true, text, "$applied hunk(s)")
+    if (applied == 0) return AgentPatchResult(false, currentText, "patch 不包含 hunk")
+    if (text == currentText) return AgentPatchResult(true, text, "文本没有变化")
+    return AgentPatchResult(true, text, "已应用 $applied 个 hunk")
 }
 
 private fun parseAgentPatch(currentPath: String, patch: String): AgentPatchParseResult {
@@ -788,7 +788,7 @@ private fun parseAgentPatch(currentPath: String, patch: String): AgentPatchParse
     fun flushHunk(): AgentPatchResult? {
         if (!hunkStarted) return null
         if (oldText.isEmpty() && newText.isEmpty()) {
-            return AgentPatchResult(false, "", "empty hunk")
+            return AgentPatchResult(false, "", "空 hunk")
         }
         hunks += AgentPatchHunk(oldText.toString(), newText.toString())
         oldText.clear()
@@ -829,7 +829,7 @@ private fun parseAgentPatch(currentPath: String, patch: String): AgentPatchParse
                     }
                     '-' -> oldText.append(line.drop(1)).append('\n')
                     '+' -> newText.append(line.drop(1)).append('\n')
-                    else -> return AgentPatchParseResult(false, message = "invalid hunk line: $line")
+                    else -> return AgentPatchParseResult(false, message = "无效 hunk 行：$line")
                 }
             }
             inPatch && inCurrentFile && hunkStarted && line.isEmpty() -> {
@@ -839,8 +839,8 @@ private fun parseAgentPatch(currentPath: String, patch: String): AgentPatchParse
         }
     }
     flushHunk()?.let { return AgentPatchParseResult(false, message = it.message) }
-    if (!sawTargetFile) return AgentPatchParseResult(false, message = "patch does not target current file")
-    if (hunks.isEmpty()) return AgentPatchParseResult(false, message = "patch contained no hunks")
+    if (!sawTargetFile) return AgentPatchParseResult(false, message = "patch 未指向当前文件")
+    if (hunks.isEmpty()) return AgentPatchParseResult(false, message = "patch 不包含 hunk")
     return AgentPatchParseResult(true, hunks)
 }
 
@@ -885,23 +885,23 @@ private fun appendDiagnostics(out: StringBuilder, diagnostics: List<UiDiagnostic
 private fun formatBuildProgress(state: BuildState): String = buildString {
     val errors = state.diagnostics.count { it.severity == UiSeverity.Error }
     val warnings = state.diagnostics.count { it.severity == UiSeverity.Warning }
-    append("status: ").append(state.status.name).append('\n')
+    append("状态: ").append(state.status.name).append('\n')
     if (state.moduleName.isNotBlank()) {
-        append("module: ").append(state.moduleName).append('\n')
+        append("模块: ").append(state.moduleName).append('\n')
     }
-    append("elapsedMs: ").append(state.elapsedMs).append('\n')
-    append("steps: ").append(state.steps.count { it.status != StepStatus.Pending })
+    append("耗时 ms: ").append(state.elapsedMs).append('\n')
+    append("步骤: ").append(state.steps.count { it.status != StepStatus.Pending })
         .append('/').append(state.steps.size).append('\n')
-    append("diagnostics: ").append(errors).append(" error(s), ").append(warnings).append(" warning(s)\n")
-    state.banner?.let { append("banner: ").append(it).append('\n') }
+    append("诊断: ").append(errors).append(" 个错误，").append(warnings).append(" 个警告\n")
+    state.banner?.let { append("横幅: ").append(it).append('\n') }
     if (state.steps.isNotEmpty()) {
-        append('\n').append("## Steps\n")
+        append('\n').append("## 步骤\n")
         state.steps.takeLast(40).forEach { step ->
             append("- ").append(step.status.name).append(' ').append(step.name).append('\n')
         }
     }
     if (state.diagnostics.isNotEmpty()) {
-        append('\n').append("## Diagnostics\n")
+        append('\n').append("## 诊断\n")
         state.diagnostics.takeLast(20).forEach { d ->
             append("- ").append(d.severity).append(' ')
             d.file?.let {
@@ -914,7 +914,7 @@ private fun formatBuildProgress(state: BuildState): String = buildString {
         }
     }
     if (state.log.isNotEmpty()) {
-        append('\n').append("## Recent log\n")
+        append('\n').append("## 最近日志\n")
         state.log.takeLast(40).forEach { line ->
             if (line.timeLabel.isNotBlank()) append(line.timeLabel).append(' ')
             append(line.level).append(": ").append(line.message).append('\n')
@@ -923,28 +923,28 @@ private fun formatBuildProgress(state: BuildState): String = buildString {
 }
 
 private fun formatRunTasks(tasks: List<RunTaskOption>): String {
-    if (tasks.isEmpty()) return "no build tasks"
+    if (tasks.isEmpty()) return "没有构建任务"
     return buildString {
         tasks.forEach { task ->
             append("- id: ").append(task.id)
-            append("\n  label: ").append(task.label)
-            if (task.group.isNotBlank()) append("\n  group: ").append(task.group)
+            append("\n  标签: ").append(task.label)
+            if (task.group.isNotBlank()) append("\n  分组: ").append(task.group)
             append('\n')
         }
     }
 }
 
 private fun formatAppTheme(settings: UiSettings): String = buildString {
-    append("themeMode: ").append(settings.themeMode).append('\n')
-    append("accent: ").append(themeAccentValue(settings.accent)).append('\n')
+    append("主题模式: ").append(settings.themeMode).append('\n')
+    append("强调色: ").append(themeAccentValue(settings.accent)).append('\n')
 }
 
 private fun applyAppThemeSettings(state: IdeUiState, themeMode: String?, accent: String?): String? {
     val mode = themeMode?.lowercase()
     val accentValue = accent?.lowercase()
-    if (mode == null && accentValue == null) return "missing themeMode or accent"
-    if (mode != null && mode !in THEME_MODES) return "invalid themeMode: $themeMode"
-    if (accentValue != null && accentValue !in THEME_ACCENTS) return "invalid accent: $accent"
+    if (mode == null && accentValue == null) return "缺少 themeMode 或 accent"
+    if (mode != null && mode !in THEME_MODES) return "无效 themeMode：$themeMode"
+    if (accentValue != null && accentValue !in THEME_ACCENTS) return "无效 accent：$accent"
     mode?.let { state.backend.settings.setSetting("appearance", "themeMode", it) }
     accentValue?.let { state.backend.settings.setSetting("appearance", "accent", it) }
     state.notifySettingsChanged()

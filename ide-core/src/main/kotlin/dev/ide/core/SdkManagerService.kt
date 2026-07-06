@@ -140,7 +140,7 @@ class SdkManagerService(
     fun cancelSdkDownload(id: String) {
         if (jobs.containsKey(id)) {
             cancelled.add(id)
-            update(id) { it.copy(detail = "Cancelling…") }
+            update(id) { it.copy(detail = "正在取消…") }
         }
     }
 
@@ -170,7 +170,7 @@ class SdkManagerService(
         val platform = sdk.androidJar.parent?.fileName?.toString() ?: return "无法确定平台。"
         if (AndroidSdk.platformSourcesDir(sdkRoot, platform) != null) return "$platform 的源码已安装。"
         val sdkmanager = findSdkmanager(sdkRoot)
-            ?: return "未找到 sdkmanager——请通过 Android Studio 的 SDK Manager 安装源码（SDK Platforms → Sources for Android $platform）。"
+            ?: return "未找到 sdkmanager——请通过 Android Studio 的 SDK 管理器安装源码（SDK 平台 → Android $platform 源码）。"
         return runCatching {
             val proc = ProcessBuilder(sdkmanager.toString(), "sources;$platform")
                 .directory(sdkRoot.toFile()).redirectErrorStream(true).start()
@@ -181,7 +181,7 @@ class SdkManagerService(
             }
             if (proc.exitValue() == 0) {
                 notifyChanged() // pick up the freshly-installed sources (active engine re-attaches + reindexes)
-                "Installed sources for $platform."
+                "已安装 $platform 源码。"
             } else "sdkmanager 安装 $platform 源码失败（退出码 ${proc.exitValue()}）。"
         }.getOrElse { "无法运行 sdkmanager：${it.message}" }
     }
@@ -215,7 +215,7 @@ class SdkManagerService(
     /** Run [work] (returns null on success, else an error message) as a background download tracked under [id]. */
     private fun launchDownload(id: String, label: String, work: suspend () -> String?) {
         cancelled.remove(id)
-        update(id) { it.copy(label = label, status = "DOWNLOADING", fraction = -1.0, detail = "Starting…") }
+        update(id) { it.copy(label = label, status = "DOWNLOADING", fraction = -1.0, detail = "正在开始…") }
         val job = scope.launch {
             val err = try {
                 work()
@@ -225,8 +225,8 @@ class SdkManagerService(
                 "下载失败：${e.message}"
             }
             when {
-                id in cancelled -> finish(id, "FAILED", "Cancelled")
-                err == null -> { finish(id, "DONE", "Installed"); notifyChanged() }
+                id in cancelled -> finish(id, "FAILED", "已取消")
+                err == null -> { finish(id, "DONE", "已安装"); notifyChanged() }
                 else -> finish(id, "FAILED", err)
             }
         }
@@ -273,8 +273,8 @@ class SdkManagerService(
 private fun UiSdkManagerState.withAggregate(): UiSdkManagerState {
     val active = downloads.filter { it.status != "DONE" && it.status != "FAILED" }
     if (active.isEmpty()) return copy(busy = false, message = "", fraction = -1.0)
-    val message = if (active.size == 1) "${active[0].status.lowercase().replaceFirstChar { it.uppercase() }} ${active[0].label}…"
-                  else "${active.size} downloads in progress"
+    val message = if (active.size == 1) "正在下载 ${active[0].label}…"
+                  else "${active.size} 个下载正在进行"
     val fraction = if (active.size == 1) active[0].fraction else -1.0
     return copy(busy = true, message = message, fraction = fraction)
 }

@@ -163,10 +163,10 @@ fun DiagnosticSheet(
         UiSeverity.Info, UiSeverity.Hint -> CaIcons.info
     }
     val label = when (severity) {
-        UiSeverity.Error -> "Error"
-        UiSeverity.Warning -> if (unused) "Unused" else "Warning"
-        UiSeverity.Info -> "Info"
-        UiSeverity.Hint -> "Hint"
+        UiSeverity.Error -> "错误"
+        UiSeverity.Warning -> if (unused) "未使用" else "警告"
+        UiSeverity.Info -> "信息"
+        UiSeverity.Hint -> "提示"
     }
     val sheetShape = RoundedCornerShape(topStart = Ca.radius.sheet, topEnd = Ca.radius.sheet)
     // scrim over the editor pane (tap to dismiss); panel docked at the bottom for thumb reach

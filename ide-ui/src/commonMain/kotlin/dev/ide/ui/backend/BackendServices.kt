@@ -48,7 +48,7 @@ interface FileService {
 
     /** Rename a file/dir in place to [newName] (for a Java public type, renames the type + references). */
     suspend fun renamePath(path: String, newName: String): UiRenameResult =
-        UiRenameResult(false, "Rename is not supported by this backend")
+        UiRenameResult(false, "当前后端不支持重命名")
 
     /** Move a file/dir into [destDir]; returns the new path or null. Bumps [fileSystemEpoch]. */
     fun movePath(path: String, destDir: String): String? = null
@@ -120,7 +120,7 @@ interface EditorService {
 
     /** Rename the symbol under [offset] to [newName] project-wide. Bumps [FileService.fileSystemEpoch]. */
     suspend fun rename(path: String, text: String, offset: Int, newName: String): UiRenameResult =
-        UiRenameResult(false, "Rename is not supported by this backend")
+        UiRenameResult(false, "当前后端不支持重命名")
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +161,7 @@ interface PreviewService {
 
     /** Run the `@Preview` composable [functionName] through the on-device interpreter. */
     suspend fun runComposePreview(path: String, text: String, functionName: String): UiPreviewResult =
-        UiPreviewResult(ok = false, message = "Compose preview is not available")
+        UiPreviewResult(ok = false, message = "Compose 预览不可用")
 }
 
 /** A stage of the real-view layout-render pipeline, shown in the floating status chip. [stage] is a short
@@ -263,40 +263,40 @@ interface DependencyService {
     /** Resolve and add [coordinate] to [moduleName] at [scope], bundling its transitive closure.
      *  [variant] scopes the declaration to a build variant (e.g. `debug` → `debugImplementation`); null = shared. */
     suspend fun addDependency(moduleName: String, coordinate: String, scope: String, exclusions: List<String> = emptyList(), variant: String? = null): UiAddResult =
-        UiAddResult(false, "Dependency management not supported by this backend")
+        UiAddResult(false, "当前后端不支持依赖管理")
 
     /** Import a Maven BOM as a platform of [moduleName] (Gradle `platform(...)`); [variant] scopes it to a build variant. */
     suspend fun addPlatform(moduleName: String, coordinate: String, variant: String? = null): UiAddResult =
-        UiAddResult(false, "Dependency management not supported by this backend")
+        UiAddResult(false, "当前后端不支持依赖管理")
 
     /** One-click Firebase setup (BoM + [artifacts]). */
     suspend fun addFirebase(moduleName: String, artifacts: List<String> = listOf("firebase-analytics")): UiAddResult =
-        UiAddResult(false, "Dependency management not supported by this backend")
+        UiAddResult(false, "当前后端不支持依赖管理")
 
     /** One-click Google Play Services: add each fully-qualified [coordinates] entry. */
     suspend fun addGooglePlayServices(moduleName: String, coordinates: List<String>): UiAddResult =
-        UiAddResult(false, "Dependency management not supported by this backend")
+        UiAddResult(false, "当前后端不支持依赖管理")
 
     /** Remove the declared dependency or platform [coordinate] from [moduleName]. */
     fun removeDependency(moduleName: String, coordinate: String): Boolean = false
 
     /** Replace the transitive exclusions on a declared library [coordinate], then re-resolve. */
     suspend fun setDependencyExclusions(moduleName: String, coordinate: String, exclusions: List<String>): UiAddResult =
-        UiAddResult(false, "Dependency management not supported by this backend")
+        UiAddResult(false, "当前后端不支持依赖管理")
 
     /** Published versions of the declared library [coordinate]'s artifact, newest-first (the version picker). */
     suspend fun availableVersions(moduleName: String, coordinate: String): List<String> = emptyList()
 
     /** Update a declared library [coordinate] — change its version/scope/exclusions in one re-resolve. */
     suspend fun updateDependency(moduleName: String, coordinate: String, version: String, scope: String, exclusions: List<String>): UiAddResult =
-        UiAddResult(false, "Dependency management not supported by this backend")
+        UiAddResult(false, "当前后端不支持依赖管理")
 
     /** Other modules [moduleName] may depend on (no self/cycle/duplicate). */
     fun moduleDependencyTargets(moduleName: String): List<String> = emptyList()
 
     /** Add a module-on-module dependency from [moduleName] onto [targetModule] at [scope]; [variant] scopes it. */
     suspend fun addModuleDependency(moduleName: String, targetModule: String, scope: String, variant: String? = null): UiAddResult =
-        UiAddResult(false, "Dependency management not supported by this backend")
+        UiAddResult(false, "当前后端不支持依赖管理")
 
     /** The directory a picked local library should be copied into, or null. */
     fun localLibraryDropDir(moduleName: String): String? = null
@@ -306,7 +306,7 @@ interface DependencyService {
 
     /** Attach the local library at [path] to [moduleName] at [scope]. */
     suspend fun addLocalLibrary(moduleName: String, path: String, scope: String): UiAddResult =
-        UiAddResult(false, "Dependency management not supported by this backend")
+        UiAddResult(false, "当前后端不支持依赖管理")
 
     /** The Maven repositories libraries resolve from. */
     fun repositories(): List<UiRepository> = emptyList()
@@ -344,7 +344,7 @@ interface ModuleService {
 
     /** Persist [edit] to [moduleName] (language level + facet values) through a model transaction. */
     suspend fun updateModuleConfig(moduleName: String, edit: UiModuleConfigEdit): UiConfigResult =
-        UiConfigResult(false, "Module configuration not supported by this backend")
+        UiConfigResult(false, "当前后端不支持模块配置")
 
     /** The Android `buildFeatures` toggles for [moduleName], or null when it is not an Android module. */
     suspend fun getBuildFeatures(moduleName: String): UiBuildFeatures? = null
@@ -354,7 +354,7 @@ interface ModuleService {
      * Enabling a feature also adds the dependencies it needs (the ViewBinding/Compose runtime), like AGP.
      */
     suspend fun setBuildFeature(moduleName: String, feature: String, enabled: Boolean): UiConfigResult =
-        UiConfigResult(false, "Build features not supported by this backend")
+        UiConfigResult(false, "当前后端不支持构建特性")
 
     /** For an Android module, the referenced-but-missing module-relative keep-rule files. */
     suspend fun missingProguardFiles(moduleName: String): List<UiMissingProguardFile> = emptyList()
@@ -367,7 +367,7 @@ interface ModuleService {
 
     /** Create a new module [name] of [typeId] with [languageLevel] and [facetValues]. */
     suspend fun createModule(name: String, typeId: String, languageLevel: String?, facetValues: Map<String, Map<String, Any?>>): UiConfigResult =
-        UiConfigResult(false, "Module management not supported by this backend")
+        UiConfigResult(false, "当前后端不支持模块管理")
 
     /** Remove the module [name] from the project model (its files are left on disk). */
     fun removeModule(name: String): Boolean = false
@@ -387,15 +387,15 @@ interface SigningService {
     suspend fun keystores(): List<UiKeystore> = emptyList()
 
     /** Generate a new keystore (keypair + self-signed cert) and register it. */
-    suspend fun createKeystore(spec: UiKeystoreSpec): UiKeystoreResult = UiKeystoreResult(false, "Not supported by this backend")
+    suspend fun createKeystore(spec: UiKeystoreSpec): UiKeystoreResult = UiKeystoreResult(false, "当前后端不支持此操作")
 
     /** Import the keystore at [filePath] after verifying [storePass]; register it under [name]. */
     suspend fun importKeystore(filePath: String, name: String, storePass: String, keyAlias: String, keyPass: String): UiKeystoreResult =
-        UiKeystoreResult(false, "Not supported by this backend")
+        UiKeystoreResult(false, "当前后端不支持此操作")
 
     /** Open [filePath] with [storePass] and report its aliases + certs, or the error. */
     suspend fun validateKeystore(filePath: String, storePass: String): UiKeystoreValidation =
-        UiKeystoreValidation(false, emptyList(), emptyList(), "Not supported by this backend")
+        UiKeystoreValidation(false, emptyList(), emptyList(), "当前后端不支持此操作")
 
     /** Remove keystore [id] from the registry (and delete its file). */
     fun deleteKeystore(id: String): Boolean = false
@@ -408,7 +408,7 @@ interface SigningService {
 
     /** Assign [keystoreId] (null ⇒ the default debug keystore) to sign [moduleName]'s [buildType]. */
     suspend fun assignSigning(moduleName: String, buildType: String, keystoreId: String?): UiConfigResult =
-        UiConfigResult(false, "Not supported by this backend")
+        UiConfigResult(false, "当前后端不支持此操作")
 }
 
 // ---------------------------------------------------------------------------
@@ -438,7 +438,7 @@ interface ProjectService {
 
     /** Create a new project from [templateId] with [args]; becomes active (bumps [projectEpoch]). */
     suspend fun createProject(templateId: String, args: Map<String, String>): UiProjectResult =
-        UiProjectResult(false, "Project creation not supported by this backend")
+        UiProjectResult(false, "当前后端不支持创建项目")
 
     /** Open the existing project rooted at [rootPath]; becomes active (bumps [projectEpoch]). */
     suspend fun openProject(rootPath: String): Boolean = false
@@ -485,7 +485,7 @@ interface StoreService {
      * ready-made project. A successful create/install bumps [ProjectService.projectEpoch].
      */
     suspend fun install(id: String, args: Map<String, String> = emptyMap()): UiStoreInstallResult =
-        UiStoreInstallResult(false, "The Projects Store is not available in this build")
+        UiStoreInstallResult(false, "此构建中不可用项目商店")
 
     companion object {
         /** A store that advertises nothing — the default for backends that wire no catalog. */
@@ -506,7 +506,7 @@ interface SdkService {
     suspend fun sdkPackages(): List<UiSdkPackage> = emptyList()
 
     /** Start downloading one Android package by id; returns immediately. */
-    suspend fun installSdkPackage(path: String): String = "Not supported."
+    suspend fun installSdkPackage(path: String): String = "不支持此操作。"
 
     /** Cancel an in-flight SDK/JDK download by id. */
     fun cancelSdkDownload(id: String) {}
@@ -518,13 +518,13 @@ interface SdkService {
     fun jdkInfo(): UiJdkInfo? = null
 
     /** Start downloading a JDK [feature] for its sources; desktop only. */
-    suspend fun downloadJdkSources(feature: Int): String = "Not supported."
+    suspend fun downloadJdkSources(feature: Int): String = "不支持此操作。"
 
     /** Android platform-sources status, or null when there's no Android SDK. */
     fun androidSourcesInfo(): UiAndroidSourcesInfo? = null
 
     /** Download the Android platform sources; returns a status message. */
-    suspend fun downloadAndroidSources(): String = "Not supported."
+    suspend fun downloadAndroidSources(): String = "不支持此操作。"
 }
 
 // ---------------------------------------------------------------------------
@@ -677,7 +677,7 @@ interface AgentService {
         onTextDelta: (String) -> Unit = {},
         onStreamChars: (Int) -> Unit = {},
     ): UiAgentResponse =
-        UiAgentResponse("AI Agent transport is not available in this backend.")
+        UiAgentResponse("当前后端没有可用的 AI Agent 传输。")
 
     fun loadConversationStore(): UiAgentConversationStore = UiAgentConversationStore()
 

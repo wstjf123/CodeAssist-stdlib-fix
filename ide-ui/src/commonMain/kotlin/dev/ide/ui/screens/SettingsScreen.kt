@@ -60,6 +60,7 @@ import dev.ide.ui.components.SettingsSliderRow
 import dev.ide.ui.components.SettingsTextRow
 import dev.ide.ui.components.SettingsToggleRow
 import dev.ide.ui.icons.CaIcons
+import dev.ide.ui.platform.PlatformBackHandler
 import dev.ide.ui.theme.Ca
 import dev.ide.ui.theme.Motion
 import kotlinx.coroutines.delay
@@ -126,7 +127,7 @@ fun SettingsScreen(
     val onAction: (String, UiSettingControl.Action) -> Unit = { pageId, action ->
         when (action.key) {
             ACTION_VIEW_LOGS -> onOpenLogs()
-            ACTION_BACKUP -> scope.launch { backend.projects.backupProjects()?.let { fileActions.share(it) }; toast = "Backup ready" }
+            ACTION_BACKUP -> scope.launch { backend.projects.backupProjects()?.let { fileActions.share(it) }; toast = "备份已准备好" }
             else -> scope.launch { backend.settings.invokeSettingAction(pageId, action.key)?.let { toast = it } }
         }
     }
@@ -199,6 +200,7 @@ private fun NarrowLayout(
 ) {
     var openId by remember { mutableStateOf<String?>(null) }
     val open = openId?.let { id -> pages.firstOrNull { it.id == id } }
+    PlatformBackHandler(enabled = open != null) { openId = null }
     if (open == null) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             items(pages, key = { it.id }) { page ->

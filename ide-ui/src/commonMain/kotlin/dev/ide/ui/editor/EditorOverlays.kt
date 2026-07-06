@@ -278,18 +278,18 @@ internal fun SelectionToolbar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (hasSelection) {
-            ToolbarAction("Copy", onCopy)
-            ToolbarAction("Cut", onCut)
+            ToolbarAction("复制", onCopy)
+            ToolbarAction("剪切", onCut)
         }
-        ToolbarAction("Paste", onPaste)
-        ToolbarAction("Select all", onSelectAll)
+        ToolbarAction("粘贴", onPaste)
+        ToolbarAction("全选", onSelectAll)
         // Quick documentation for the symbol under the caret (the touch path for Ctrl-Q).
         if (onDocs != null) {
             Box(
                 Modifier.clickable(onClick = onDocs).padding(horizontal = 9.dp, vertical = 6.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(CaIcons.info, "Quick documentation", Modifier.size(16.dp), tint = Ca.colors.textSecondary)
+                Icon(CaIcons.info, "快速文档", Modifier.size(16.dp), tint = Ca.colors.textSecondary)
             }
         }
         // Quick-fixes / intentions for the caret position, when any exist.

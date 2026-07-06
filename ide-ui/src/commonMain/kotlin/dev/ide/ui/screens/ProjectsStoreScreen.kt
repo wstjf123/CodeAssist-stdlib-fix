@@ -144,7 +144,7 @@ private fun StoreHeader(onOpenHub: (() -> Unit)?) {
         Column(Modifier.weight(1f)) {
             Text("商店", color = Ca.colors.textPrimary, style = Ca.type.large, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                "Templates and sample projects to start from",
+                "用于快速开始的模板和示例项目",
                 color = Ca.colors.textSecondary, style = Ca.type.subhead,
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
@@ -358,7 +358,7 @@ private fun EmptySectionCard() {
         Column(Modifier.weight(1f)) {
             Text("即将推出", color = Ca.colors.textPrimary, style = Ca.type.subhead, fontWeight = FontWeight.SemiBold)
             Text(
-                "Community projects will land here once submissions open.",
+                "开放提交后，社区项目会显示在这里。",
                 color = Ca.colors.textSecondary, style = Ca.type.footnote,
             )
         }
@@ -458,14 +458,14 @@ private fun StoreDetailSheet(
             when {
                 item.kind == UiStoreItemKind.Template && templateId != null ->
                     PrimaryButton(
-                        "Use this template",
+                        "使用此模板",
                         onClick = { onCreateFromTemplate(templateId) },
                         icon = CaIcons.plus,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 item.available ->
                     PrimaryButton(
-                        if (busy) "Installing…" else "Get",
+                        if (busy) "正在安装…" else "获取",
                         onClick = {
                             if (!busy) {
                                 busy = true
@@ -520,7 +520,7 @@ private fun StoreGlyph(
 }
 
 private fun kindLabel(item: UiStoreItem): String = when (item.kind) {
-    UiStoreItemKind.Template -> "Template"
-    UiStoreItemKind.Sample -> "Sample"
+    UiStoreItemKind.Template -> "模板"
+    UiStoreItemKind.Sample -> "示例"
     UiStoreItemKind.Community -> "社区"
 }

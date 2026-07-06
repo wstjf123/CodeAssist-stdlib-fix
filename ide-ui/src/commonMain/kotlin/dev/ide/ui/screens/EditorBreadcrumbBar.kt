@@ -97,24 +97,24 @@ private fun ViewModeToggle(
     ) {
         SegmentItem(
             CaIcons.code,
-            "Code",
+            "代码",
             mode == EditorViewMode.Text
         ) {
             onSelect(EditorViewMode.Text)
         }
-        SegmentItem(CaIcons.layers, "Blocks", mode == EditorViewMode.Blocks) {
+        SegmentItem(CaIcons.layers, "块", mode == EditorViewMode.Blocks) {
             onSelect(
                 EditorViewMode.Blocks
             )
         }
         if (canPreview) {
-            SegmentItem(CaIcons.image, "Preview", mode == EditorViewMode.Preview) {
+            SegmentItem(CaIcons.image, "预览", mode == EditorViewMode.Preview) {
                 onSelect(
                     EditorViewMode.Preview
                 )
             }
             // Split = code + preview together, so you can edit and watch it update (the phone-friendly path).
-            SegmentItem(CaIcons.split, "Split", mode == EditorViewMode.Split) {
+            SegmentItem(CaIcons.split, "分割", mode == EditorViewMode.Split) {
                 onSelect(
                     EditorViewMode.Split
                 )

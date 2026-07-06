@@ -62,16 +62,16 @@ fun LearnScreen(
 
             var i = 0
             if (onOpenDocs != null) {
-                LearnCard(CaIcons.docText, "Documentation", "Architecture, build, and language guides.", delayMillis = i++ * 50, onClick = onOpenDocs)
+                LearnCard(CaIcons.docText, "文档", "架构、构建和语言指南。", delayMillis = i++ * 50, onClick = onOpenDocs)
             }
             if (onBrowseSamples != null) {
-                LearnCard(CaIcons.grid, "Browse samples", "Open the store's sample projects to read and run.", delayMillis = i++ * 50, onClick = onBrowseSamples)
+                LearnCard(CaIcons.grid, "浏览示例", "打开项目商店中的示例项目，阅读并运行。", delayMillis = i++ * 50, onClick = onBrowseSamples)
             }
             if (onJoinDiscord != null) {
-                LearnCard(CaIcons.discord, "Join the community", "Ask questions and share what you build.", delayMillis = i++ * 50, accent = DiscordBlurple, onClick = onJoinDiscord)
+                LearnCard(CaIcons.discord, "加入社区", "提问并分享你的作品。", delayMillis = i++ * 50, accent = DiscordBlurple, onClick = onJoinDiscord)
             }
             // The in-app, interactive tutorials are not built yet; surface the destination without a fake link.
-            SoonCard(CaIcons.lightbulb, "Interactive tutorials", "Step-by-step lessons inside the editor.")
+            SoonCard(CaIcons.lightbulb, "交互式教程", "编辑器内的分步课程。")
         }
     }
 }

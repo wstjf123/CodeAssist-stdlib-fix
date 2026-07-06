@@ -59,7 +59,7 @@ class JdkManager(private val platformDir: Path, private val fetcher: SdkNetFetch
             val dest = platformDir.resolve("jdk-src.zip")
             // Pull just lib/src.zip straight out of the archive (no whole-JDK unpack, no external `tar`).
             val found = if (ext == "zip") extractSrcZipFromZip(archive, dest) else extractSrcZipFromTarGz(archive, dest)
-            return if (found) null else "Downloaded JDK has no src.zip."
+            return if (found) null else "下载的 JDK 中没有 src.zip。"
         } catch (e: Exception) {
             return "JDK 下载失败：${e.message}"
         } finally {

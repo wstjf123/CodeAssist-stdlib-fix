@@ -141,15 +141,15 @@ internal class ModuleService(private val ctx: EngineContext) {
             listOf(
                 UiBuildFeature(
                     "viewBinding", "View Binding",
-                    "Generate a type-safe binding class for each layout — a field per view id, plus inflate()/bind(), no findViewById.",
+                    "为每个布局生成类型安全的绑定类：每个 view id 对应一个字段，并提供 inflate()/bind()，无需 findViewById。",
                     bf.viewBinding,
-                    note = "Adds the ViewBinding runtime and generates a <Layout>Binding for every layout.",
+                    note = "会添加 ViewBinding 运行时，并为每个布局生成 <Layout>Binding。",
                 ),
                 UiBuildFeature(
                     "compose", "Jetpack Compose",
-                    "Compile @Composable UI with the Compose compiler and render @Preview composables in the editor.",
+                    "使用 Compose 编译器编译 @Composable UI，并在编辑器中渲染 @Preview。",
                     bf.compose,
-                    note = "Adds the Compose compiler plugin and the Compose runtime + tooling dependencies.",
+                    note = "会添加 Compose 编译器插件、运行时和 tooling 依赖。",
                 ),
             ),
         )
@@ -170,7 +170,7 @@ internal class ModuleService(private val ctx: EngineContext) {
         )
         val facet = module.facets.get(AndroidFacet.KEY) ?: return UiConfigResult(
             false,
-            "'$moduleName' is not an Android module."
+            "'$moduleName' 不是 Android 模块。"
         )
         val project =
             ctx.projectOf(module) ?: return UiConfigResult(false, "没有项目拥有模块 '$moduleName'。")
@@ -201,14 +201,14 @@ internal class ModuleService(private val ctx: EngineContext) {
                 else -> emptyList()
             }
             val failures = ensureFeatureDependencies(moduleName, coords)
-            if (failures.isNotEmpty()) depNote = " (couldn't add: ${failures.joinToString(", ")})"
+            if (failures.isNotEmpty()) depNote = "（无法添加：${failures.joinToString(", ")}）"
         }
 
         ctx.invalidateAnalyzers()
         ctx.invalidateSyntheticClasses() // viewBinding on/off changes the synthetic binding classes
         ctx.resyncIndex()
-        val verb = if (enabled) "Enabled" else "Disabled"
-        return UiConfigResult(true, "$verb $feature on ${module.name}$depNote")
+        val verb = if (enabled) "已启用" else "已停用"
+        return UiConfigResult(true, "$verb ${featureLabel(feature)}（${module.name}）$depNote")
     }
 
     /** Add each of [coordinates] to [moduleName] unless a dependency on the same `group:name` already exists.
@@ -228,6 +228,12 @@ internal class ModuleService(private val ctx: EngineContext) {
             if (!r.success && !r.message.contains("already a dependency") && !r.message.contains("已是")) failures += coord
         }
         return failures
+    }
+
+    private fun featureLabel(feature: String): String = when (feature) {
+        "viewBinding" -> "View Binding"
+        "compose" -> "Jetpack Compose"
+        else -> feature
     }
 
     /** The directory `proguardFiles`/`consumerProguardFiles` entries resolve against (the module root,
@@ -328,7 +334,7 @@ internal class ModuleService(private val ctx: EngineContext) {
     ): UiConfigResult {
         val moduleName = name.trim()
         if (!isValidModuleName(moduleName)) return UiConfigResult(
-            false, "Invalid module name — start with a letter; use letters, digits, '-' or '_'."
+            false, "模块名称无效：必须以字母开头，只能使用字母、数字、'-' 或 '_'。"
         )
         if (ctx.modules().any { it.name == moduleName }) return UiConfigResult(
             false, "名为 '$moduleName' 的模块已存在。"
@@ -337,7 +343,7 @@ internal class ModuleService(private val ctx: EngineContext) {
             false, "未知模块类型 '$typeId'。"
         )
         val project = ctx.store.workspace.projects.firstOrNull() ?: return UiConfigResult(
-            false, "No project to add a module to."
+            false, "没有可添加模块的项目。"
         )
         val level = languageLevel?.let { runCatching { LanguageLevel.valueOf(it) }.getOrNull() }
         if (languageLevel != null && level == null) return UiConfigResult(

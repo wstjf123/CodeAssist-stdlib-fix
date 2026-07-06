@@ -109,6 +109,7 @@ internal fun EditorCenter(
                 canUndo = active?.session?.canUndo == true,
                 canRedo = active?.session?.canRedo == true,
                 onUndo = { active?.session?.undo() },
+                onUndoAll = { active?.session?.undoAll() },
                 onRedo = { active?.session?.redo() },
                 onFind = { if (active != null) findEpoch++ },
                 onReformat = { if (active != null) formatEpoch++ },
@@ -245,7 +246,7 @@ internal fun EditorCenter(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        "Open a file from the navigator",
+                        "从导航栏打开文件",
                         color = Ca.colors.textTertiary,
                         style = Ca.type.subhead
                     )

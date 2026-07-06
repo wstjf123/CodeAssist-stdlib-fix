@@ -281,7 +281,7 @@ fun PreviewProblemChip(issues: List<PreviewIssue>, modifier: Modifier) {
         GlassBar(Modifier) {
             PillButton({ open = !open }) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(if (hasError) CaIcons.error else CaIcons.warning, "Preview problems", Modifier.size(15.dp), tint = tint)
+                    Icon(if (hasError) CaIcons.error else CaIcons.warning, "预览问题", Modifier.size(15.dp), tint = tint)
                     Text(" ${issues.size}", color = tint, style = Ca.type.caption)
                 }
             }

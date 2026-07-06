@@ -220,7 +220,7 @@ fun ComposePreviewPane(
                 }) {
                     Icon(
                         if (live) CaIcons.stop else CaIcons.play,
-                        if (live) "Stop live preview" else "Resume live preview",
+                        if (live) "停止实时预览" else "恢复实时预览",
                         Modifier.size(15.dp),
                         tint = if (live) Ca.colors.textSecondary else Ca.colors.run,
                     )
@@ -279,7 +279,7 @@ fun ComposePreviewPane(
                 else -> {
                     LaunchedEffect(Unit) { problems = emptyList(); busy = false }
                     Text(
-                        if (current == null) "No @Preview found" else "Compose preview renders on device",
+                        if (current == null) "未找到 @Preview" else "Compose 预览在设备上渲染",
                         color = if (state.night) Color(0xFFA0A1AA) else Ca.colors.textTertiary,
                         style = Ca.type.caption,
                         textAlign = TextAlign.Center,

@@ -48,8 +48,8 @@ import kotlinx.coroutines.launch
 /** Which severities the Logs viewer shows. */
 private enum class LogFilter(val label: String, val keep: (String) -> Boolean) {
     All("全部", { true }),
-    Warnings("Warnings", { it == "WARN" || it == "ERROR" }),
-    Errors("Errors", { it == "ERROR" }),
+    Warnings("警告", { it == "WARN" || it == "ERROR" }),
+    Errors("错误", { it == "ERROR" }),
 }
 
 /**
@@ -145,7 +145,7 @@ fun LogsScreen(
         if (shown.isEmpty()) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Text(
-                    if (all.isEmpty()) "No logs yet." else "No logs match this filter.",
+                    if (all.isEmpty()) "还没有日志。" else "没有匹配此筛选条件的日志。",
                     color = Ca.colors.textTertiary,
                     style = Ca.type.footnote,
                 )

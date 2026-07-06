@@ -198,6 +198,7 @@ fun CodeAssistApp(
 
                 screen == Screen.Run || screen == Screen.ModuleConfig -> screen = Screen.Editor
 
+                screen == Screen.CreateProject && createTemplateId != null -> createTemplateId = null
                 screen == Screen.CreateProject -> screen = Screen.Projects
                 screen == Screen.Editor -> screen = Screen.Projects
                 // On the home screen, a Store/Learn tab steps back to the project picker before exiting.
@@ -281,9 +282,10 @@ fun CodeAssistApp(
 
                         Screen.CreateProject -> CreateProjectScreen(
                             backend = backend,
-                            onCancel = { screen = Screen.Projects },
-                            onCreated = { screen = Screen.Editor },
-                            initialTemplateId = createTemplateId,
+                            onCancel = { createTemplateId = null; screen = Screen.Projects },
+                            onCreated = { createTemplateId = null; screen = Screen.Editor },
+                            selectedTemplateId = createTemplateId,
+                            onSelectedTemplateChange = { createTemplateId = it },
                         )
 
                         Screen.Editor -> EditorScreen(

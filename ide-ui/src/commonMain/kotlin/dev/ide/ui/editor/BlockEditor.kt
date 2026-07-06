@@ -161,8 +161,8 @@ fun BlockEditor(
         Column(Modifier.fillMaxSize()) {
             val current = tree
             when {
-                current == null && failed -> Hint("This file can’t be projected to blocks yet.")
-                current == null -> Hint("Projecting blocks…")
+                current == null && failed -> Hint("此文件暂时无法投影为块。")
+                current == null -> Hint("正在投影为块…")
                 else -> Box(
                     Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())
                         .clickable(remember { MutableInteractionSource() }, null) { ctx.select(null) }

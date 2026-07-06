@@ -43,18 +43,18 @@ internal fun AndroidSourcesBanner(state: IdeUiState) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            status ?: "Android platform sources (${info?.platform}) aren't installed — needed for android.* parameter names & docs.",
+            status ?: "尚未安装 Android 平台源码（${info?.platform}），android.* 参数名和文档需要它。",
             color = Ca.colors.textSecondary, style = Ca.type.footnote, modifier = Modifier.weight(1f),
         )
         if (status == null) {
             Text(
-                if (busy) "Downloading…" else "Download",
+                if (busy) "正在下载…" else "下载",
                 color = if (busy) Ca.colors.textTertiary else Ca.colors.accent,
                 style = Ca.type.footnote,
                 modifier = Modifier.then(
                     if (busy) Modifier else Modifier.clickable {
                         busy = true
-                        scope.launch { status = runCatching { state.backend.sdk.downloadAndroidSources() }.getOrElse { "Download failed: ${it.message}" } }
+                        scope.launch { status = runCatching { state.backend.sdk.downloadAndroidSources() }.getOrElse { "下载失败：${it.message}" } }
                     },
                 ),
             )

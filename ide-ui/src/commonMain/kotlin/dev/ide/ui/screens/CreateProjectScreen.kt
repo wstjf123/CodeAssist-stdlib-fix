@@ -72,12 +72,11 @@ fun CreateProjectScreen(
     onCancel: () -> Unit,
     onCreated: () -> Unit,
     /** Pre-select a template (e.g. opened from a Projects Store item) and jump straight to its configure step. */
-    initialTemplateId: String? = null,
+    selectedTemplateId: String? = null,
+    onSelectedTemplateChange: (String?) -> Unit = {},
 ) {
     val templates = remember { backend.projects.projectTemplates() }
-    var selected by remember(initialTemplateId) {
-        mutableStateOf(initialTemplateId?.let { id -> templates.firstOrNull { it.id == id } })
-    }
+    val selected = selectedTemplateId?.let { id -> templates.firstOrNull { it.id == id } }
     Box(Modifier.fillMaxSize().background(Ca.colors.bg), contentAlignment = Alignment.TopCenter) {
         Column(
             Modifier.widthIn(max = 640.dp).fillMaxSize().padding(horizontal = 24.dp, vertical = 32.dp),
@@ -87,13 +86,13 @@ fun CreateProjectScreen(
                 Gallery(
                     templates = templates,
                     onBack = onCancel,
-                    onPick = { selected = it },
+                    onPick = { onSelectedTemplateChange(it.id) },
                 )
             } else {
                 Configure(
                     backend = backend,
                     template = sel,
-                    onBack = { selected = null },
+                    onBack = { onSelectedTemplateChange(null) },
                     onCreated = onCreated,
                 )
             }
@@ -192,23 +191,25 @@ private fun ColumnScope.Configure(
 
     Header(title = template.displayName, subtitle = template.description, onBack = onBack)
     Spacer(Modifier.height(20.dp))
-    Column(
-        Modifier.weight(1f).verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        FormField(stringResource(Res.string.project_name), name, "MyProject", onChange = { name = it })
-        FormField(stringResource(Res.string.package_name), effectivePkg, "com.example.app", onChange = { pkg = it; pkgEdited = true })
-        template.parameters.forEach { p ->
-            ParamControl(p, value = paramValues[p.key] ?: defaultValue(p), onChange = { paramValues[p.key] = it })
+    Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopStart) {
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            FormField(stringResource(Res.string.project_name), name, "MyProject", onChange = { name = it })
+            FormField(stringResource(Res.string.package_name), effectivePkg, "com.example.app", onChange = { pkg = it; pkgEdited = true })
+            template.parameters.forEach { p ->
+                ParamControl(p, value = paramValues[p.key] ?: defaultValue(p), onChange = { paramValues[p.key] = it })
+            }
+            error?.let { Text(it, color = Ca.colors.error, style = Ca.type.footnote) }
+            PrimaryButton(
+                text = stringResource(if (busy) Res.string.creating else Res.string.create_project),
+                onClick = ::create,
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            )
+            Spacer(Modifier.height(24.dp))
         }
-        error?.let { Text(it, color = Ca.colors.error, style = Ca.type.footnote) }
     }
-    Spacer(Modifier.height(16.dp))
-    PrimaryButton(
-        text = stringResource(if (busy) Res.string.creating else Res.string.create_project),
-        onClick = ::create,
-        modifier = Modifier.fillMaxWidth(),
-    )
 }
 
 @Composable
