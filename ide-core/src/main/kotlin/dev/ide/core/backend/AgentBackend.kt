@@ -252,7 +252,7 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
             ?: fallback
     }
 
-    private class SseResponseState {
+    private inner class SseResponseState {
         val text = StringBuilder()
         val calls = ArrayList<UiAgentToolCall>()
         var activeItem: ActiveOutputItem? = null
@@ -279,7 +279,7 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
             )
     }
 
-    private class ActiveOutputItem(
+    private inner class ActiveOutputItem(
         val id: String?,
         val outputIndex: Int?,
         val type: String?,
