@@ -21,6 +21,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -66,11 +67,14 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
             setRequestProperty("Content-Type", "application/json")
             setRequestProperty("Accept", "text/event-stream")
         }
-        val cancellation = currentCoroutineContext()[Job]?.invokeOnCompletion { cause ->
+        val job = currentCoroutineContext()[Job]
+        val cancellation = job?.invokeOnCompletion { cause ->
             if (cause is CancellationException) conn.disconnect()
         }
         try {
+            currentCoroutineContext().ensureActive()
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            currentCoroutineContext().ensureActive()
             val code = conn.responseCode
             if (code !in 200..299) {
                 val raw = conn.errorStream?.use { input ->
@@ -80,7 +84,7 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
             }
             val contentType = conn.contentType.orEmpty()
             if ("text/event-stream" in contentType) {
-                return@withContext readSse(conn, onTextDelta, onStreamChars)
+                return@withContext readSse(conn, job, onTextDelta, onStreamChars)
             }
             val raw = conn.inputStream.use { input ->
                 BufferedReader(InputStreamReader(input, Charsets.UTF_8)).use { it.readText() }
@@ -135,6 +139,7 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
 
     private fun readSse(
         conn: HttpURLConnection,
+        job: Job?,
         onTextDelta: (String) -> Unit,
         onStreamChars: (Int) -> Unit,
     ): UiAgentResponse {
@@ -143,6 +148,7 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
         conn.inputStream.use { input ->
             BufferedReader(InputStreamReader(input, Charsets.UTF_8)).useLines { lines ->
                 lines.forEach { line ->
+                    if (job?.isCancelled == true) throw CancellationException("agent request cancelled")
                     raw.append(line).append('\n')
                     val trimmed = line.trim()
                     if (!trimmed.startsWith("data:")) return@forEach

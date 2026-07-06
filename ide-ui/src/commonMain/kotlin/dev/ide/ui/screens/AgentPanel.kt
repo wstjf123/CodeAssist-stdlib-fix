@@ -51,6 +51,7 @@ import dev.ide.ui.components.IconButtonCa
 import dev.ide.ui.icons.CaIcons
 import dev.ide.ui.theme.Ca
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 
@@ -92,9 +93,9 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
     val messages = state.agentMessages
     val listState = rememberLazyListState()
     val displayItems = buildAgentDisplayItems(messages)
-    val scrollContentTick = (displayItems.lastOrNull()?.contentLength ?: 0) / 240
+    val scrollRevision = displayItems.sumOf { it.contentLength }
 
-    LaunchedEffect(displayItems.size, scrollContentTick) {
+    LaunchedEffect(displayItems.size, scrollRevision) {
         if (displayItems.isNotEmpty()) {
             yield()
             listState.scrollToItem(displayItems.lastIndex)
@@ -158,18 +159,19 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
                 state.agentPrompt = ""
                 state.agentSending = true
                 state.agentReceivedChars = 0
-                state.agentJob = state.agentScope.launch {
+                val job = state.agentScope.launch {
+                    val runningJob = coroutineContext[Job] ?: return@launch
                     try {
                         val text = runAgentLoop(
                             state = state,
                             messages = messages,
                             onTextDelta = { delta ->
-                                state.agentScope.launch {
+                                state.agentScope.launch(runningJob) {
                                     appendAgentDelta(messages, delta)
                                 }
                             },
                             onStreamChars = { count ->
-                                state.agentScope.launch {
+                                state.agentScope.launch(runningJob) {
                                     state.agentReceivedChars += count
                                 }
                             },
@@ -189,6 +191,7 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
                         state.recordAgentChanged()
                     }
                 }
+                state.agentJob = job
             },
             onStop = {
                 state.agentJob?.cancel()
