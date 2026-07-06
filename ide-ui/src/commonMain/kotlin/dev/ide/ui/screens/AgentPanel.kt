@@ -165,12 +165,20 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
                 state.agentReceivedChars = 0
                 state.agentJob = state.agentScope.launch {
                     try {
-                        val text = runAgentLoop(state, messages) { delta ->
-                            state.agentScope.launch {
-                                state.agentReceivedChars += delta.length
-                                appendAgentDelta(messages, delta)
-                            }
-                        }
+                        val text = runAgentLoop(
+                            state = state,
+                            messages = messages,
+                            onTextDelta = { delta ->
+                                state.agentScope.launch {
+                                    appendAgentDelta(messages, delta)
+                                }
+                            },
+                            onStreamChars = { count ->
+                                state.agentScope.launch {
+                                    state.agentReceivedChars += count
+                                }
+                            },
+                        )
                         if (text.isNotBlank()) messages += AgentConversationItem("message", "assistant", text)
                     } catch (e: CancellationException) {
                         messages += AgentConversationItem("message", "assistant", "已停止。")
@@ -489,6 +497,7 @@ private suspend fun runAgentLoop(
     state: IdeUiState,
     messages: MutableList<AgentConversationItem>,
     onTextDelta: (String) -> Unit,
+    onStreamChars: (Int) -> Unit,
 ): String {
     val config = UiAgentConfig(
         baseUrl = state.agentConfig.baseUrl,
@@ -500,17 +509,20 @@ private suspend fun runAgentLoop(
     repeat(8) {
         var receivedTextDelta = false
         val response = state.backend.agent.respond(
-            UiAgentRequest(
+            request = UiAgentRequest(
                 config = config,
                 instructions = agentInstructions(),
                 input = compactAgentInput(messages),
                 tools = tools,
-            )
-        ) { delta ->
-            if (!isUsefulAgentText(delta)) return@respond
-            receivedTextDelta = true
-            onTextDelta(delta)
-        }
+            ),
+            onTextDelta = { delta ->
+                if (isUsefulAgentText(delta)) {
+                    receivedTextDelta = true
+                    onTextDelta(delta)
+                }
+            },
+            onStreamChars = onStreamChars,
+        )
         if (response.toolCalls.isEmpty()) {
             if (receivedTextDelta && isUsefulAgentText(response.text)) return ""
             if (isUsefulAgentText(response.text)) return response.text
@@ -539,7 +551,7 @@ private suspend fun runAgentLoop(
 private fun agentInstructions(): String =
     "You are an AI coding agent embedded in CodeAssist IDE. " +
         "Use tools to inspect the workspace, diagnostics, logs, and to modify the currently edited buffer when needed. " +
-        "When modifying code, prefer replace_current_selection for focused edits and replace_current_file only when a whole-file rewrite is necessary."
+        "When modifying code, use apply_patch with a unified patch for the current editor file."
 
 private fun compactAgentInput(messages: List<AgentConversationItem>): List<UiAgentInputItem> {
     val (dropped, retainedItems) = splitTailFromLastUserMessages(messages, userMessageCount = 10)
@@ -705,14 +717,9 @@ private fun agentTools(): List<UiAgentTool> = listOf(
         """{"type":"object","properties":{},"additionalProperties":false}""",
     ),
     UiAgentTool(
-        "replace_current_selection",
-        "Replace the current editor selection, or insert at the caret if the selection is empty.",
-        """{"type":"object","properties":{"text":{"type":"string"}},"required":["text"],"additionalProperties":false}""",
-    ),
-    UiAgentTool(
-        "replace_current_file",
-        "Replace the entire current editor buffer with the supplied text.",
-        """{"type":"object","properties":{"text":{"type":"string"}},"required":["text"],"additionalProperties":false}""",
+        "apply_patch",
+        "Apply a unified patch to the current editor file. The patch must use *** Begin Patch, *** Update File: <current path>, @@ hunks, and *** End Patch.",
+        """{"type":"object","properties":{"patch":{"type":"string"}},"required":["patch"],"additionalProperties":false}""",
     ),
 )
 
@@ -746,22 +753,133 @@ private fun executeAgentTool(state: IdeUiState, call: UiAgentToolCall): String {
                 if (logs.isEmpty()) "no IDE logs"
                 else logs.joinToString("\n") { "${it.timeLabel} ${it.level}/${it.tag}: ${it.message}" }
             }
-            "replace_current_selection" -> {
-                val text = call.stringArguments["text"] ?: return "missing text"
-                val session = active?.session ?: return "no current file"
-                val start = session.selection.min
-                session.replaceRange(start, session.selection.max, text, TextRange(start + text.length))
-                "updated ${active.path} at selection"
-            }
-            "replace_current_file" -> {
-                val text = call.stringArguments["text"] ?: return "missing text"
-                val session = active?.session ?: return "no current file"
-                session.replaceRange(0, session.doc.length, text, TextRange(text.length.coerceAtMost(session.doc.length + text.length)))
-                "replaced ${active.path}"
+            "apply_patch" -> {
+                val patch = call.stringArguments["patch"] ?: return "missing patch"
+                val file = active ?: return "no current file"
+                val result = applyAgentPatch(file.path, file.text, patch)
+                if (!result.ok) return result.message
+                if (result.text == file.text) return "patch applied to ${file.path}: ${result.message}"
+                val session = file.session
+                session.replaceRange(0, session.doc.length, result.text, TextRange(result.text.length))
+                "applied patch to ${file.path}: ${result.message}"
             }
             else -> "unknown tool: ${call.name}"
         }
     }.getOrElse { "tool failed: ${it.message ?: "unknown error"}" }
+}
+
+private data class AgentPatchResult(val ok: Boolean, val text: String, val message: String)
+
+private data class AgentPatchHunk(val oldText: String, val newText: String)
+
+private data class AgentPatchParseResult(val ok: Boolean, val hunks: List<AgentPatchHunk> = emptyList(), val message: String = "")
+
+private fun applyAgentPatch(currentPath: String, currentText: String, patch: String): AgentPatchResult {
+    val parsed = parseAgentPatch(currentPath, patch)
+    if (!parsed.ok) return AgentPatchResult(false, currentText, parsed.message)
+    var text = currentText
+    var searchFrom = 0
+    var applied = 0
+    parsed.hunks.forEachIndexed { index, hunk ->
+        val match = findPatchMatch(text, hunk.oldText, searchFrom)
+            ?: findPatchMatch(text, hunk.oldText, 0)
+            ?: return AgentPatchResult(false, currentText, "hunk ${index + 1} did not match current file")
+        text = text.replaceRange(match.first, match.second, hunk.newText)
+        searchFrom = match.first + hunk.newText.length
+        applied++
+    }
+    if (applied == 0) return AgentPatchResult(false, currentText, "patch contained no hunks")
+    if (text == currentText) return AgentPatchResult(true, text, "no text changed")
+    return AgentPatchResult(true, text, "$applied hunk(s)")
+}
+
+private fun parseAgentPatch(currentPath: String, patch: String): AgentPatchParseResult {
+    val lines = patch.replace("\r\n", "\n").replace('\r', '\n').split('\n')
+    var inPatch = false
+    var inCurrentFile = false
+    var sawTargetFile = false
+    var hunkStarted = false
+    val hunks = ArrayList<AgentPatchHunk>()
+    val oldText = StringBuilder()
+    val newText = StringBuilder()
+
+    fun flushHunk(): AgentPatchResult? {
+        if (!hunkStarted) return null
+        if (oldText.isEmpty() && newText.isEmpty()) {
+            return AgentPatchResult(false, "", "empty hunk")
+        }
+        hunks += AgentPatchHunk(oldText.toString(), newText.toString())
+        oldText.clear()
+        newText.clear()
+        hunkStarted = false
+        return null
+    }
+
+    lines.forEach { line ->
+        when {
+            line == "*** Begin Patch" -> {
+                inPatch = true
+            }
+            line == "*** End Patch" -> {
+                flushHunk()?.let { return AgentPatchParseResult(false, message = it.message) }
+                inCurrentFile = false
+                inPatch = false
+            }
+            inPatch && line.startsWith("*** Update File:") -> {
+                flushHunk()?.let { return AgentPatchParseResult(false, message = it.message) }
+                val path = line.removePrefix("*** Update File:").trim()
+                inCurrentFile = pathMatchesCurrentFile(path, currentPath)
+                sawTargetFile = sawTargetFile || inCurrentFile
+            }
+            inPatch && line.startsWith("*** ") -> {
+                flushHunk()?.let { return AgentPatchParseResult(false, message = it.message) }
+                inCurrentFile = false
+            }
+            inPatch && inCurrentFile && line.startsWith("@@") -> {
+                flushHunk()?.let { return AgentPatchParseResult(false, message = it.message) }
+                hunkStarted = true
+            }
+            inPatch && inCurrentFile && hunkStarted && line.isNotEmpty() -> {
+                when (line[0]) {
+                    ' ' -> {
+                        oldText.append(line.drop(1)).append('\n')
+                        newText.append(line.drop(1)).append('\n')
+                    }
+                    '-' -> oldText.append(line.drop(1)).append('\n')
+                    '+' -> newText.append(line.drop(1)).append('\n')
+                    else -> return AgentPatchParseResult(false, message = "invalid hunk line: $line")
+                }
+            }
+            inPatch && inCurrentFile && hunkStarted && line.isEmpty() -> {
+                oldText.append('\n')
+                newText.append('\n')
+            }
+        }
+    }
+    flushHunk()?.let { return AgentPatchParseResult(false, message = it.message) }
+    if (!sawTargetFile) return AgentPatchParseResult(false, message = "patch does not target current file")
+    if (hunks.isEmpty()) return AgentPatchParseResult(false, message = "patch contained no hunks")
+    return AgentPatchParseResult(true, hunks)
+}
+
+private fun pathMatchesCurrentFile(path: String, currentPath: String): Boolean {
+    val normalized = path.replace('\\', '/')
+    val current = currentPath.replace('\\', '/')
+    return normalized == current ||
+        current.endsWith("/$normalized") ||
+        normalized == current.substringAfterLast('/')
+}
+
+private fun findPatchMatch(text: String, oldText: String, startIndex: Int): IntRange? {
+    if (oldText.isEmpty()) return null
+    val exact = text.indexOf(oldText, startIndex.coerceIn(0, text.length))
+    if (exact >= 0) return exact until exact + oldText.length
+    if (oldText.endsWith('\n')) {
+        val trimmed = oldText.dropLast(1)
+        val trimmedIndex = text.indexOf(trimmed, startIndex.coerceIn(0, text.length))
+        if (trimmedIndex >= 0) return trimmedIndex until trimmedIndex + trimmed.length
+    }
+    return null
 }
 
 private fun collectFilePaths(root: TreeNode): List<String> {

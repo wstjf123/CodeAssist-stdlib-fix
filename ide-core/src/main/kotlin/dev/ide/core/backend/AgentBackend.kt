@@ -47,7 +47,11 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
         ctx?.manager?.setPreference(CONVERSATION_SEQ_PREF, store.nextSeq.toString())
     }
 
-    override suspend fun respond(request: UiAgentRequest, onTextDelta: (String) -> Unit): UiAgentResponse = withContext(Dispatchers.IO) {
+    override suspend fun respond(
+        request: UiAgentRequest,
+        onTextDelta: (String) -> Unit,
+        onStreamChars: (Int) -> Unit,
+    ): UiAgentResponse = withContext(Dispatchers.IO) {
         val base = request.config.baseUrl.trimEnd('/')
         val endpoint = if (base.endsWith("/responses")) base else "$base/responses"
         val body = buildRequestBody(request)
@@ -74,14 +78,15 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
             }
             val contentType = conn.contentType.orEmpty()
             if ("text/event-stream" in contentType) {
-                return@withContext readSse(conn, onTextDelta)
+                return@withContext readSse(conn, onTextDelta, onStreamChars)
             }
             val raw = conn.inputStream.use { input ->
                 BufferedReader(InputStreamReader(input, Charsets.UTF_8)).use { it.readText() }
             }
             if (raw.lineSequence().any { it.trimStart().startsWith("data:") }) {
-                return@withContext parseSse(raw, onTextDelta)
+                return@withContext parseSse(raw, onTextDelta, onStreamChars)
             }
+            onStreamChars(raw.length)
             val root = parseObject(raw)
             UiAgentResponse(
                 text = extractResponseText(root),
@@ -125,7 +130,11 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
         return gson.toJson(root)
     }
 
-    private fun readSse(conn: HttpURLConnection, onTextDelta: (String) -> Unit): UiAgentResponse {
+    private fun readSse(
+        conn: HttpURLConnection,
+        onTextDelta: (String) -> Unit,
+        onStreamChars: (Int) -> Unit,
+    ): UiAgentResponse {
         val raw = StringBuilder()
         val text = StringBuilder()
         var responseId: String? = null
@@ -137,7 +146,9 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
                     val trimmed = line.trim()
                     if (!trimmed.startsWith("data:")) return@forEach
                     val data = trimmed.removePrefix("data:").trim()
-                    if (data.isEmpty() || data == "[DONE]") return@forEach
+                    if (data.isEmpty()) return@forEach
+                    onStreamChars(data.length)
+                    if (data == "[DONE]") return@forEach
                     handleSseData(data, text, calls, onTextDelta) { id -> responseId = id }
                 }
             }
@@ -145,7 +156,11 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
         return UiAgentResponse(text.toString(), responseId, calls.distinctBy { it.callId }, raw.toString())
     }
 
-    private fun parseSse(raw: String, onTextDelta: (String) -> Unit): UiAgentResponse {
+    private fun parseSse(
+        raw: String,
+        onTextDelta: (String) -> Unit,
+        onStreamChars: (Int) -> Unit,
+    ): UiAgentResponse {
         val text = StringBuilder()
         var responseId: String? = null
         val calls = ArrayList<UiAgentToolCall>()
@@ -153,8 +168,10 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
             .map { it.trim() }
             .filter { it.startsWith("data:") }
             .map { it.removePrefix("data:").trim() }
-            .filter { it.isNotEmpty() && it != "[DONE]" }
+            .filter { it.isNotEmpty() }
             .forEach { data ->
+                onStreamChars(data.length)
+                if (data == "[DONE]") return@forEach
                 handleSseData(data, text, calls, onTextDelta) { id -> responseId = id }
             }
         return UiAgentResponse(text.toString(), responseId, calls.distinctBy { it.callId }, raw)

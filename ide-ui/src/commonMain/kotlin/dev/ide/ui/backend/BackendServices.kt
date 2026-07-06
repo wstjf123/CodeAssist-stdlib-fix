@@ -655,7 +655,11 @@ data class UiAgentToolCall(
 )
 
 interface AgentService {
-    suspend fun respond(request: UiAgentRequest, onTextDelta: (String) -> Unit = {}): UiAgentResponse =
+    suspend fun respond(
+        request: UiAgentRequest,
+        onTextDelta: (String) -> Unit = {},
+        onStreamChars: (Int) -> Unit = {},
+    ): UiAgentResponse =
         UiAgentResponse("AI Agent transport is not available in this backend.")
 
     fun loadConversationStore(): UiAgentConversationStore = UiAgentConversationStore()
