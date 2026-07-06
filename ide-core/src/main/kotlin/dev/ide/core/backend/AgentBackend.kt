@@ -16,6 +16,7 @@ import dev.ide.ui.backend.UiAgentRequest
 import dev.ide.ui.backend.UiAgentResponse
 import dev.ide.ui.backend.UiAgentTokenUsage
 import dev.ide.ui.backend.UiAgentToolCall
+import dev.ide.ui.backend.UiAgentToolParameters
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -121,7 +122,7 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
                                     addProperty("type", "function")
                                     addProperty("name", tool.name)
                                     addProperty("description", tool.description)
-                                    add("parameters", parseJson(tool.parametersJson) ?: JsonObject())
+                                    add("parameters", tool.parameters.toJson())
                                 }
                             )
                         }
@@ -424,7 +425,7 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
     private fun parseStringArguments(argumentsJson: String): Map<String, String> {
         val args = parseObject(argumentsJson) ?: return emptyMap()
         return args.entrySet()
-            .mapNotNull { (key, value) -> value.asStringOrNull()?.let { key to it } }
+            .mapNotNull { (key, value) -> value.asArgumentStringOrNull()?.let { key to it } }
             .toMap()
     }
 
@@ -433,6 +434,29 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
 
     private fun parseJson(text: String): JsonElement? =
         runCatching { JsonParser.parseString(text) }.getOrNull()
+
+    private fun UiAgentToolParameters.toJson(): JsonObject =
+        JsonObject().apply {
+            addProperty("type", "object")
+            add(
+                "properties",
+                JsonObject().apply {
+                    properties.forEach { property ->
+                        add(
+                            property.name,
+                            JsonObject().apply {
+                                addProperty("type", property.type)
+                                property.description?.let { addProperty("description", it) }
+                            },
+                        )
+                    }
+                },
+            )
+            if (required.isNotEmpty()) {
+                add("required", JsonArray().apply { required.forEach { add(it) } })
+            }
+            addProperty("additionalProperties", additionalProperties)
+        }
 
     private fun parseConversationStore(raw: String): UiAgentConversationStore? =
         runCatching {
@@ -492,6 +516,17 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
 
     private fun JsonElement.asStringOrNull(): String? =
         takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }?.asString
+
+    private fun JsonElement.asArgumentStringOrNull(): String? {
+        if (!isJsonPrimitive) return null
+        val primitive = asJsonPrimitive
+        return when {
+            primitive.isString -> primitive.asString
+            primitive.isNumber -> primitive.asNumber.toString()
+            primitive.isBoolean -> primitive.asBoolean.toString()
+            else -> null
+        }
+    }
 
     private fun JsonElement.asIntOrNull(): Int? =
         takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isNumber }?.asInt

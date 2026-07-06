@@ -22,6 +22,9 @@ interface FileService {
     /** Read a file's current on-disk text. */
     fun readFile(path: String): String
 
+    /** Write [text] to [path], creating parent directories as needed. Bumps [fileSystemEpoch]. */
+    fun writeFile(path: String, text: String): Boolean = false
+
     /** Name of the module owning [path], or null if outside the project. */
     fun moduleNameForFile(path: String): String?
 
@@ -661,7 +664,19 @@ data class UiAgentTokenUsage(
 data class UiAgentTool(
     val name: String,
     val description: String,
-    val parametersJson: String,
+    val parameters: UiAgentToolParameters = UiAgentToolParameters(),
+)
+
+data class UiAgentToolParameters(
+    val properties: List<UiAgentToolProperty> = emptyList(),
+    val required: List<String> = emptyList(),
+    val additionalProperties: Boolean = false,
+)
+
+data class UiAgentToolProperty(
+    val name: String,
+    val type: String = "string",
+    val description: String? = null,
 )
 
 data class UiAgentToolCall(

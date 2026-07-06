@@ -1,6 +1,5 @@
 package dev.ide.ui.screens
 
-import androidx.compose.ui.text.TextRange
 import dev.ide.ui.AgentConversationItem
 import dev.ide.ui.ComposePreviewHost
 import dev.ide.ui.EditorViewMode
@@ -10,6 +9,7 @@ import dev.ide.ui.backend.BuildState
 import dev.ide.ui.backend.RunTaskOption
 import dev.ide.ui.backend.StepStatus
 import dev.ide.ui.backend.TreeNode
+import dev.ide.ui.backend.TreeViewMode
 import dev.ide.ui.backend.UiAgentContentItem
 import dev.ide.ui.backend.UiAgentConfig
 import dev.ide.ui.backend.UiAgentInputItem
@@ -17,9 +17,12 @@ import dev.ide.ui.backend.UiAgentRequest
 import dev.ide.ui.backend.UiAgentTokenUsage
 import dev.ide.ui.backend.UiAgentTool
 import dev.ide.ui.backend.UiAgentToolCall
+import dev.ide.ui.backend.UiAgentToolParameters
+import dev.ide.ui.backend.UiAgentToolProperty
 import dev.ide.ui.backend.UiAccent
 import dev.ide.ui.backend.UiComposePreview
 import dev.ide.ui.backend.UiDiagnostic
+import dev.ide.ui.backend.UiFileSymbol
 import dev.ide.ui.backend.UiSettings
 import dev.ide.ui.backend.UiSeverity
 import kotlinx.coroutines.Deferred
@@ -105,8 +108,9 @@ internal fun appendAgentDelta(messages: MutableList<AgentConversationItem>, delt
 
 private fun agentInstructions(): String =
     "You are an AI coding agent embedded in CodeAssist IDE. " +
-        "Use tools to inspect the workspace, diagnostics, logs, and to modify the currently edited buffer when needed. " +
-        "When modifying code, use apply_patch with a unified patch for the current editor file."
+        "Use tools to inspect the workspace, diagnostics, logs, previews, and build state. " +
+        "When modifying files, use apply_patch with the Codex apply_patch format. " +
+        "Patches may add, update, move, and delete files under the workspace."
 
 private fun compactAgentInput(messages: List<AgentConversationItem>): List<UiAgentInputItem> {
     val input = ArrayList<UiAgentInputItem>()
@@ -389,90 +393,150 @@ private fun toolFailure(text: String): AgentToolResult =
 private fun agentTools(): List<UiAgentTool> = listOf(
     UiAgentTool(
         "list_workspace_files",
-        "List openable files in the current workspace. Returns absolute paths.",
-        """{"type":"object","properties":{},"additionalProperties":false}""",
+        "List files in the current workspace. Returns absolute paths.",
+    ),
+    UiAgentTool(
+        "glob",
+        "Find workspace files by glob pattern. Matches relative and absolute paths. Supports *, ?, and **.",
+        agentToolParameters(
+            agentToolProperty("pattern"),
+            agentToolProperty("limit", "number"),
+            required = listOf("pattern"),
+        ),
+    ),
+    UiAgentTool(
+        "grep",
+        "Search workspace text. Use regex=true for regular expressions; pathGlob narrows files before searching.",
+        agentToolParameters(
+            agentToolProperty("query"),
+            agentToolProperty("pathGlob"),
+            agentToolProperty("regex", "boolean"),
+            agentToolProperty("caseSensitive", "boolean"),
+            agentToolProperty("limit", "number"),
+            required = listOf("query"),
+        ),
+    ),
+    UiAgentTool(
+        "read_file",
+        "Read a workspace file or the current editor file. Supports path, startLine/endLine, offset/length, and symbol name for existing file-structure ranges.",
+        agentToolParameters(
+            agentToolProperty("path"),
+            agentToolProperty("startLine", "number"),
+            agentToolProperty("endLine", "number"),
+            agentToolProperty("offset", "number"),
+            agentToolProperty("length", "number"),
+            agentToolProperty("symbol"),
+            agentToolProperty("includeLineNumbers", "boolean"),
+        ),
     ),
     UiAgentTool(
         "read_workspace_file",
-        "Read a workspace file by absolute path. Reads the unsaved editor buffer when the path is currently open.",
-        """{"type":"object","properties":{"path":{"type":"string"}},"required":["path"],"additionalProperties":false}""",
+        "Compatibility alias for read_file with a required path.",
+        agentToolParameters(
+            agentToolProperty("path"),
+            agentToolProperty("startLine", "number"),
+            agentToolProperty("endLine", "number"),
+            agentToolProperty("offset", "number"),
+            agentToolProperty("length", "number"),
+            agentToolProperty("symbol"),
+            required = listOf("path"),
+        ),
     ),
     UiAgentTool(
         "get_current_file",
-        "Return the current editor file path and unsaved buffer text.",
-        """{"type":"object","properties":{},"additionalProperties":false}""",
+        "Compatibility alias for read_file without a path; returns the current editor buffer.",
+        agentToolParameters(
+            agentToolProperty("startLine", "number"),
+            agentToolProperty("endLine", "number"),
+            agentToolProperty("offset", "number"),
+            agentToolProperty("length", "number"),
+            agentToolProperty("symbol"),
+        ),
     ),
     UiAgentTool(
         "get_diagnostics",
         "Return current editor diagnostics and warning/error messages.",
-        """{"type":"object","properties":{},"additionalProperties":false}""",
     ),
     UiAgentTool(
         "get_build_logs",
         "Return recent build logs.",
-        """{"type":"object","properties":{},"additionalProperties":false}""",
     ),
     UiAgentTool(
         "get_build_progress",
         "Return current build status, elapsed time, task steps, diagnostic counts, and recent build log tail.",
-        """{"type":"object","properties":{},"additionalProperties":false}""",
     ),
     UiAgentTool(
         "start_build",
         "Start the IDE's default build using the same action as the build console Run button, then return current progress.",
-        """{"type":"object","properties":{},"additionalProperties":false}""",
     ),
     UiAgentTool(
         "stop_build",
         "Stop the current IDE build using the same action as the build console Stop button, then return current progress.",
-        """{"type":"object","properties":{},"additionalProperties":false}""",
     ),
     UiAgentTool(
         "list_build_tasks",
         "List build and run tasks available in the IDE Run picker.",
-        """{"type":"object","properties":{},"additionalProperties":false}""",
     ),
     UiAgentTool(
         "run_build_task",
         "Start a specific IDE build/run task by id from list_build_tasks, then return current progress.",
-        """{"type":"object","properties":{"id":{"type":"string"}},"required":["id"],"additionalProperties":false}""",
+        agentToolParameters(agentToolProperty("id"), required = listOf("id")),
     ),
     UiAgentTool(
         "get_app_theme",
         "Return the current app theme mode and accent.",
-        """{"type":"object","properties":{},"additionalProperties":false}""",
     ),
     UiAgentTool(
         "set_app_theme",
         "Change the IDE app theme live using existing settings. themeMode accepts light, dark, or system. accent optionally accepts violet, teal, or orange.",
-        """{"type":"object","properties":{"themeMode":{"type":"string","description":"light, dark, or system"},"accent":{"type":"string","description":"violet, teal, or orange"}},"additionalProperties":false}""",
+        agentToolParameters(
+            agentToolProperty("themeMode", description = "light, dark, or system"),
+            agentToolProperty("accent", description = "violet, teal, or orange"),
+        ),
     ),
     UiAgentTool(
         "toggle_app_theme",
         "Toggle the IDE app theme between explicit light and dark using the existing theme setting.",
-        """{"type":"object","properties":{},"additionalProperties":false}""",
     ),
     UiAgentTool(
         "get_ide_logs",
         "Return recent IDE logs.",
-        """{"type":"object","properties":{},"additionalProperties":false}""",
     ),
     UiAgentTool(
         "apply_patch",
-        "Apply a unified patch to the current editor file. The patch must use *** Begin Patch, *** Update File: <current path>, @@ hunks, and *** End Patch.",
-        """{"type":"object","properties":{"patch":{"type":"string"}},"required":["patch"],"additionalProperties":false}""",
+        "Apply a Codex apply_patch patch to workspace files. Supports Add File, Update File, Move to, Delete File, @@ hunks, and *** End of File. Parent directories are created automatically.",
+        agentToolParameters(agentToolProperty("patch"), required = listOf("patch")),
     ),
     UiAgentTool(
         "open_compose_preview",
         "Open an existing Compose @Preview in the IDE preview pane using the normal UI state path. If previewName is omitted, opens the current selected preview or the first preview.",
-        """{"type":"object","properties":{"previewName":{"type":"string"},"mode":{"type":"string","description":"preview or split"}},"additionalProperties":false}""",
+        agentToolParameters(
+            agentToolProperty("previewName"),
+            agentToolProperty("mode", description = "preview or split"),
+        ),
     ),
     UiAgentTool(
         "capture_compose_preview",
         "Capture a PNG screenshot of the visible Compose @Preview in the current editor file and return it as an input_image tool output. Call open_compose_preview first if the requested preview is not already visible.",
-        """{"type":"object","properties":{"previewName":{"type":"string"},"dark":{"type":"string","description":"Optional true/false night mode override"}},"additionalProperties":false}""",
+        agentToolParameters(
+            agentToolProperty("previewName"),
+            agentToolProperty("dark", "boolean", "Optional night mode override."),
+        ),
     ),
 )
+
+private fun agentToolParameters(
+    vararg properties: UiAgentToolProperty,
+    required: List<String> = emptyList(),
+): UiAgentToolParameters =
+    UiAgentToolParameters(properties.toList(), required)
+
+private fun agentToolProperty(
+    name: String,
+    type: String = "string",
+    description: String? = null,
+): UiAgentToolProperty =
+    UiAgentToolProperty(name, type, description)
 
 private suspend fun executeAgentToolCalls(
     state: IdeUiState,
@@ -492,9 +556,10 @@ private suspend fun executeAgentToolCalls(
 
 private fun createAgentToolContext(state: IdeUiState): AgentToolContext {
     val active = state.active
+    val allFiles = collectFilePaths(state.backend.files.fileTree(TreeViewMode.AllFiles))
     return AgentToolContext(
         rootPath = state.backend.project.rootPath,
-        filePaths = collectFilePaths(state.tree),
+        filePaths = allFiles,
         activePath = active?.path,
         activeText = active?.text,
         diagnostics = active?.session?.diagnostics.orEmpty().toList(),
@@ -514,8 +579,8 @@ private fun createAgentToolContext(state: IdeUiState): AgentToolContext {
 private fun supportsParallelToolExecution(call: UiAgentToolCall): Boolean =
     when (call.name) {
         "list_workspace_files",
-        "read_workspace_file",
-        "get_current_file",
+        "glob",
+        "grep",
         "get_diagnostics",
         "get_build_logs",
         "get_build_progress",
@@ -545,6 +610,29 @@ private fun executeAgentToolUnchecked(context: AgentToolContext, call: UiAgentTo
     return when (call.name) {
         "list_workspace_files" -> {
             toolSuccess(context.filePaths.take(500).joinToString("\n"))
+        }
+        "glob" -> {
+            val pattern = call.stringArguments["pattern"] ?: return toolFailure("缺少 pattern")
+            val limit = call.intArgument("limit", 200, 1, 1000)
+            val matches = globWorkspaceFiles(context.rootPath, context.filePaths, pattern).take(limit)
+            toolSuccess(if (matches.isEmpty()) "没有匹配文件" else matches.joinToString("\n"))
+        }
+        "grep" -> {
+            val query = call.stringArguments["query"] ?: return toolFailure("缺少 query")
+            val limit = call.intArgument("limit", 200, 1, 1000)
+            val matches = grepWorkspaceFiles(
+                rootPath = context.rootPath,
+                filePaths = context.filePaths,
+                readFile = { path ->
+                    if (path == context.activePath) context.activeText.orEmpty() else context.readFile(path)
+                },
+                query = query,
+                pathGlob = call.stringArguments["pathGlob"],
+                regex = call.booleanArgument("regex"),
+                caseSensitive = call.booleanArgument("caseSensitive"),
+                limit = limit,
+            )
+            toolSuccess(if (matches.isEmpty()) "没有匹配项" else matches.joinToString("\n"))
         }
         "read_workspace_file" -> {
             val path = call.stringArguments["path"] ?: return toolFailure("缺少路径")
@@ -591,22 +679,33 @@ private suspend fun executeAgentToolUnchecked(state: IdeUiState, call: UiAgentTo
     val active = state.active
     return when (call.name) {
         "list_workspace_files" -> {
-            toolSuccess(collectFilePaths(state.tree).take(500).joinToString("\n"))
+            toolSuccess(collectFilePaths(state.backend.files.fileTree(TreeViewMode.AllFiles)).take(500).joinToString("\n"))
         }
-        "read_workspace_file" -> {
-            val path = call.stringArguments["path"] ?: return toolFailure("缺少路径")
-            val known = collectFilePaths(state.tree).toSet()
-            if (path !in known && !path.startsWith(state.backend.project.rootPath)) {
-                return toolFailure("路径不在工作区内")
-            }
-            toolSuccess(if (active?.path == path) active.text else state.backend.files.readFile(path).take(20000))
+        "glob" -> {
+            val pattern = call.stringArguments["pattern"] ?: return toolFailure("缺少 pattern")
+            val files = collectFilePaths(state.backend.files.fileTree(TreeViewMode.AllFiles))
+            val limit = call.intArgument("limit", 200, 1, 1000)
+            val matches = globWorkspaceFiles(state.backend.project.rootPath, files, pattern).take(limit)
+            toolSuccess(if (matches.isEmpty()) "没有匹配文件" else matches.joinToString("\n"))
         }
-        "get_current_file" -> {
-            if (active == null) {
-                toolFailure("没有当前文件")
-            } else {
-                toolSuccess("path: ${active.path}\n```\n${active.text.take(20000)}\n```")
-            }
+        "grep" -> {
+            val query = call.stringArguments["query"] ?: return toolFailure("缺少 query")
+            val files = collectFilePaths(state.backend.files.fileTree(TreeViewMode.AllFiles))
+            val limit = call.intArgument("limit", 200, 1, 1000)
+            val matches = grepWorkspaceFiles(
+                rootPath = state.backend.project.rootPath,
+                filePaths = files,
+                readFile = { path -> if (active?.path == path) active.text else state.backend.files.readFile(path) },
+                query = query,
+                pathGlob = call.stringArguments["pathGlob"],
+                regex = call.booleanArgument("regex"),
+                caseSensitive = call.booleanArgument("caseSensitive"),
+                limit = limit,
+            )
+            toolSuccess(if (matches.isEmpty()) "没有匹配项" else matches.joinToString("\n"))
+        }
+        "read_file", "read_workspace_file", "get_current_file" -> {
+            readAgentFile(state, call)
         }
         "get_diagnostics" -> {
             val diagnostics = active?.session?.diagnostics.orEmpty()
@@ -667,15 +766,9 @@ private suspend fun executeAgentToolUnchecked(state: IdeUiState, call: UiAgentTo
         }
         "apply_patch" -> {
             val patch = call.stringArguments["patch"] ?: return toolFailure("缺少 patch")
-            val file = active ?: return toolFailure("没有当前文件")
-            val result = applyAgentPatch(file.path, file.text, patch)
+            val result = applyAgentPatch(state, patch)
             if (!result.ok) return toolFailure(result.message)
-            if (result.text == file.text) {
-                return toolSuccess("patch 已应用到 ${file.path}: ${result.message}")
-            }
-            val session = file.session
-            session.replaceRange(0, session.doc.length, result.text, TextRange(result.text.length))
-            toolSuccess("已应用 patch 到 ${file.path}: ${result.message}")
+            toolSuccess(result.message)
         }
         "open_compose_preview" -> {
             val file = active ?: return toolFailure("没有当前文件")
@@ -750,119 +843,597 @@ private suspend fun openComposePreviewUi(
     return host.awaitPreviewVisible(file.path, target, PREVIEW_OPEN_TIMEOUT_MS)
 }
 
-private data class AgentPatchResult(val ok: Boolean, val text: String, val message: String)
+private data class AgentPatchResult(val ok: Boolean, val message: String)
 
-private data class AgentPatchHunk(val oldText: String, val newText: String)
+private sealed class AgentPatchHunk {
+    abstract val path: String
 
-private data class AgentPatchParseResult(val ok: Boolean, val hunks: List<AgentPatchHunk> = emptyList(), val message: String = "")
-
-private fun applyAgentPatch(currentPath: String, currentText: String, patch: String): AgentPatchResult {
-    val parsed = parseAgentPatch(currentPath, patch)
-    if (!parsed.ok) return AgentPatchResult(false, currentText, parsed.message)
-    var text = currentText
-    var searchFrom = 0
-    var applied = 0
-    parsed.hunks.forEachIndexed { index, hunk ->
-        val match = findPatchMatch(text, hunk.oldText, searchFrom)
-            ?: findPatchMatch(text, hunk.oldText, 0)
-            ?: return AgentPatchResult(false, currentText, "第 ${index + 1} 个 hunk 与当前文件不匹配")
-        text = text.replaceRange(match.first, match.last + 1, hunk.newText)
-        searchFrom = match.first + hunk.newText.length
-        applied++
-    }
-    if (applied == 0) return AgentPatchResult(false, currentText, "patch 不包含 hunk")
-    if (text == currentText) return AgentPatchResult(true, text, "文本没有变化")
-    return AgentPatchResult(true, text, "已应用 $applied 个 hunk")
+    data class AddFile(override val path: String, val contents: String) : AgentPatchHunk()
+    data class DeleteFile(override val path: String) : AgentPatchHunk()
+    data class UpdateFile(
+        override val path: String,
+        val movePath: String?,
+        val chunks: List<AgentPatchChunk>,
+    ) : AgentPatchHunk()
 }
 
-private fun parseAgentPatch(currentPath: String, patch: String): AgentPatchParseResult {
-    val lines = patch.replace("\r\n", "\n").replace('\r', '\n').split('\n')
-    var inPatch = false
-    var inCurrentFile = false
-    var sawTargetFile = false
-    var hunkStarted = false
-    val hunks = ArrayList<AgentPatchHunk>()
-    val oldText = StringBuilder()
-    val newText = StringBuilder()
+private data class AgentPatchChunk(
+    val changeContext: String?,
+    val oldLines: List<String>,
+    val newLines: List<String>,
+    val isEndOfFile: Boolean,
+)
 
-    fun flushHunk(): AgentPatchResult? {
-        if (!hunkStarted) return null
-        if (oldText.isEmpty() && newText.isEmpty()) {
-            return AgentPatchResult(false, "", "空 hunk")
+private data class AgentPatchParseResult(
+    val ok: Boolean,
+    val hunks: List<AgentPatchHunk> = emptyList(),
+    val message: String = "",
+)
+
+private sealed class AgentAppliedChange {
+    abstract val path: String
+
+    data class Add(override val path: String, val text: String) : AgentAppliedChange()
+    data class Delete(override val path: String) : AgentAppliedChange()
+    data class Update(override val path: String, val text: String) : AgentAppliedChange()
+    data class Move(val from: String, override val path: String, val text: String) : AgentAppliedChange()
+}
+
+private fun applyAgentPatch(state: IdeUiState, patch: String): AgentPatchResult {
+    val parsed = parseAgentPatch(patch)
+    if (!parsed.ok) return AgentPatchResult(false, parsed.message)
+    if (parsed.hunks.isEmpty()) return AgentPatchResult(false, "No files were modified.")
+
+    val rootPath = normalizeWorkspacePath(state.backend.project.rootPath)
+    val filePaths = collectFilePaths(state.backend.files.fileTree(TreeViewMode.AllFiles)).map(::normalizeWorkspacePath).toMutableSet()
+    val changes = ArrayList<AgentAppliedChange>()
+    val added = ArrayList<String>()
+    val modified = ArrayList<String>()
+    val deleted = ArrayList<String>()
+
+    fun fail(message: String): AgentPatchResult {
+        if (changes.isNotEmpty()) {
+            syncOpenFilesAfterPatch(state, changes)
+            state.refreshTree()
         }
-        hunks += AgentPatchHunk(oldText.toString(), newText.toString())
-        oldText.clear()
-        newText.clear()
-        hunkStarted = false
+        return AgentPatchResult(false, message)
+    }
+
+    for (hunk in parsed.hunks) {
+        when (hunk) {
+            is AgentPatchHunk.AddFile -> {
+                val path = resolveAgentPatchPath(rootPath, hunk.path)
+                    ?: return fail("路径不在工作区内：${hunk.path}")
+                ensurePatchCanTouchOpenFile(state, path)?.let { return fail(it) }
+                if (!state.backend.files.writeFile(path, hunk.contents)) {
+                    return fail("Failed to write file $path")
+                }
+                filePaths += path
+                changes += AgentAppliedChange.Add(path, hunk.contents)
+                added += displayWorkspacePath(rootPath, path)
+            }
+            is AgentPatchHunk.DeleteFile -> {
+                val path = resolveAgentPatchPath(rootPath, hunk.path)
+                    ?: return fail("路径不在工作区内：${hunk.path}")
+                if (path !in filePaths) return fail("Failed to delete file $path")
+                ensurePatchCanTouchOpenFile(state, path)?.let { return fail(it) }
+                if (!state.backend.files.deletePath(path)) {
+                    return fail("Failed to delete file $path")
+                }
+                filePaths -= path
+                changes += AgentAppliedChange.Delete(path)
+                deleted += displayWorkspacePath(rootPath, path)
+            }
+            is AgentPatchHunk.UpdateFile -> {
+                val path = resolveAgentPatchPath(rootPath, hunk.path)
+                    ?: return fail("路径不在工作区内：${hunk.path}")
+                if (path !in filePaths) return fail("Failed to read file to update $path")
+                ensurePatchCanTouchOpenFile(state, path)?.let { return fail(it) }
+                val oldText = state.openFiles.firstOrNull { normalizeWorkspacePath(it.path) == path }?.text
+                    ?: state.backend.files.readFile(path)
+                val newText = deriveAgentPatchText(oldText, hunk.chunks)
+                    ?: return fail("Failed to apply update hunk to $path")
+                if (hunk.movePath == null) {
+                    if (!state.backend.files.writeFile(path, newText)) {
+                        return fail("Failed to write file $path")
+                    }
+                    changes += AgentAppliedChange.Update(path, newText)
+                    modified += displayWorkspacePath(rootPath, path)
+                } else {
+                    val movePath = resolveAgentPatchPath(rootPath, hunk.movePath)
+                        ?: return fail("路径不在工作区内：${hunk.movePath}")
+                    ensurePatchCanTouchOpenFile(state, movePath)?.let { return fail(it) }
+                    if (!state.backend.files.writeFile(movePath, newText)) {
+                        return fail("Failed to write file $movePath")
+                    }
+                    filePaths += movePath
+                    if (!state.backend.files.deletePath(path)) {
+                        syncOpenFilesAfterPatch(state, listOf(AgentAppliedChange.Update(movePath, newText)))
+                        state.refreshTree()
+                        return fail("Failed to remove original $path")
+                    }
+                    filePaths -= path
+                    changes += AgentAppliedChange.Move(path, movePath, newText)
+                    modified += displayWorkspacePath(rootPath, movePath)
+                }
+            }
+        }
+    }
+
+    syncOpenFilesAfterPatch(state, changes)
+    state.refreshTree()
+    return AgentPatchResult(true, buildPatchSummary(added, modified, deleted))
+}
+
+private fun parseAgentPatch(patch: String): AgentPatchParseResult {
+    val lines = unwrapAgentPatch(patch).replace("\r\n", "\n").replace('\r', '\n').lines()
+    if (lines.firstOrNull()?.trim() != "*** Begin Patch") {
+        return AgentPatchParseResult(false, message = "Invalid patch: The first line of the patch must be '*** Begin Patch'")
+    }
+    if (lines.lastOrNull()?.trim() != "*** End Patch") {
+        return AgentPatchParseResult(false, message = "Invalid patch: The last line of the patch must be '*** End Patch'")
+    }
+
+    val hunks = ArrayList<AgentPatchHunk>()
+    var mode = "started"
+    var updatePath: String? = null
+    var movePath: String? = null
+    val chunks = ArrayList<AgentPatchChunk>()
+    var chunkContext: String? = null
+    var oldLines = ArrayList<String>()
+    var newLines = ArrayList<String>()
+    var endOfFile = false
+    var chunkStarted = false
+    var addPath: String? = null
+    val addContents = StringBuilder()
+
+    fun flushChunk(): String? {
+        if (!chunkStarted) return null
+        if (oldLines.isEmpty() && newLines.isEmpty()) return "Update hunk does not contain any lines"
+        chunks += AgentPatchChunk(chunkContext, oldLines.toList(), newLines.toList(), endOfFile)
+        chunkContext = null
+        oldLines = ArrayList()
+        newLines = ArrayList()
+        endOfFile = false
+        chunkStarted = false
         return null
     }
 
-    lines.forEach { line ->
+    fun flushMode(): String? {
+        when (mode) {
+            "add" -> {
+                val path = addPath ?: return "Add file hunk is missing a path"
+                hunks += AgentPatchHunk.AddFile(path, addContents.toString())
+                addPath = null
+                addContents.clear()
+            }
+            "update" -> {
+                flushChunk()?.let { return it }
+                val path = updatePath ?: return "Update file hunk is missing a path"
+                if (chunks.isEmpty()) return "Update file hunk for path '$path' is empty"
+                hunks += AgentPatchHunk.UpdateFile(path, movePath, chunks.toList())
+                updatePath = null
+                movePath = null
+                chunks.clear()
+            }
+            "delete", "started" -> Unit
+        }
+        mode = "started"
+        return null
+    }
+
+    lines.forEachIndexed { index, rawLine ->
+        if (index == 0) return@forEachIndexed
+        val lineNumber = index + 1
+        val trimmed = rawLine.trim()
+        val updateLine = rawLine.trimEnd()
+        if (trimmed == "*** End Patch") {
+            flushMode()?.let { return AgentPatchParseResult(false, message = "Invalid patch hunk on line $lineNumber: $it") }
+            mode = "ended"
+            return@forEachIndexed
+        }
+
         when {
-            line == "*** Begin Patch" -> {
-                inPatch = true
+            mode == "started" && trimmed.startsWith("*** Environment ID:") -> Unit
+            trimmed.startsWith("*** Add File: ") -> {
+                flushMode()?.let { return AgentPatchParseResult(false, message = "Invalid patch hunk on line $lineNumber: $it") }
+                addPath = trimmed.removePrefix("*** Add File: ").trim()
+                mode = "add"
             }
-            line == "*** End Patch" -> {
-                flushHunk()?.let { return AgentPatchParseResult(false, message = it.message) }
-                inCurrentFile = false
-                inPatch = false
+            trimmed.startsWith("*** Delete File: ") -> {
+                flushMode()?.let { return AgentPatchParseResult(false, message = "Invalid patch hunk on line $lineNumber: $it") }
+                hunks += AgentPatchHunk.DeleteFile(trimmed.removePrefix("*** Delete File: ").trim())
+                mode = "delete"
             }
-            inPatch && line.startsWith("*** Update File:") -> {
-                flushHunk()?.let { return AgentPatchParseResult(false, message = it.message) }
-                val path = line.removePrefix("*** Update File:").trim()
-                inCurrentFile = pathMatchesCurrentFile(path, currentPath)
-                sawTargetFile = sawTargetFile || inCurrentFile
+            trimmed.startsWith("*** Update File: ") -> {
+                flushMode()?.let { return AgentPatchParseResult(false, message = "Invalid patch hunk on line $lineNumber: $it") }
+                updatePath = trimmed.removePrefix("*** Update File: ").trim()
+                mode = "update"
             }
-            inPatch && line.startsWith("*** ") -> {
-                flushHunk()?.let { return AgentPatchParseResult(false, message = it.message) }
-                inCurrentFile = false
+            mode == "add" -> {
+                if (!rawLine.startsWith("+")) {
+                    return AgentPatchParseResult(false, message = "Invalid patch hunk on line $lineNumber: '$trimmed' is not a valid hunk header")
+                }
+                addContents.append(rawLine.drop(1)).append('\n')
             }
-            inPatch && inCurrentFile && line.startsWith("@@") -> {
-                flushHunk()?.let { return AgentPatchParseResult(false, message = it.message) }
-                hunkStarted = true
+            mode == "delete" -> {
+                return AgentPatchParseResult(false, message = "Invalid patch hunk on line $lineNumber: '$trimmed' is not a valid hunk header")
             }
-            inPatch && inCurrentFile && hunkStarted && line.isNotEmpty() -> {
-                when (line[0]) {
-                    ' ' -> {
-                        oldText.append(line.drop(1)).append('\n')
-                        newText.append(line.drop(1)).append('\n')
+            mode == "update" -> {
+                if (endOfFile && updateLine.isNotEmpty() && updateLine != "@@" && !updateLine.startsWith("@@ ")) {
+                    return AgentPatchParseResult(false, message = "Invalid patch hunk on line $lineNumber: Expected update hunk to start with a @@ context marker, got: '$rawLine'")
+                }
+                when {
+                    chunks.isEmpty() && movePath == null && updateLine.startsWith("*** Move to: ") -> {
+                        movePath = updateLine.removePrefix("*** Move to: ").trim()
                     }
-                    '-' -> oldText.append(line.drop(1)).append('\n')
-                    '+' -> newText.append(line.drop(1)).append('\n')
-                    else -> return AgentPatchParseResult(false, message = "无效 hunk 行：$line")
+                    updateLine == "@@" || updateLine.startsWith("@@ ") -> {
+                        flushChunk()?.let { return AgentPatchParseResult(false, message = "Invalid patch hunk on line $lineNumber: $it") }
+                        chunkContext = updateLine.removePrefix("@@").trim().takeIf { it.isNotEmpty() }
+                        chunkStarted = true
+                    }
+                    updateLine == "*** End of File" -> {
+                        if (!chunkStarted || oldLines.isEmpty() && newLines.isEmpty()) {
+                            return AgentPatchParseResult(false, message = "Invalid patch hunk on line $lineNumber: Update hunk does not contain any lines")
+                        }
+                        endOfFile = true
+                    }
+                    rawLine.isEmpty() -> {
+                        chunkStarted = true
+                        oldLines += ""
+                        newLines += ""
+                    }
+                    rawLine.startsWith(" ") -> {
+                        chunkStarted = true
+                        oldLines += rawLine.drop(1)
+                        newLines += rawLine.drop(1)
+                    }
+                    rawLine.startsWith("+") -> {
+                        chunkStarted = true
+                        newLines += rawLine.drop(1)
+                    }
+                    rawLine.startsWith("-") -> {
+                        chunkStarted = true
+                        oldLines += rawLine.drop(1)
+                    }
+                    oldLines.isNotEmpty() || newLines.isNotEmpty() -> {
+                        return AgentPatchParseResult(false, message = "Invalid patch hunk on line $lineNumber: Expected update hunk to start with a @@ context marker, got: '$rawLine'")
+                    }
+                    else -> {
+                        return AgentPatchParseResult(false, message = "Invalid patch hunk on line $lineNumber: Unexpected line found in update hunk: '$rawLine'")
+                    }
                 }
             }
-            inPatch && inCurrentFile && hunkStarted && line.isEmpty() -> {
-                oldText.append('\n')
-                newText.append('\n')
+            trimmed.isNotEmpty() -> {
+                return AgentPatchParseResult(
+                    false,
+                    message = "Invalid patch hunk on line $lineNumber: '$trimmed' is not a valid hunk header. Valid hunk headers: '*** Add File: {path}', '*** Delete File: {path}', '*** Update File: {path}'",
+                )
             }
         }
     }
-    flushHunk()?.let { return AgentPatchParseResult(false, message = it.message) }
-    if (!sawTargetFile) return AgentPatchParseResult(false, message = "patch 未指向当前文件")
-    if (hunks.isEmpty()) return AgentPatchParseResult(false, message = "patch 不包含 hunk")
+    if (mode != "ended") return AgentPatchParseResult(false, message = "Invalid patch: The last line of the patch must be '*** End Patch'")
     return AgentPatchParseResult(true, hunks)
 }
 
-private fun pathMatchesCurrentFile(path: String, currentPath: String): Boolean {
-    val normalized = path.replace('\\', '/')
-    val current = currentPath.replace('\\', '/')
-    return normalized == current ||
-        current.endsWith("/$normalized") ||
-        normalized == current.substringAfterLast('/')
+private fun unwrapAgentPatch(patch: String): String {
+    val trimmed = patch.trim()
+    val lines = trimmed.lines()
+    if (lines.size >= 4 && (lines.first() == "<<EOF" || lines.first() == "<<'EOF'" || lines.first() == "<<\"EOF\"") && lines.last().endsWith("EOF")) {
+        return lines.drop(1).dropLast(1).joinToString("\n").trim()
+    }
+    return trimmed
 }
 
-private fun findPatchMatch(text: String, oldText: String, startIndex: Int): IntRange? {
-    if (oldText.isEmpty()) return null
-    val exact = text.indexOf(oldText, startIndex.coerceIn(0, text.length))
-    if (exact >= 0) return exact until exact + oldText.length
-    if (oldText.endsWith('\n')) {
-        val trimmed = oldText.dropLast(1)
-        val trimmedIndex = text.indexOf(trimmed, startIndex.coerceIn(0, text.length))
-        if (trimmedIndex >= 0) return trimmedIndex until trimmedIndex + trimmed.length
+private fun deriveAgentPatchText(currentText: String, chunks: List<AgentPatchChunk>): String? {
+    val originalLines = currentText.split('\n').toMutableList()
+    if (originalLines.lastOrNull()?.isEmpty() == true) originalLines.removeAt(originalLines.lastIndex)
+    val replacements = ArrayList<Triple<Int, Int, List<String>>>()
+    var lineIndex = 0
+
+    chunks.forEach { chunk ->
+        chunk.changeContext?.let { context ->
+            val contextIndex = seekAgentPatchSequence(originalLines, listOf(context), lineIndex, eof = false)
+                ?: return null
+            lineIndex = contextIndex + 1
+        }
+        if (chunk.oldLines.isEmpty()) {
+            val insertionIndex = if (originalLines.lastOrNull()?.isEmpty() == true) originalLines.lastIndex else originalLines.size
+            replacements += Triple(insertionIndex, 0, chunk.newLines)
+            return@forEach
+        }
+
+        var pattern = chunk.oldLines
+        var newLines = chunk.newLines
+        var found = seekAgentPatchSequence(originalLines, pattern, lineIndex, chunk.isEndOfFile)
+        if (found == null && pattern.lastOrNull()?.isEmpty() == true) {
+            pattern = pattern.dropLast(1)
+            if (newLines.lastOrNull()?.isEmpty() == true) newLines = newLines.dropLast(1)
+            found = seekAgentPatchSequence(originalLines, pattern, lineIndex, chunk.isEndOfFile)
+        }
+        val start = found ?: return null
+        replacements += Triple(start, pattern.size, newLines)
+        lineIndex = start + pattern.size
     }
-    return null
+
+    val newContentLines = originalLines.toMutableList()
+    replacements.sortedByDescending { it.first }.forEach { (start, oldLength, newLines) ->
+        repeat(oldLength) { if (start < newContentLines.size) newContentLines.removeAt(start) }
+        newLines.forEachIndexed { index, line -> newContentLines.add(start + index, line) }
+    }
+    if (newContentLines.lastOrNull()?.isNotEmpty() != false) newContentLines += ""
+    return newContentLines.joinToString("\n")
 }
+
+private fun seekAgentPatchSequence(lines: List<String>, pattern: List<String>, start: Int, eof: Boolean): Int? {
+    if (pattern.isEmpty()) return start.coerceIn(0, lines.size)
+    if (pattern.size > lines.size) return null
+    val searchStart = if (eof && lines.size >= pattern.size) lines.size - pattern.size else start.coerceIn(0, lines.size)
+    val searchEnd = lines.size - pattern.size
+    fun search(matches: (String, String) -> Boolean): Int? {
+        for (i in searchStart..searchEnd) {
+            var ok = true
+            for (j in pattern.indices) {
+                if (!matches(lines[i + j], pattern[j])) {
+                    ok = false
+                    break
+                }
+            }
+            if (ok) return i
+        }
+        return null
+    }
+    return search { a, b -> a == b }
+        ?: search { a, b -> a.trimEnd() == b.trimEnd() }
+        ?: search { a, b -> a.trim() == b.trim() }
+        ?: search { a, b -> normalizePatchLine(a) == normalizePatchLine(b) }
+}
+
+private fun normalizePatchLine(line: String): String =
+    line.trim().map { ch ->
+        when (ch) {
+            '\u2010', '\u2011', '\u2012', '\u2013', '\u2014', '\u2015', '\u2212' -> '-'
+            '\u2018', '\u2019', '\u201A', '\u201B' -> '\''
+            '\u201C', '\u201D', '\u201E', '\u201F' -> '"'
+            '\u00A0', '\u2002', '\u2003', '\u2004', '\u2005', '\u2006', '\u2007',
+            '\u2008', '\u2009', '\u200A', '\u202F', '\u205F', '\u3000' -> ' '
+            else -> ch
+        }
+    }.joinToString("")
+
+private suspend fun readAgentFile(state: IdeUiState, call: UiAgentToolCall): AgentToolResult {
+    val rootPath = normalizeWorkspacePath(state.backend.project.rootPath)
+    val requested = call.stringArguments["path"]
+    val active = state.active
+    val path = if (requested.isNullOrBlank()) {
+        active?.path ?: return toolFailure("没有当前文件")
+    } else {
+        resolveAgentPatchPath(rootPath, requested) ?: return toolFailure("路径不在工作区内：$requested")
+    }
+    val normalizedPath = normalizeWorkspacePath(path)
+    val known = collectFilePaths(state.backend.files.fileTree(TreeViewMode.AllFiles)).map(::normalizeWorkspacePath).toSet()
+    if (normalizedPath !in known && normalizedPath != normalizeWorkspacePath(active?.path.orEmpty())) {
+        return toolFailure("文件不存在或不在工作区内：$path")
+    }
+    val text = state.openFiles.firstOrNull { normalizeWorkspacePath(it.path) == normalizedPath }?.text
+        ?: state.backend.files.readFile(normalizedPath)
+    val symbol = call.stringArguments["symbol"]?.takeIf { it.isNotBlank() }
+    val range = if (symbol != null) {
+        val structure = runCatching { state.backend.editor.fileStructure(normalizedPath, text) }.getOrDefault(emptyList())
+        symbolRange(text, structure, symbol) ?: return toolFailure("未找到符号：$symbol")
+    } else {
+        requestedRange(text, call)
+    }
+    val includeLineNumbers = call.booleanArgument("includeLineNumbers", default = true)
+    val body = formatFileRead(normalizedPath, text, range.first, range.last + 1, includeLineNumbers)
+    return toolSuccess(body)
+}
+
+private fun requestedRange(text: String, call: UiAgentToolCall): IntRange {
+    val offset = call.stringArguments["offset"]?.toIntOrNull()
+    val length = call.stringArguments["length"]?.toIntOrNull()
+    if (offset != null) {
+        val start = offset.coerceIn(0, text.length)
+        val end = (start + (length ?: 20000).coerceAtLeast(0)).coerceIn(start, text.length)
+        return start until end
+    }
+    val starts = lineStarts(text)
+    val startLine = call.stringArguments["startLine"]?.toIntOrNull()?.coerceAtLeast(1)
+    val endLine = call.stringArguments["endLine"]?.toIntOrNull()?.coerceAtLeast(1)
+    if (startLine != null || endLine != null) {
+        val first = (startLine ?: 1).coerceAtMost(starts.size)
+        val last = (endLine ?: (first + 199)).coerceAtLeast(first).coerceAtMost(starts.size)
+        return lineOffsetRange(text, starts, first, last)
+    }
+    return 0 until text.length.coerceAtMost(20000)
+}
+
+private fun symbolRange(text: String, structure: List<UiFileSymbol>, symbol: String): IntRange? {
+    val match = structure.firstOrNull { it.name == symbol }
+        ?: structure.firstOrNull { it.name.contains(symbol, ignoreCase = true) }
+        ?: return null
+    val starts = lineStarts(text)
+    val startLine = lineNumberForOffset(starts, match.nameOffset).coerceAtLeast(1)
+    val endLine = lineNumberForOffset(starts, match.endOffset).coerceAtLeast(startLine)
+    return lineOffsetRange(text, starts, startLine, endLine)
+}
+
+private fun formatFileRead(path: String, text: String, start: Int, end: Int, includeLineNumbers: Boolean): String {
+    val clippedStart = start.coerceIn(0, text.length)
+    val clippedEnd = end.coerceIn(clippedStart, text.length)
+    val content = text.substring(clippedStart, clippedEnd)
+    if (!includeLineNumbers) return "path: $path\n```\n$content\n```"
+    val firstLine = lineNumberForOffset(lineStarts(text), clippedStart)
+    val numbered = content.lineSequence().mapIndexed { index, line ->
+        "${firstLine + index}: $line"
+    }.joinToString("\n")
+    return "path: $path\nlines: $firstLine-${firstLine + content.lineSequence().count().coerceAtLeast(1) - 1}\n```\n$numbered\n```"
+}
+
+private fun lineStarts(text: String): List<Int> {
+    val starts = ArrayList<Int>()
+    starts += 0
+    text.forEachIndexed { index, ch -> if (ch == '\n' && index + 1 <= text.length) starts += index + 1 }
+    return starts
+}
+
+private fun lineNumberForOffset(starts: List<Int>, offset: Int): Int {
+    var low = 0
+    var high = starts.lastIndex
+    while (low <= high) {
+        val mid = (low + high) ushr 1
+        if (starts[mid] <= offset) low = mid + 1 else high = mid - 1
+    }
+    return high.coerceAtLeast(0) + 1
+}
+
+private fun lineOffsetRange(text: String, starts: List<Int>, startLine: Int, endLine: Int): IntRange {
+    val start = starts[(startLine - 1).coerceIn(0, starts.lastIndex)]
+    val end = if (endLine < starts.size) starts[endLine] else text.length
+    return start until end
+}
+
+private fun globWorkspaceFiles(rootPath: String, filePaths: List<String>, pattern: String): List<String> {
+    val regex = globToRegex(pattern.replace('\\', '/'))
+    val root = normalizeWorkspacePath(rootPath)
+    return filePaths
+        .map(::normalizeWorkspacePath)
+        .filter { path ->
+            val rel = displayWorkspacePath(root, path)
+            regex.matches(path) || regex.matches(rel)
+        }
+        .sorted()
+}
+
+private fun grepWorkspaceFiles(
+    rootPath: String,
+    filePaths: List<String>,
+    readFile: (String) -> String,
+    query: String,
+    pathGlob: String?,
+    regex: Boolean,
+    caseSensitive: Boolean,
+    limit: Int,
+): List<String> {
+    val options = if (caseSensitive) emptySet() else setOf(RegexOption.IGNORE_CASE)
+    val needle = runCatching { Regex(if (regex) query else Regex.escape(query), options) }.getOrNull() ?: return listOf("无效正则：$query")
+    val root = normalizeWorkspacePath(rootPath)
+    val files = if (pathGlob.isNullOrBlank()) filePaths.map(::normalizeWorkspacePath)
+    else globWorkspaceFiles(root, filePaths, pathGlob)
+    val out = ArrayList<String>()
+    for (path in files.sorted()) {
+        val text = runCatching { readFile(path) }.getOrDefault("")
+        text.lineSequence().forEachIndexed { index, line ->
+            val match = needle.find(line)
+            if (match != null) {
+                out += "${displayWorkspacePath(root, path)}:${index + 1}:${match.range.first + 1}: $line"
+                if (out.size >= limit) return out
+            }
+        }
+    }
+    return out
+}
+
+private fun globToRegex(pattern: String): Regex {
+    val out = StringBuilder("^")
+    var i = 0
+    while (i < pattern.length) {
+        when (val ch = pattern[i]) {
+            '*' -> {
+                if (i + 1 < pattern.length && pattern[i + 1] == '*') {
+                    out.append(".*")
+                    i++
+                } else {
+                    out.append("[^/]*")
+                }
+            }
+            '?' -> out.append("[^/]")
+            '.', '(', ')', '+', '|', '^', '$', '@', '%', '{', '}', '[', ']', '\\' -> out.append('\\').append(ch)
+            else -> out.append(ch)
+        }
+        i++
+    }
+    out.append('$')
+    return Regex(out.toString())
+}
+
+private fun resolveAgentPatchPath(rootPath: String, path: String): String? {
+    val normalizedRoot = normalizeWorkspacePath(rootPath).trimEnd('/')
+    val raw = path.trim().replace('\\', '/')
+    if (raw.isEmpty()) return null
+    val resolved = if (raw.startsWith("/")) normalizeWorkspacePath(raw) else normalizeWorkspacePath("$normalizedRoot/$raw")
+    return resolved.takeIf { it == normalizedRoot || it.startsWith("$normalizedRoot/") }
+}
+
+private fun normalizeWorkspacePath(path: String): String {
+    val absolute = path.replace('\\', '/')
+    val prefix = if (absolute.startsWith("/")) "/" else ""
+    val parts = ArrayList<String>()
+    absolute.split('/').forEach { part ->
+        when {
+            part.isEmpty() || part == "." -> Unit
+            part == ".." -> if (parts.isNotEmpty()) parts.removeAt(parts.lastIndex)
+            else -> parts += part
+        }
+    }
+    return prefix + parts.joinToString("/")
+}
+
+private fun displayWorkspacePath(rootPath: String, path: String): String {
+    val root = normalizeWorkspacePath(rootPath).trimEnd('/')
+    val normalized = normalizeWorkspacePath(path)
+    return normalized.removePrefix("$root/").takeIf { it != normalized } ?: normalized
+}
+
+private fun ensurePatchCanTouchOpenFile(state: IdeUiState, path: String): String? {
+    val file = state.openFiles.firstOrNull { normalizeWorkspacePath(it.path) == path } ?: return null
+    return if (file.modified) "文件有未保存修改，拒绝覆盖：$path" else null
+}
+
+private fun syncOpenFilesAfterPatch(state: IdeUiState, changes: List<AgentAppliedChange>) {
+    changes.forEach { change ->
+        when (change) {
+            is AgentAppliedChange.Add -> updateOpenFileAfterPatch(state, change.path, change.text)
+            is AgentAppliedChange.Update -> updateOpenFileAfterPatch(state, change.path, change.text)
+            is AgentAppliedChange.Delete -> closeOpenFileAfterPatch(state, change.path)
+            is AgentAppliedChange.Move -> {
+                closeOpenFileAfterPatch(state, change.from)
+                updateOpenFileAfterPatch(state, change.path, change.text)
+            }
+        }
+    }
+    state.activeIndex = state.activeIndex.coerceAtMost(state.openFiles.lastIndex)
+}
+
+private fun updateOpenFileAfterPatch(state: IdeUiState, path: String, text: String) {
+    val index = state.openFiles.indexOfFirst { normalizeWorkspacePath(it.path) == path }
+    if (index < 0) return
+    val name = path.substringAfterLast('/').substringAfterLast('\\')
+    state.openFiles[index] = OpenFile(path, name, text)
+    state.backend.editor.updateDocument(path, text)
+}
+
+private fun closeOpenFileAfterPatch(state: IdeUiState, path: String) {
+    val index = state.openFiles.indexOfFirst { normalizeWorkspacePath(it.path) == path }
+    if (index >= 0) state.openFiles.removeAt(index)
+}
+
+private fun buildPatchSummary(added: List<String>, modified: List<String>, deleted: List<String>): String = buildString {
+    append("Success. Updated the following files:\n")
+    added.forEach { append("A ").append(it).append('\n') }
+    modified.forEach { append("M ").append(it).append('\n') }
+    deleted.forEach { append("D ").append(it).append('\n') }
+}
+
+private fun UiAgentToolCall.intArgument(name: String, default: Int, min: Int, max: Int): Int =
+    stringArguments[name]?.toIntOrNull()?.coerceIn(min, max) ?: default
+
+private fun UiAgentToolCall.booleanArgument(name: String, default: Boolean = false): Boolean =
+    when (stringArguments[name]?.lowercase()) {
+        "true", "1", "yes", "y" -> true
+        "false", "0", "no", "n" -> false
+        else -> default
+    }
 
 private fun collectFilePaths(root: TreeNode): List<String> {
     val out = ArrayList<String>()

@@ -446,6 +446,12 @@ internal class FileBackend(private val ctx: BackendContext) : FileService {
         } else p.readText()
     }.getOrDefault("")
 
+    override fun writeFile(path: String, text: String): Boolean = runCatching {
+        ctx.services.save(Paths.get(path), text)
+        ctx.bumpFileSystemEpoch()
+        true
+    }.getOrDefault(false)
+
     /** True if [p]'s first block contains a NUL byte — a cheap, reliable "this isn't text" heuristic. */
     private fun looksBinary(p: Path): Boolean = runCatching {
         Files.newInputStream(p).use { ins ->
