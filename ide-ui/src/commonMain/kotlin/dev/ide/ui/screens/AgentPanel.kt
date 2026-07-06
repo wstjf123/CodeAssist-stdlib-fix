@@ -1,6 +1,5 @@
 package dev.ide.ui.screens
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -99,7 +98,6 @@ internal fun AgentSheets(state: IdeUiState, compact: Boolean) {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AgentPanel(
     state: IdeUiState,
@@ -112,12 +110,21 @@ private fun AgentPanel(
     val displayItems = buildAgentDisplayItems(messages)
     val scrollRevision = displayItems.sumOf { it.contentLength }
     val expandedTools = remember { mutableStateMapOf<String, Boolean>() }
-    val lazyItemCount = displayItems.sumOf { if (it.isTool && expandedTools[it.key] == true) 3 else 1 } + 1
+    val pinnedTool by remember(displayItems) {
+        derivedStateOf {
+            val visibleItems = listState.layoutInfo.visibleItemsInfo
+            displayItems.firstOrNull { item ->
+                if (!item.isTool || expandedTools[item.key] != true) return@firstOrNull false
+                val visible = visibleItems.firstOrNull { it.key == item.key } ?: return@firstOrNull false
+                visible.offset < 0 && visible.offset + visible.size > 0
+            }
+        }
+    }
 
     LaunchedEffect(displayItems.size, scrollRevision) {
         if (displayItems.isNotEmpty()) {
             yield()
-            listState.scrollToItem(lazyItemCount - 1)
+            listState.scrollToItem(displayItems.size)
         }
     }
 
@@ -153,66 +160,43 @@ private fun AgentPanel(
                 Spacer(Modifier.weight(1f))
             }
         } else {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-            ) {
-                var rowIndex = 0
-                displayItems.forEach { item ->
-                    val tool = item.isTool
-                    val expanded = tool && expandedTools[item.key] == true
-                    if (tool && expanded) {
-                        val detailsKey = "${item.key}:details"
-                        val detailsIndex = rowIndex + 1
-                        rowIndex += 3
-                        stickyHeader {
-                            val detailsVisible by remember(detailsKey, detailsIndex) {
-                                derivedStateOf {
-                                    listState.firstVisibleItemIndex <= detailsIndex ||
-                                        listState.layoutInfo.visibleItemsInfo.any { it.key == detailsKey }
-                                }
-                            }
-                            Box(
-                                Modifier.fillMaxWidth()
-                                    .background(listBackground)
-                                    .padding(bottom = if (detailsVisible) 0.dp else 8.dp),
-                            ) {
-                                ToolMessageHeader(
-                                    message = item.message,
-                                    outputItem = item.output,
-                                    expanded = true,
-                                    connected = detailsVisible,
-                                    onToggle = { expandedTools[item.key] = false },
-                                )
-                            }
-                        }
-                        item(key = detailsKey) {
-                            Box(Modifier.padding(bottom = 8.dp)) {
-                                ToolMessageDetails(message = item.message, outputItem = item.output)
-                            }
-                        }
-                        stickyHeader {
-                            Spacer(Modifier.height(0.dp))
-                        }
-                    } else {
-                        rowIndex += 1
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    displayItems.forEach { item ->
                         item(key = item.key) {
                             Box(Modifier.padding(bottom = 8.dp)) {
                                 MessageBubble(
                                     item = item,
-                                    expanded = false,
+                                    expanded = item.isTool && expandedTools[item.key] == true,
                                     onToggleTool = { expandedTools[item.key] = true },
                                 )
                             }
                         }
                     }
+                    item(key = "agent:bottom") {
+                        Spacer(Modifier.height(1.dp))
+                    }
                 }
-                item(key = "agent:bottom") {
-                    Spacer(Modifier.height(1.dp))
+                pinnedTool?.let { item ->
+                    Box(
+                        Modifier.align(Alignment.TopStart)
+                            .fillMaxWidth()
+                            .background(listBackground)
+                            .padding(bottom = 8.dp),
+                    ) {
+                        ToolMessageHeader(
+                            message = item.message,
+                            outputItem = item.output,
+                            expanded = true,
+                            onToggle = { expandedTools[item.key] = false },
+                        )
+                    }
                 }
             }
         }
-
         Composer(
             value = state.agentPrompt,
             onValueChange = { state.agentPrompt = it },
@@ -408,20 +392,11 @@ private fun ToolMessageHeader(
     message: AgentConversationItem,
     outputItem: AgentConversationItem?,
     expanded: Boolean,
-    connected: Boolean = false,
     onToggle: () -> Unit,
 ) {
     Box(
         Modifier.fillMaxWidth()
-            .background(
-                Ca.colors.surface2,
-                RoundedCornerShape(
-                    topStart = Ca.radius.sm,
-                    topEnd = Ca.radius.sm,
-                    bottomStart = if (connected) 0.dp else Ca.radius.sm,
-                    bottomEnd = if (connected) 0.dp else Ca.radius.sm,
-                ),
-            )
+            .background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.sm))
             .padding(10.dp),
     ) {
         ToolMessageHeaderContent(toolMessageState(message, outputItem), expanded, onToggle)
