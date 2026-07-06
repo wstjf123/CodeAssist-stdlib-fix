@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -59,14 +60,22 @@ import kotlinx.coroutines.yield
 
 @Composable
 internal fun AgentDock(state: IdeUiState, modifier: Modifier = Modifier) {
-    AgentPanel(state = state, modifier = modifier.fillMaxSize().padding(14.dp))
+    AgentPanel(
+        state = state,
+        modifier = modifier.fillMaxSize().padding(14.dp),
+        listBackground = Ca.colors.glassReg,
+    )
 }
 
 @Composable
 internal fun AgentSheets(state: IdeUiState, compact: Boolean) {
     if (compact) {
         BottomSheet(visible = state.agentOpen, onDismiss = { state.agentOpen = false }, heightFraction = 0.9f) {
-            AgentPanel(state = state, modifier = Modifier.fillMaxWidth().weight(1f).padding(start = 14.dp, end = 14.dp, bottom = 14.dp))
+            AgentPanel(
+                state = state,
+                modifier = Modifier.fillMaxWidth().weight(1f).padding(start = 14.dp, end = 14.dp, bottom = 14.dp),
+                listBackground = Ca.colors.glassThick,
+            )
         }
     }
     BottomSheet(visible = state.agentConfigOpen, onDismiss = { state.agentConfigOpen = false }, heightFraction = 0.72f) {
@@ -91,7 +100,11 @@ internal fun AgentSheets(state: IdeUiState, compact: Boolean) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
+private fun AgentPanel(
+    state: IdeUiState,
+    modifier: Modifier = Modifier,
+    listBackground: Color = Color.Transparent,
+) {
     val active = state.active
     val messages = state.agentMessages
     val listState = rememberLazyListState()
@@ -147,12 +160,14 @@ private fun AgentPanel(state: IdeUiState, modifier: Modifier = Modifier) {
                     val expanded = tool && expandedTools[item.key] == true
                     if (tool && expanded) {
                         stickyHeader {
-                            ToolMessageHeader(
-                                message = item.message,
-                                outputItem = item.output,
-                                expanded = true,
-                                onToggle = { expandedTools[item.key] = false },
-                            )
+                            Box(Modifier.fillMaxWidth().background(listBackground)) {
+                                ToolMessageHeader(
+                                    message = item.message,
+                                    outputItem = item.output,
+                                    expanded = true,
+                                    onToggle = { expandedTools[item.key] = false },
+                                )
+                            }
                         }
                         item(key = "${item.key}:details") {
                             Box(Modifier.padding(bottom = 8.dp)) {
