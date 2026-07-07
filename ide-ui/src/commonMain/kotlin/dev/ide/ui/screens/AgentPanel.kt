@@ -37,6 +37,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -110,14 +112,25 @@ private fun AgentPanel(
     val displayItems = buildAgentDisplayItems(messages)
     val scrollRevision = displayItems.sumOf { it.contentLength }
     val expandedTools = remember { mutableStateMapOf<String, Boolean>() }
-    val pinnedTool by remember(displayItems) {
+    val defaultToolHeaderHeightPx = with(LocalDensity.current) { DefaultToolHeaderHeight.roundToPx() }
+    var measuredToolHeaderHeightPx by remember { mutableStateOf(0) }
+    val toolHeaderHeightPx = measuredToolHeaderHeightPx.takeIf { it > 0 } ?: defaultToolHeaderHeightPx
+    val pinnedToolCard by remember(displayItems, toolHeaderHeightPx) {
         derivedStateOf {
             val visibleItems = listState.layoutInfo.visibleItemsInfo
-            displayItems.firstOrNull { item ->
-                if (!item.isTool || expandedTools[item.key] != true) return@firstOrNull false
-                val visible = visibleItems.firstOrNull { it.key == item.key } ?: return@firstOrNull false
-                visible.offset < 0 && visible.offset + visible.size > 0
+            var pinned: PinnedToolCard? = null
+            for (item in displayItems) {
+                if (!item.isTool || expandedTools[item.key] != true) continue
+                val visible = visibleItems.firstOrNull { it.key == item.key } ?: continue
+                if (visible.offset < 0 && visible.offset + visible.size > 0) {
+                    pinned = PinnedToolCard(
+                        item = item,
+                        connected = visible.offset + visible.size > toolHeaderHeightPx,
+                    )
+                    break
+                }
             }
+            pinned
         }
     }
 
@@ -180,18 +193,20 @@ private fun AgentPanel(
                         Spacer(Modifier.height(1.dp))
                     }
                 }
-                pinnedTool?.let { item ->
+                pinnedToolCard?.let { pinned ->
                     Box(
                         Modifier.align(Alignment.TopStart)
                             .fillMaxWidth()
                             .background(listBackground)
-                            .padding(bottom = 8.dp),
+                            .padding(bottom = if (pinned.connected) 0.dp else 8.dp),
                     ) {
-                        ToolMessageHeader(
-                            message = item.message,
-                            outputItem = item.output,
+                        StickyToolCardHeader(
+                            message = pinned.item.message,
+                            outputItem = pinned.item.output,
                             expanded = true,
-                            onToggle = { expandedTools[item.key] = false },
+                            connected = pinned.connected,
+                            onHeightChange = { measuredToolHeaderHeightPx = it },
+                            onToggle = { expandedTools[pinned.item.key] = false },
                         )
                     }
                 }
@@ -290,6 +305,13 @@ private data class AgentDisplayItem(
     val isTool: Boolean get() =
         message.type == "function_call" || message.type == "function_call_output"
 }
+
+private data class PinnedToolCard(
+    val item: AgentDisplayItem,
+    val connected: Boolean,
+)
+
+private val DefaultToolHeaderHeight = 40.dp
 
 private fun buildAgentDisplayItems(messages: List<AgentConversationItem>): List<AgentDisplayItem> {
     val callsById = messages.asSequence()
@@ -397,6 +419,33 @@ private fun ToolMessageHeader(
     Box(
         Modifier.fillMaxWidth()
             .background(Ca.colors.surface2, RoundedCornerShape(Ca.radius.sm))
+            .padding(10.dp),
+    ) {
+        ToolMessageHeaderContent(toolMessageState(message, outputItem), expanded, onToggle)
+    }
+}
+
+@Composable
+private fun StickyToolCardHeader(
+    message: AgentConversationItem,
+    outputItem: AgentConversationItem?,
+    expanded: Boolean,
+    connected: Boolean,
+    onHeightChange: (Int) -> Unit,
+    onToggle: () -> Unit,
+) {
+    Box(
+        Modifier.fillMaxWidth()
+            .onSizeChanged { onHeightChange(it.height) }
+            .background(
+                Ca.colors.surface2,
+                RoundedCornerShape(
+                    topStart = Ca.radius.sm,
+                    topEnd = Ca.radius.sm,
+                    bottomStart = if (connected) 0.dp else Ca.radius.sm,
+                    bottomEnd = if (connected) 0.dp else Ca.radius.sm,
+                ),
+            )
             .padding(10.dp),
     ) {
         ToolMessageHeaderContent(toolMessageState(message, outputItem), expanded, onToggle)
