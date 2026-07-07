@@ -113,19 +113,21 @@ private fun AgentPanel(
     val scrollRevision = displayItems.sumOf { it.contentLength }
     val expandedTools = remember { mutableStateMapOf<String, Boolean>() }
     val defaultToolHeaderHeightPx = with(LocalDensity.current) { DefaultToolHeaderHeight.roundToPx() }
+    val messageBottomGapPx = with(LocalDensity.current) { MessageBottomGap.roundToPx() }
     var measuredToolHeaderHeightPx by remember { mutableStateOf(0) }
     val toolHeaderHeightPx = measuredToolHeaderHeightPx.takeIf { it > 0 } ?: defaultToolHeaderHeightPx
-    val pinnedToolCard by remember(displayItems, toolHeaderHeightPx) {
+    val pinnedToolCard by remember(displayItems, toolHeaderHeightPx, messageBottomGapPx) {
         derivedStateOf {
             val visibleItems = listState.layoutInfo.visibleItemsInfo
             var pinned: PinnedToolCard? = null
             for (item in displayItems) {
                 if (!item.isTool || expandedTools[item.key] != true) continue
                 val visible = visibleItems.firstOrNull { it.key == item.key } ?: continue
-                if (visible.offset < 0 && visible.offset + visible.size > 0) {
+                val cardBottom = visible.offset + visible.size - messageBottomGapPx
+                if (visible.offset < 0 && cardBottom > 0) {
                     pinned = PinnedToolCard(
                         item = item,
-                        connected = visible.offset + visible.size > toolHeaderHeightPx,
+                        connected = cardBottom > toolHeaderHeightPx,
                     )
                     break
                 }
@@ -180,7 +182,7 @@ private fun AgentPanel(
                 ) {
                     displayItems.forEach { item ->
                         item(key = item.key) {
-                            Box(Modifier.padding(bottom = 8.dp)) {
+                            Box(Modifier.padding(bottom = MessageBottomGap)) {
                                 MessageBubble(
                                     item = item,
                                     expanded = item.isTool && expandedTools[item.key] == true,
@@ -312,6 +314,7 @@ private data class PinnedToolCard(
 )
 
 private val DefaultToolHeaderHeight = 40.dp
+private val MessageBottomGap = 8.dp
 
 private fun buildAgentDisplayItems(messages: List<AgentConversationItem>): List<AgentDisplayItem> {
     val callsById = messages.asSequence()
