@@ -43,6 +43,9 @@ class SettingsStore(
             completionMaxItems = int("completion.maxItems", d.completionMaxItems).coerceIn(MIN_COMPLETION_MAX_ITEMS, MAX_COMPLETION_MAX_ITEMS),
             postfixTemplates = bool("completion.postfixTemplates", d.postfixTemplates),
             wordCompletion = bool("completion.wordCompletion", d.wordCompletion),
+            aiInlineCompletion = bool("completion.aiInlineCompletion", d.aiInlineCompletion),
+            aiInlineModel = get(key("completion.aiInlineModel")) ?: d.aiInlineModel,
+            aiInlineReasoningEffort = oneOf("completion.aiInlineReasoningEffort", d.aiInlineReasoningEffort, "low", "medium", "high"),
             analyzeOnTheFly = bool("analysis.onTheFly", d.analyzeOnTheFly),
             reparseDelayMs = int("analysis.reparseDelayMs", d.reparseDelayMs).coerceIn(MIN_REPARSE_DELAY_MS, MAX_REPARSE_DELAY_MS),
             formatOnSave = bool("codeStyle.formatOnSave", d.formatOnSave),
@@ -140,6 +143,9 @@ class SettingsStore(
         put("completion.maxItems", s.completionMaxItems.toString())
         put("completion.postfixTemplates", s.postfixTemplates.toString())
         put("completion.wordCompletion", s.wordCompletion.toString())
+        put("completion.aiInlineCompletion", s.aiInlineCompletion.toString())
+        put("completion.aiInlineModel", s.aiInlineModel)
+        put("completion.aiInlineReasoningEffort", s.aiInlineReasoningEffort)
         put("analysis.onTheFly", s.analyzeOnTheFly.toString())
         put("analysis.reparseDelayMs", s.reparseDelayMs.toString())
         put("codeStyle.formatOnSave", s.formatOnSave.toString())

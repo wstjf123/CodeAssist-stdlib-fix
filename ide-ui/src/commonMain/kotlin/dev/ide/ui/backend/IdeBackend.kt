@@ -813,6 +813,21 @@ data class UiCompletionResult(
     val isIncomplete: Boolean = false,
 )
 
+data class UiInlineCompletionRequest(
+    val baseUrl: String,
+    val apiKey: String,
+    val model: String,
+    val reasoningEffort: String,
+    val path: String,
+    val language: String,
+    val text: String,
+    val offset: Int,
+)
+
+data class UiInlineCompletionResult(
+    val text: String = "",
+)
+
 /** A go-to-definition target: open [path] and move the caret to [offset]. */
 data class UiDefinition(val path: String, val offset: Int)
 
@@ -1066,6 +1081,9 @@ data class UiSettings(
     val completionMaxItems: Int = 200,
     val postfixTemplates: Boolean = true,
     val wordCompletion: Boolean = true,
+    val aiInlineCompletion: Boolean = false,
+    val aiInlineModel: String = "",
+    val aiInlineReasoningEffort: String = "low",
     val analyzeOnTheFly: Boolean = true,
     val reparseDelayMs: Int = 300,
     /** Soft-wrap long lines at the viewport edge (off = one row per line + horizontal scroll). */

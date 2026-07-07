@@ -114,6 +114,7 @@ import dev.ide.ui.editor.core.EditorSession
 import dev.ide.ui.editor.core.InlayPiece
 import dev.ide.ui.editor.core.LineRenderCache
 import dev.ide.ui.backend.UiInlayHint
+import dev.ide.ui.components.IconButtonCa
 import dev.ide.ui.editor.core.RangeEdit
 import dev.ide.ui.editor.core.WrapModel
 import dev.ide.ui.editor.core.smartEnter
@@ -168,6 +169,11 @@ fun CodeEditor(
     completionAutoPopup: Boolean = true,
     /** Debounce (ms) before an auto-popup completion request (Settings → Completion → Advanced). */
     completionDelayMs: Int = 110,
+    aiInlineCompletion: Boolean = false,
+    aiInlineModel: String = "",
+    aiInlineReasoningEffort: String = "low",
+    aiBaseUrl: String = "",
+    aiApiKey: String = "",
     /**
      * Scroll both axes at once with a single touch drag (Settings → Editor). Off = the classic
      * orientation-locked drag (one axis per gesture). Touch-only: desktop trackpad/wheel already pans 2D.
@@ -208,6 +214,7 @@ fun CodeEditor(
         CodeEditorContent(
             path, session, backend, modifier, onSave, onNavigate, onRenamed,
             findEpoch, formatEpoch, fontScale, onFontScaleChange, onPreview, completionAutoPopup, completionDelayMs,
+            aiInlineCompletion, aiInlineModel, aiInlineReasoningEffort, aiBaseUrl, aiApiKey,
             twoAxisScroll, pinchZoom, softKeyboardSuggestions, wordWrap, wrapIndent, fontLigatures, obscured, autoFocus,
         )
     }
@@ -229,6 +236,11 @@ private fun CodeEditorContent(
     onPreview: (variantId: String) -> Unit = {},
     completionAutoPopup: Boolean = true,
     completionDelayMs: Int = 110,
+    aiInlineCompletion: Boolean = false,
+    aiInlineModel: String = "",
+    aiInlineReasoningEffort: String = "low",
+    aiBaseUrl: String = "",
+    aiApiKey: String = "",
     twoAxisScroll: Boolean = true,
     pinchZoom: Boolean = true,
     softKeyboardSuggestions: Boolean = true,
@@ -390,6 +402,9 @@ private fun CodeEditorContent(
         gutterNumberCache.getOrPut(n) {
             measurer.measure(AnnotatedString(n.toString()), style = gutterStyle, softWrap = false, maxLines = 1)
         }
+    val aiInlineStyle = remember(codeStyle, colors) { codeStyle.copy(color = colors.textTertiary.copy(alpha = 0.62f)) }
+    fun inlineLayout(text: String): TextLayoutResult =
+        measurer.measure(AnnotatedString(text), style = aiInlineStyle, softWrap = false, maxLines = 3)
 
     // A fold strip on the inner edge of the gutter holds the ▸/▾ chevrons (collapsed folds always show one;
     // an expandable line shows one on the caret line). Reserved so the line numbers don't reflow when a
@@ -723,6 +738,13 @@ private fun CodeEditorContent(
     // Apply the user's completion prefs to the controller (idempotent per recompose).
     completion.autoPopupEnabled = completionAutoPopup
     completion.delayMs = completionDelayMs
+    val aiInline = rememberAiInlineCompletionController(path, editorSession, backend)
+    aiInline.enabled = aiInlineCompletion
+    aiInline.baseUrl = aiBaseUrl
+    aiInline.apiKey = aiApiKey
+    aiInline.model = aiInlineModel
+    aiInline.reasoningEffort = aiInlineReasoningEffort
+    aiInline.delayMs = max(completionDelayMs + 250, 450)
     // Active snippet/template expansion (tab-stop stepping), or null. Reset when the file changes.
     var snippet by remember(path) { mutableStateOf<SnippetSession?>(null) }
     var paneTopInWindow by remember(path) { mutableFloatStateOf(0f) }
@@ -881,6 +903,7 @@ private fun CodeEditorContent(
             applyEditsKeepingViewport(edits, TextRange(base), anchorLine)
             snippet = SnippetSession.start(editorSession, base, snip)
             completion.dismiss()
+            aiInline.dismiss()
             return
         }
         // caret lands inside the inserted text (the item decides); edits above shift it by their delta
@@ -899,12 +922,14 @@ private fun CodeEditorContent(
         val sel = if (selLen > 0) TextRange(caret, caret + selLen) else TextRange(caret)
         applyEditsKeepingViewport(edits, sel, anchorLine)
         completion.dismiss()
+        aiInline.dismiss()
     }
 
     // Smart Enter (Shift+Enter): finish the current line, then open an indented new line — IntelliJ's
     // "Complete Statement". The decision is a pure function ([smartEnter]); we just apply its edit.
     fun completeStatement() {
         completion.dismiss()
+        aiInline.dismiss()
         val edit = smartEnter(editorSession.doc.chars, editorSession.selection.start, editorSession.language)
         editorSession.applyEdits(listOf(edit), TextRange(edit.caret))
     }
@@ -915,6 +940,7 @@ private fun CodeEditorContent(
     // caret's line. A no-op (already formatted / unsupported language) returns nothing and does nothing.
     suspend fun runFormat(rangeStart: Int, rangeEnd: Int) {
         completion.dismiss()
+        aiInline.dismiss()
         val text = editorSession.doc.text
         val caretBefore = editorSession.selection.start.coerceIn(0, editorSession.doc.length)
         val anchorLine = editorSession.doc.lineForOffset(caretBefore)
@@ -955,6 +981,7 @@ private fun CodeEditorContent(
         completion.selected = 0
         // This revision is accept()'s own edit (it inserts an identifier, which would otherwise re-trigger
         // completion). Swallow it once so the popup stays closed until the next real keystroke.
+        aiInline.dismiss()
         if (completion.consumeSuppressedTrigger()) return@LaunchedEffect
         val d = editorSession.doc
         val caret = editorSession.selection.start
@@ -988,6 +1015,15 @@ private fun CodeEditorContent(
                     if (completion.autoPopupEnabled) completion.reopen() else completion.dismiss()
                 }
             else -> completion.dismiss()
+        }
+        aiInline.request()
+    }
+
+    LaunchedEffect(editorSession.selection.start, editorSession.selection.end, isFocused, obscured) {
+        if (!isFocused || obscured || !editorSession.selection.collapsed) {
+            aiInline.dismiss()
+        } else {
+            aiInline.request()
         }
     }
 
@@ -1308,6 +1344,13 @@ private fun CodeEditorContent(
                             else -> Unit
                         }
                     }
+                    if (!showPopup && aiInline.suggestion != null) {
+                        when (ev.key) {
+                            Key.Tab, Key.Enter -> return@onPreviewKeyEvent aiInline.accept()
+                            Key.Escape -> { aiInline.dismiss(); return@onPreviewKeyEvent true }
+                            else -> Unit
+                        }
+                    }
                     // Esc closes the (informational) signature-help panel when no completion popup is open; the
                     // panel captures no other keys, so everything else flows through to the editor.
                     if (sig.help != null && !sig.dismissed && !showPopup && ev.key == Key.Escape) {
@@ -1580,9 +1623,32 @@ private fun CodeEditorContent(
                         caretContent = caretAnim.value, // animated, content-space; read here → redraw per frame
                         handlesVisible = handlesVisible && lastInputWasTouch,
                         handleColor = colors.accent,
+                        inlineSuggestion = aiInline.suggestion,
+                        inlineLayout = ::inlineLayout,
                     )
                 },
         )
+
+        aiInline.suggestion?.takeIf { engaged && isFocused && editorSession.selection.collapsed }?.let { suggestion ->
+            val (_, x, top) = caretGeometry(suggestion.offset.coerceIn(0, editorSession.doc.length))
+            Row(
+                Modifier
+                    .offset {
+                        IntOffset(
+                            x.roundToInt().coerceIn(gutterWidthPx.roundToInt(), (viewport.width - 72).coerceAtLeast(gutterWidthPx.roundToInt())),
+                            (top + metrics.lineHeight + 4.dp.toPx()).roundToInt().coerceIn(0, (viewport.height - 32).coerceAtLeast(0)),
+                        )
+                    }
+                    .background(colors.surface.copy(alpha = 0.96f), RoundedCornerShape(Ca.radius.sm))
+                    .border(1.dp, colors.separator, RoundedCornerShape(Ca.radius.sm))
+                    .padding(horizontal = 2.dp, vertical = 1.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(1.dp),
+            ) {
+                IconButtonCa(CaIcons.check, "接受 AI 补全", { aiInline.accept() }, boxSize = 28, iconSize = 15, active = true)
+                IconButtonCa(CaIcons.close, "关闭 AI 补全", { aiInline.dismiss() }, boxSize = 28, iconSize = 15)
+            }
+        }
 
         // inline diagnostic chips — one per line, the most severe diagnostic on it; composed once and
         // positioned in the layout phase so scrolling moves them without recomposition. Only Error and

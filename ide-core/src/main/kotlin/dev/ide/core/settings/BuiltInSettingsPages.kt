@@ -137,6 +137,18 @@ object BuiltInSettingsPages {
             SettingControl.Toggle("autoPopup", "自动显示建议", "输入时弹出列表（关闭后仅 Ctrl-Space 触发）", default = d.completionAutoPopup),
             SettingControl.Toggle("postfixTemplates", "后缀模板", "提供 .val / .if / .notnull / … 补全", default = d.postfixTemplates),
             SettingControl.Toggle("wordCompletion", "单词补全", "将文件中已有单词作为后备补全", default = d.wordCompletion),
+            SettingControl.Toggle("aiInlineCompletion", "AI 内联补全", "在光标后显示 AI 生成的灰色候选，可点接受插入。接口地址和密钥复用 AI 助手配置。", default = d.aiInlineCompletion, group = "AI"),
+            SettingControl.Text("aiInlineModel", "AI 补全模型", "留空则使用 AI 助手模型", default = d.aiInlineModel, placeholder = "gpt-5.5", group = "AI"),
+            SettingControl.Choice(
+                "aiInlineReasoningEffort", "AI 思考深度", "自动补全建议使用低思考深度以降低延迟",
+                default = d.aiInlineReasoningEffort,
+                options = listOf(
+                    SettingControl.Choice.Option("low", "低"),
+                    SettingControl.Choice.Option("medium", "中"),
+                    SettingControl.Choice.Option("high", "高"),
+                ),
+                group = "AI",
+            ),
             SettingControl.IntSlider("delayMs", "自动弹出延迟", "按键后多久显示列表", default = d.completionDelayMs, min = IdeSettings.MIN_COMPLETION_DELAY_MS, max = IdeSettings.MAX_COMPLETION_DELAY_MS, step = 10, unit = "ms", advanced = true),
             SettingControl.IntSlider("maxItems", "最大建议数", default = d.completionMaxItems, min = IdeSettings.MIN_COMPLETION_MAX_ITEMS, max = IdeSettings.MAX_COMPLETION_MAX_ITEMS, step = 10, advanced = true),
         )

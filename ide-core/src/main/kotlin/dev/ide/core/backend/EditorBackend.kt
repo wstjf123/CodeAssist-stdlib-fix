@@ -27,6 +27,8 @@ import dev.ide.ui.backend.UiQuickDoc
 import dev.ide.ui.backend.UiDiagnostic
 import dev.ide.ui.backend.UiFoldRegion
 import dev.ide.ui.backend.UiHighlightModifier
+import dev.ide.ui.backend.UiInlineCompletionRequest
+import dev.ide.ui.backend.UiInlineCompletionResult
 import dev.ide.ui.backend.UiInlayHint
 import dev.ide.ui.backend.UiInlayKind
 import dev.ide.ui.backend.UiInlayPart
@@ -147,6 +149,9 @@ internal class EditorBackend(private val ctx: BackendContext) : EditorService {
             isIncomplete = result.isIncomplete,
         )
     }
+
+    override suspend fun inlineCompletion(request: UiInlineCompletionRequest): UiInlineCompletionResult =
+        AgentBackend(ctx).inlineCompletion(request)
 
     override suspend fun analyze(path: String, text: String): List<UiDiagnostic> {
         // Routes through the full analysis engine: JDT compiler errors + the Java analyzers, merged,

@@ -114,6 +114,8 @@ internal fun DrawScope.drawEditor(
     caretContent: Offset,
     handlesVisible: Boolean,
     handleColor: Color,
+    inlineSuggestion: AiInlineSuggestion? = null,
+    inlineLayout: ((String) -> TextLayoutResult)? = null,
 ) {
     val doc = session.doc
     val sel = session.selection
@@ -293,6 +295,20 @@ internal fun DrawScope.drawEditor(
                 drawText(compositeLayoutFor(line), topLeft = Offset(textLeft, lineTop(line)))
             } else if (doc.lineLength(line) != 0) {
                 drawText(layoutFor(line), topLeft = Offset(textLeft, lineTop(line)))
+            }
+        }
+
+        inlineSuggestion?.let { suggestion ->
+            val layoutProvider = inlineLayout
+            if (layoutProvider != null && suggestion.offset == sel.end && sel.collapsed) {
+                val line = doc.lineForOffset(suggestion.offset.coerceIn(0, doc.length))
+                if (line in firstVisible..lastVisible && !foldModel.isHidden(line)) {
+                    val base = layoutFor(line)
+                    val col = rawToVisual(line, suggestion.offset - doc.lineStart(line)).coerceIn(0, base.layoutInput.text.length)
+                    val x = textLeft + base.getHorizontalPosition(col, usePrimaryDirection = true)
+                    val y = yTopOf(line, suggestion.offset)
+                    drawText(layoutProvider(suggestion.text), color = colors.muted.copy(alpha = 0.62f), topLeft = Offset(x, y))
+                }
             }
         }
 

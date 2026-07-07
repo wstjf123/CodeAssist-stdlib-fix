@@ -85,6 +85,10 @@ interface EditorService {
     /** Code completion for the live buffer [text] at [offset]. */
     suspend fun complete(path: String, text: String, offset: Int): UiCompletionResult
 
+    /** AI inline completion for the live buffer [text] at [offset]. Empty means no suggestion. */
+    suspend fun inlineCompletion(request: UiInlineCompletionRequest): UiInlineCompletionResult =
+        UiInlineCompletionResult()
+
     /** Diagnostics for the live buffer [text]. May throw [AnalysisPreempted] when completion took priority. */
     suspend fun analyze(path: String, text: String): List<UiDiagnostic>
 

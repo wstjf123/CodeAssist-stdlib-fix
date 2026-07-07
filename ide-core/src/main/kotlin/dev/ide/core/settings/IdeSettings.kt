@@ -56,6 +56,12 @@ data class IdeSettings(
     val postfixTemplates: Boolean = true,
     /** Offer plain words already in the buffer (hippie/word completion) as a fallback. */
     val wordCompletion: Boolean = true,
+    /** Show an AI-generated inline completion after a short idle period. */
+    val aiInlineCompletion: Boolean = false,
+    /** Optional model override for AI inline completion; blank means reuse the Agent model. */
+    val aiInlineModel: String = "",
+    /** Reasoning effort for AI inline completion. Keep low by default for typing latency. */
+    val aiInlineReasoningEffort: String = "low",
 
     // ---- analysis ----
     /** Run diagnostics as you type. Off = the editor never auto-analyzes (errors only surface on build). */

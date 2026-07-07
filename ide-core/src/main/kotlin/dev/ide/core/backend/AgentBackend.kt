@@ -17,6 +17,8 @@ import dev.ide.ui.backend.UiAgentResponse
 import dev.ide.ui.backend.UiAgentTokenUsage
 import dev.ide.ui.backend.UiAgentToolCall
 import dev.ide.ui.backend.UiAgentToolParameters
+import dev.ide.ui.backend.UiInlineCompletionRequest
+import dev.ide.ui.backend.UiInlineCompletionResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -48,6 +50,45 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
         ctx?.manager?.setPreference(CONVERSATIONS_PREF, gson.toJson(store))
         ctx?.manager?.setPreference(ACTIVE_CONVERSATION_PREF, store.activeConversationId)
         ctx?.manager?.setPreference(CONVERSATION_SEQ_PREF, store.nextSeq.toString())
+    }
+
+    suspend fun inlineCompletion(request: UiInlineCompletionRequest): UiInlineCompletionResult = withContext(Dispatchers.IO) {
+        if (request.baseUrl.isBlank() || request.apiKey.isBlank() || request.model.isBlank()) return@withContext UiInlineCompletionResult()
+        val base = request.baseUrl.trimEnd('/')
+        val endpoint = if (base.endsWith("/responses")) base else "$base/responses"
+        val body = buildInlineCompletionBody(request)
+        val conn = (URI(endpoint).toURL().openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = 15_000
+            readTimeout = 45_000
+            doOutput = true
+            setRequestProperty("Authorization", "Bearer ${request.apiKey}")
+            setRequestProperty("Content-Type", "application/json")
+            setRequestProperty("Accept", "text/event-stream")
+        }
+        val job = currentCoroutineContext()[Job]
+        val cancellation = job?.invokeOnCompletion { cause ->
+            if (cause is CancellationException) conn.disconnect()
+        }
+        try {
+            currentCoroutineContext().ensureActive()
+            conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            currentCoroutineContext().ensureActive()
+            val code = conn.responseCode
+            if (code !in 200..299) return@withContext UiInlineCompletionResult()
+            val response = if ("text/event-stream" in conn.contentType.orEmpty()) {
+                readSse(conn, job, onTextDelta = {}, onStreamChars = {})
+            } else {
+                val raw = conn.inputStream.use { input ->
+                    BufferedReader(InputStreamReader(input, Charsets.UTF_8)).use { it.readText() }
+                }
+                val root = parseObject(raw)
+                UiAgentResponse(extractResponseText(root), raw = raw)
+            }
+            UiInlineCompletionResult(cleanInlineCompletion(response.text))
+        } finally {
+            cancellation?.dispose()
+        }
     }
 
     override suspend fun respond(
@@ -136,6 +177,71 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
             }
         }
         return gson.toJson(root)
+    }
+
+    private fun buildInlineCompletionBody(request: UiInlineCompletionRequest): String {
+        val text = request.text
+        val offset = request.offset.coerceIn(0, text.length)
+        val prefix = text.substring(0, offset).takeLast(INLINE_PREFIX_LIMIT)
+        val suffix = text.substring(offset).take(INLINE_SUFFIX_LIMIT)
+        val prompt = buildString {
+            appendLine("Complete code at the cursor.")
+            appendLine("Return only the exact text to insert. No markdown, no explanation.")
+            appendLine("Stop after the smallest useful completion. Do not repeat existing suffix text.")
+            appendLine("Path: ${request.path}")
+            appendLine("Language: ${request.language}")
+            appendLine("<prefix>")
+            append(prefix)
+            appendLine()
+            appendLine("</prefix>")
+            appendLine("<suffix>")
+            append(suffix)
+            appendLine()
+            appendLine("</suffix>")
+        }
+        val root = JsonObject().apply {
+            addProperty("model", request.model)
+            addProperty("instructions", INLINE_COMPLETION_INSTRUCTIONS)
+            add(
+                "input",
+                JsonArray().apply {
+                    add(
+                        JsonObject().apply {
+                            addProperty("type", "message")
+                            addProperty("role", "user")
+                            add(
+                                "content",
+                                JsonArray().apply {
+                                    add(
+                                        JsonObject().apply {
+                                            addProperty("type", "input_text")
+                                            addProperty("text", prompt)
+                                        }
+                                    )
+                                }
+                            )
+                        }
+                    )
+                },
+            )
+            addProperty("stream", true)
+            addProperty("store", false)
+            add("reasoning", JsonObject().apply { addProperty("effort", request.reasoningEffort) })
+        }
+        return gson.toJson(root)
+    }
+
+    private fun cleanInlineCompletion(raw: String): String {
+        var text = raw.trim()
+        if (text.startsWith("```")) {
+            val lines = text.lines().drop(1).toMutableList()
+            if (lines.lastOrNull()?.trim() == "```") lines.removeAt(lines.lastIndex)
+            text = lines.joinToString("\n")
+                .trimEnd()
+        }
+        val firstLine = text.lineSequence().firstOrNull().orEmpty().trim()
+        if (firstLine.equals("null", ignoreCase = true) || firstLine.equals("none", ignoreCase = true)) return ""
+        return text.take(INLINE_COMPLETION_LIMIT)
     }
 
     private fun readSse(
@@ -555,6 +661,11 @@ internal class AgentBackend(private val ctx: BackendContext? = null) : AgentServ
         private const val CONVERSATIONS_PREF = "agent.conversations"
         private const val ACTIVE_CONVERSATION_PREF = "agent.activeConversationId"
         private const val CONVERSATION_SEQ_PREF = "agent.conversationSeq"
+        private const val INLINE_PREFIX_LIMIT = 12_000
+        private const val INLINE_SUFFIX_LIMIT = 4_000
+        private const val INLINE_COMPLETION_LIMIT = 2_000
+        private const val INLINE_COMPLETION_INSTRUCTIONS =
+            "You are an inline code completion engine. Return only code that should be inserted at the cursor."
         val gson = Gson()
         val conversationStoreType = object : TypeToken<UiAgentConversationStore>() {}.type
     }

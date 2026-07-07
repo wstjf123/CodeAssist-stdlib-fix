@@ -198,6 +198,9 @@ class IdeUiState(
     var completionAutoPopup by mutableStateOf(true)
     /** Debounce (ms) after a keystroke before the completion popup requests suggestions. */
     var completionDelayMs by mutableStateOf(110)
+    var aiInlineCompletion by mutableStateOf(false)
+    var aiInlineModel by mutableStateOf("")
+    var aiInlineReasoningEffort by mutableStateOf("low")
     /** Run diagnostics as you type (off = the highlighting daemon skips the diagnostics pass). */
     var analyzeOnTheFly by mutableStateOf(true)
     /** Quiet period (ms) after the last edit before the highlighting daemon runs. */
@@ -359,6 +362,9 @@ class IdeUiState(
         codeFoldingEnabled = s.codeFolding
         completionAutoPopup = s.completionAutoPopup
         completionDelayMs = s.completionDelayMs
+        aiInlineCompletion = s.aiInlineCompletion
+        aiInlineModel = s.aiInlineModel
+        aiInlineReasoningEffort = s.aiInlineReasoningEffort
         analyzeOnTheFly = s.analyzeOnTheFly
         reparseDelayMs = s.reparseDelayMs
         wordWrapEnabled = s.wordWrap
