@@ -45,7 +45,7 @@ internal suspend fun runAgentLoop(
         reasoningEffort = state.agentConfig.reasoningEffort,
     )
     val tools = agentTools()
-    repeat(8) {
+    while (true) {
         var receivedTextDelta = false
         val response = state.backend.agent.respond(
             request = UiAgentRequest(
@@ -95,7 +95,6 @@ internal suspend fun runAgentLoop(
         maybeAutoCompactForUsage(messages, response.usage)
         state.recordAgentChanged()
     }
-    return "工具调用次数过多，已停止。"
 }
 
 internal fun appendAgentDelta(messages: MutableList<AgentConversationItem>, delta: String) {
