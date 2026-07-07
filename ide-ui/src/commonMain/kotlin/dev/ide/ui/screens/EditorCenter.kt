@@ -158,7 +158,7 @@ internal fun EditorCenter(
                 // (on desktop those are docked side panes that leave the editor interactive). A covered editor
                 // dismisses its floating popups so they don't hang over the overlay.
                 val editorObscured = state.paletteOpen || state.sheetDest != null || state.agentConfigOpen || state.agentHistoryOpen ||
-                        (compact && (state.navOpen || state.consoleOpen || state.agentOpen))
+                        state.agentOpen || (compact && (state.navOpen || state.consoleOpen))
                 val codeSurface: @Composable (Modifier, Boolean) -> Unit = { mod, autoFocus ->
                     CodeEditor(
                         path = active.path,
@@ -187,6 +187,14 @@ internal fun EditorCenter(
                         wrapIndent = state.wrapIndentEnabled,
                         fontLigatures = state.fontLigaturesEnabled,
                         autoFocus = autoFocus,
+                        onAgent = {
+                            if (!state.agentConfig.configured) {
+                                state.agentConfigOpen = true
+                            } else {
+                                state.agentOpen = true
+                                state.consoleOpen = false
+                            }
+                        },
                         // Tapping a @Preview gutter icon switches this tab to the Preview surface, rendering that
                         // specific composable. The editor tools (incl. the Code/Blocks/Preview switch) are pinned
                         // to the breadcrumb row, so they're already visible — making the view change easy to undo.

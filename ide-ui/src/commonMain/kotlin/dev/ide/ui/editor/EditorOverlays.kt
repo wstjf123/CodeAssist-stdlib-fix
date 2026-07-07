@@ -264,6 +264,7 @@ internal fun SelectionToolbar(
     hasSelection: Boolean,
     hasActions: Boolean,
     onActions: () -> Unit,
+    onAgent: () -> Unit,
     onCopy: () -> Unit,
     onCut: () -> Unit,
     onPaste: () -> Unit,
@@ -281,6 +282,7 @@ internal fun SelectionToolbar(
             ToolbarAction("复制", onCopy)
             ToolbarAction("剪切", onCut)
         }
+        ToolbarAction("AI", onAgent)
         ToolbarAction("粘贴", onPaste)
         ToolbarAction("全选", onSelectAll)
         // Quick documentation for the symbol under the caret (the touch path for Ctrl-Q).

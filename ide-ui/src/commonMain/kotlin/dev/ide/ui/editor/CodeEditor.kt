@@ -165,6 +165,8 @@ fun CodeEditor(
     onFontScaleChange: (Float) -> Unit = {},
     /** Tapped a `@Preview` gutter icon — the host switches to the Preview surface rendering this variant. */
     onPreview: (variantId: String) -> Unit = {},
+    /** Open the embedded AI agent from editor touch affordances without changing the current selection. */
+    onAgent: () -> Unit = {},
     /** Whether typing auto-opens the completion popup (Settings → Completion); Ctrl-Space always works. */
     completionAutoPopup: Boolean = true,
     /** Debounce (ms) before an auto-popup completion request (Settings → Completion → Advanced). */
@@ -213,7 +215,7 @@ fun CodeEditor(
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         CodeEditorContent(
             path, session, backend, modifier, onSave, onNavigate, onRenamed,
-            findEpoch, formatEpoch, fontScale, onFontScaleChange, onPreview, completionAutoPopup, completionDelayMs,
+            findEpoch, formatEpoch, fontScale, onFontScaleChange, onPreview, onAgent, completionAutoPopup, completionDelayMs,
             aiInlineCompletion, aiInlineModel, aiInlineReasoningEffort, aiBaseUrl, aiApiKey,
             twoAxisScroll, pinchZoom, softKeyboardSuggestions, wordWrap, wrapIndent, fontLigatures, obscured, autoFocus,
         )
@@ -234,6 +236,7 @@ private fun CodeEditorContent(
     fontScale: Float = 1f,
     onFontScaleChange: (Float) -> Unit = {},
     onPreview: (variantId: String) -> Unit = {},
+    onAgent: () -> Unit = {},
     completionAutoPopup: Boolean = true,
     completionDelayMs: Int = 110,
     aiInlineCompletion: Boolean = false,
@@ -716,6 +719,9 @@ private fun CodeEditorContent(
     // IntelliJ-style. -1 when the pointer is a touch or has left the editor.
     var hoveredLine by remember(editorSession) { mutableIntStateOf(-1) }
     var handlesVisible by remember(path) { mutableStateOf(false) }
+    LaunchedEffect(obscured) {
+        if (obscured) handlesVisible = false
+    }
     // triple-tap → select line: a double-tap "arms" this for a brief window; the next quick tap nearby then
     // selects the whole line instead of placing the caret. Keeps detectTapGestures' single/double logic intact.
     var tripleArmed by remember(path) { mutableStateOf(false) }
@@ -1714,7 +1720,7 @@ private fun CodeEditorContent(
         }
 
         // floating selection toolbar (touch): Copy / Cut / Paste / Select all above the selection
-        if (handlesVisible && lastInputWasTouch) {
+        if (handlesVisible && lastInputWasTouch && !obscured) {
             val selMin = editorSession.selection.min
             val (_, selX, selTop) = caretGeometry(selMin)
             val gapPx = with(density) { 8.dp.roundToPx() }
@@ -1730,6 +1736,10 @@ private fun CodeEditorContent(
                     // no gutter bulb, so the toolbar still surfaces caret INTENTIONS here (the only touch path).
                     hasActions = acts.available.isNotEmpty() && acts.caretDiagnostic == null,
                     onActions = { handlesVisible = false; acts.openMenu() },
+                    onAgent = {
+                        handlesVisible = false
+                        onAgent()
+                    },
                     onCopy = {
                         editorSession.selectedText()?.let { clipboard.setText(AnnotatedString(it)) }
                         handlesVisible = false
