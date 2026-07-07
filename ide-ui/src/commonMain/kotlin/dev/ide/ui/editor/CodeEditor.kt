@@ -818,6 +818,7 @@ private fun CodeEditorContent(
     val activePrefix = liveCompletion?.let { doc.substring(it.tokenStart, caretOffset) } ?: ""
     val displayed = liveCompletion?.filtered(activePrefix) ?: emptyList()
     val showPopup = !completion.dismissed && displayed.isNotEmpty()
+    val aiInlineBlockedByCompletion = showPopup || completion.popupVisible || (liveCompletion != null && !completion.dismissed)
     val safeSelected = completion.selected.coerceIn(0, (displayed.size - 1).coerceAtLeast(0))
 
     // Keep the popup *window* mounted across the 1-frame gaps a keystroke opens up, instead of unmounting and
@@ -1001,26 +1002,37 @@ private fun CodeEditorContent(
             }
         }
 
+        var ordinaryCompletionActive = false
         when {
             // A new member-access context (`.`) always needs a fresh candidate set from the backend.
-            before == '.' ->
-                if (completion.autoPopupEnabled) completion.reopen() else completion.dismiss()
+            before == '.' -> {
+                if (completion.autoPopupEnabled) {
+                    completion.reopen()
+                    ordinaryCompletionActive = true
+                } else completion.dismiss()
+            }
             // Extending an identifier: if the live popup session already covers this token with a complete,
             // locally-filterable set, the client-side filter (`displayed = liveCompletion.filtered(prefix)`)
             // narrows it instantly — so skip the backend re-query (it would be redundant AND would preempt the
             // highlighting/diagnostics daemon on the shared engine lane). Otherwise (new/changed token, a
             // truncated/incomplete set) re-query so the list stays authoritative.
-            before != null && isIdentifierChar(before, extraWordChars(path)) ->
+            before != null && isIdentifierChar(before, extraWordChars(path)) -> {
                 if (!canNarrowLocally(completion.current, completion.dismissed, d.chars, caret, extraWordChars(path))) {
-                    if (completion.autoPopupEnabled) completion.reopen() else completion.dismiss()
+                    if (completion.autoPopupEnabled) {
+                        completion.reopen()
+                        ordinaryCompletionActive = true
+                    } else completion.dismiss()
+                } else {
+                    ordinaryCompletionActive = !completion.dismissed
                 }
+            }
             else -> completion.dismiss()
         }
-        aiInline.request()
+        if (ordinaryCompletionActive) aiInline.dismiss() else aiInline.request()
     }
 
-    LaunchedEffect(editorSession.selection.start, editorSession.selection.end, isFocused, obscured) {
-        if (!isFocused || obscured || !editorSession.selection.collapsed) {
+    LaunchedEffect(editorSession.selection.start, editorSession.selection.end, isFocused, obscured, aiInlineBlockedByCompletion) {
+        if (!isFocused || obscured || !editorSession.selection.collapsed || aiInlineBlockedByCompletion) {
             aiInline.dismiss()
         } else {
             aiInline.request()
@@ -1623,13 +1635,13 @@ private fun CodeEditorContent(
                         caretContent = caretAnim.value, // animated, content-space; read here → redraw per frame
                         handlesVisible = handlesVisible && lastInputWasTouch,
                         handleColor = colors.accent,
-                        inlineSuggestion = aiInline.suggestion,
+                        inlineSuggestion = if (aiInlineBlockedByCompletion) null else aiInline.suggestion,
                         inlineLayout = ::inlineLayout,
                     )
                 },
         )
 
-        aiInline.suggestion?.takeIf { engaged && isFocused && editorSession.selection.collapsed }?.let { suggestion ->
+        aiInline.suggestion?.takeIf { engaged && isFocused && editorSession.selection.collapsed && !aiInlineBlockedByCompletion }?.let { suggestion ->
             val (_, x, top) = caretGeometry(suggestion.offset.coerceIn(0, editorSession.doc.length))
             Row(
                 Modifier
