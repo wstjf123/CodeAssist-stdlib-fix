@@ -112,6 +112,9 @@ private fun AgentPanel(
     val displayItems = buildAgentDisplayItems(messages)
     val scrollRevision = displayItems.sumOf { it.contentLength }
     val expandedTools = remember { mutableStateMapOf<String, Boolean>() }
+    fun toggleTool(key: String) {
+        expandedTools[key] = expandedTools[key] != true
+    }
     val defaultToolHeaderHeightPx = with(LocalDensity.current) { DefaultToolHeaderHeight.roundToPx() }
     val messageBottomGapPx = with(LocalDensity.current) { MessageBottomGap.roundToPx() }
     var measuredToolHeaderHeightPx by remember { mutableStateOf(0) }
@@ -186,7 +189,7 @@ private fun AgentPanel(
                                 MessageBubble(
                                     item = item,
                                     expanded = item.isTool && expandedTools[item.key] == true,
-                                    onToggleTool = { expandedTools[item.key] = true },
+                                    onToggleTool = { toggleTool(item.key) },
                                 )
                             }
                         }
@@ -208,7 +211,7 @@ private fun AgentPanel(
                             expanded = true,
                             connected = pinned.connected,
                             onHeightChange = { measuredToolHeaderHeightPx = it },
-                            onToggle = { expandedTools[pinned.item.key] = false },
+                            onToggle = { toggleTool(pinned.item.key) },
                         )
                     }
                 }
