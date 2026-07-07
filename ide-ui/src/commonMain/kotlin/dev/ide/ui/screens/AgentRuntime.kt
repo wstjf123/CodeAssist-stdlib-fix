@@ -110,6 +110,7 @@ internal fun appendAgentDelta(messages: MutableList<AgentConversationItem>, delt
 private fun agentInstructions(): String =
     "You are an AI coding agent embedded in CodeAssist IDE. " +
         "Use tools to inspect the workspace, diagnostics, logs, previews, and build state. " +
+        "When the user refers to selected text or the current selection, call get_selected_text. " +
         "When the user asks to read or inspect a named function, class, object, or symbol, use read_file with symbol when the path is known. " +
         "If grep found the target file, immediately call read_file with that path and symbol instead of reading unrelated files. " +
         "Once the requested content has been retrieved, answer from that content and avoid redundant reads. " +
@@ -383,6 +384,9 @@ private data class AgentToolContext(
     val filePaths: List<String>,
     val activePath: String?,
     val activeText: String?,
+    val selectionStart: Int?,
+    val selectionEnd: Int?,
+    val selectedText: String?,
     val diagnostics: List<UiDiagnostic>,
     val buildLog: List<String>,
     val buildProgress: String,
@@ -436,6 +440,10 @@ private fun agentTools(): List<UiAgentTool> = listOf(
             agentToolProperty("symbol"),
             agentToolProperty("includeLineNumbers", "boolean"),
         ),
+    ),
+    UiAgentTool(
+        "get_selected_text",
+        "Return the current editor selection text, including file path, line range, and offset range.",
     ),
     UiAgentTool(
         "get_diagnostics",
@@ -548,6 +556,9 @@ private fun createAgentToolContext(state: IdeUiState): AgentToolContext {
         filePaths = allFiles,
         activePath = active?.path,
         activeText = active?.text,
+        selectionStart = active?.session?.selection?.min,
+        selectionEnd = active?.session?.selection?.max,
+        selectedText = active?.session?.selectedText(),
         diagnostics = active?.session?.diagnostics.orEmpty().toList(),
         buildLog = state.backend.build.buildState.value.log
             .takeLast(160)
@@ -567,6 +578,7 @@ private fun supportsParallelToolExecution(call: UiAgentToolCall): Boolean =
         "list_workspace_files",
         "glob",
         "grep",
+        "get_selected_text",
         "get_diagnostics",
         "get_build_logs",
         "get_build_progress",
@@ -624,6 +636,17 @@ private fun executeAgentToolUnchecked(context: AgentToolContext, call: UiAgentTo
             if (context.diagnostics.isEmpty()) toolSuccess("没有诊断信息")
             else toolSuccess(buildString { appendDiagnostics(this, context.diagnostics) })
         }
+        "get_selected_text" -> {
+            toolSuccess(
+                formatSelectedText(
+                    context.activePath,
+                    context.activeText,
+                    context.selectionStart,
+                    context.selectionEnd,
+                    context.selectedText,
+                )
+            )
+        }
         "get_build_logs" -> {
             if (context.buildLog.isEmpty()) toolSuccess("没有构建日志")
             else toolSuccess(context.buildLog.joinToString("\n"))
@@ -677,6 +700,17 @@ private suspend fun executeAgentToolUnchecked(state: IdeUiState, call: UiAgentTo
         }
         "read_file" -> {
             readAgentFile(state, call)
+        }
+        "get_selected_text" -> {
+            toolSuccess(
+                formatSelectedText(
+                    active?.path,
+                    active?.text,
+                    active?.session?.selection?.min,
+                    active?.session?.selection?.max,
+                    active?.session?.selectedText(),
+                )
+            )
         }
         "get_diagnostics" -> {
             val diagnostics = active?.session?.diagnostics.orEmpty()
@@ -1239,6 +1273,24 @@ private fun formatFileRead(path: String, text: String, start: Int, end: Int, inc
         "${firstLine + index}: $line"
     }.joinToString("\n")
     return "path: $path\nlines: $firstLine-${firstLine + content.lineSequence().count().coerceAtLeast(1) - 1}\n```\n$numbered\n```"
+}
+
+private fun formatSelectedText(
+    path: String?,
+    fullText: String?,
+    selectionStart: Int?,
+    selectionEnd: Int?,
+    selectedText: String?,
+): String {
+    val filePath = path ?: return "没有当前文件"
+    val text = selectedText ?: return "当前编辑器没有选中文本\npath: $filePath"
+    val source = fullText.orEmpty()
+    val start = selectionStart?.coerceIn(0, source.length) ?: 0
+    val end = selectionEnd?.coerceIn(start, source.length) ?: start
+    val starts = lineStarts(source)
+    val firstLine = lineNumberForOffset(starts, start)
+    val lastLine = lineNumberForOffset(starts, end)
+    return "path: $filePath\nlines: $firstLine-$lastLine\noffsets: $start-$end\n```\n$text\n```"
 }
 
 private fun lineStarts(text: String): List<Int> {
